@@ -1,0 +1,47 @@
+spring:
+  datasource:
+    driver-class-name: org.postgresql.Driver
+    url: ${DB_URL:jdbc:postgresql://110.20.1.218:1990/ygspdb}
+    username: ${DB_USER:postgres}
+    password: ${DB_PASSWORD}
+    hikari:
+      connection-timeout: 30000
+      maximum-pool-size: 5
+      minimum-idle: 1
+  main:
+    banner-mode: off
+
+kras:
+  url: ${KRAS_URL:http://110.20.1.12:8385/conn/estateGateway}
+  conn-sys-id: ${KRAS_CONN_SYS_ID:HOH4-N9PX-73Y6-B393}
+  chk-pnu: ${KRAS_CHK_PNU:4687025625111190010}
+  config: ${KRAS_CONFIG:conf/kras/base-tables.xml}
+  schedule: ${KRAS_SCHEDULE:0 30 4 * * *}
+  timeout-seconds: 300
+
+kais:
+  work-dir: ${KAIS_WORK_DIR:./KAIS_WORK}
+  config: ${KAIS_CONFIG:conf/kais/base-tables.xml}
+  schedule: ${KAIS_SCHEDULE:0 30 3 * * *}
+
+ods:
+  schema: ${ODS_SCHEMA:ods}
+  schedule: ${ODS_SCHEDULE:0 30 5 * * *}
+
+sync:
+  org-code: ${SYNC_ORG_CODE:46870}
+  enabled: ${SYNC_ENABLED:true}
+
+logging:
+  charset:
+    console: UTF-8
+    file: UTF-8
+  file:
+    name: ${LOG_DIR:./logs}/geomex-sync.log
+  logback:
+    rollingpolicy:
+      file-name-pattern: ${LOG_DIR:./logs}/geomex-sync.%d{yyyy-MM-dd}.log
+      max-history: 90
+  level:
+    root: INFO
+    geomex.sync: DEBUG

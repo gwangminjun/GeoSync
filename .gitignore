@@ -1,0 +1,10 @@
+.gradle/
+build/
+jre/
+*.class
+*.log
+logs/
+KAIS_WORK/
+conf/application.yml
+.idea/
+*.iml
