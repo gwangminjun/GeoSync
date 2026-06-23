@@ -15,5 +15,7 @@ workspace/kras/**/*.shx
 workspace/kras/**/*.prj
 workspace/kras/**/*.fix
 workspace/kras/**/*.txt
+workspace/kras/**/*.gmx
+workspace/kras/**/*.gmx_err
 .idea/
 *.iml

@@ -1,5 +1,6 @@
 package geomex.sync.web;
 
+import geomex.sync.service.KrasCatalogStatusService;
 import geomex.sync.service.SyncStatusService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Controller;
@@ -10,12 +11,14 @@ import org.springframework.web.bind.annotation.GetMapping;
 public class DashboardController {
 
     private final SyncStatusService statusService;
+    private final KrasCatalogStatusService catalogStatusService;
 
     @Value("${sync.org-code:46870}")
     private String orgCode;
 
-    public DashboardController(SyncStatusService statusService) {
+    public DashboardController(SyncStatusService statusService, KrasCatalogStatusService catalogStatusService) {
         this.statusService = statusService;
+        this.catalogStatusService = catalogStatusService;
     }
 
     @GetMapping("/")
@@ -28,6 +31,7 @@ public class DashboardController {
         model.addAttribute("kaisLast", statusService.getLastRun("KAIS").orElse(null));
         model.addAttribute("todaySuccess", statusService.todaySuccessCount());
         model.addAttribute("todayError", statusService.todayErrorCount());
+        model.addAttribute("catalogStatuses", catalogStatusService.getStatuses());
         model.addAttribute("history", statusService.getRecentHistory(20));
         return "dashboard";
     }

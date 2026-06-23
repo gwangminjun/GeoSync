@@ -51,6 +51,13 @@ public class SyncStatusService {
         return history.stream().filter(h -> h.type().equals(type)).findFirst();
     }
 
+    public Optional<SyncHistory> getLastSuccess(String type) {
+        return history.stream()
+                .filter(h -> h.type().equals(type))
+                .filter(h -> "SUCCESS".equals(h.status()))
+                .findFirst();
+    }
+
     public int todaySuccessCount() {
         LocalDateTime todayStart = LocalDateTime.now().toLocalDate().atStartOfDay();
         return history.stream()

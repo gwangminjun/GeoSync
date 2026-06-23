@@ -91,6 +91,65 @@
     </form>
   </div>
 
+  <!-- 카탈로그 기준 파일 저장 상태 -->
+  <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:12px;">
+    <div style="font-size:14px;font-weight:700;color:#f3f5f7;">46870 데이터 저장 상태</div>
+    <div style="font-size:12px;color:#69707b;">workspace/kras/<span th:text="${orgCode}">46870</span> 기준</div>
+  </div>
+  <div style="background:#1a1f26;border:1px solid #262c35;border-radius:11px;overflow-x:auto;overflow-y:hidden;margin-bottom:26px;">
+    <table style="width:100%;min-width:1480px;border-collapse:collapse;font-size:13px;table-layout:fixed;">
+      <thead>
+        <tr style="background:#171b21;">
+          <th style="width:260px;text-align:left;padding:11px 18px;font-size:11px;font-weight:600;color:#69707b;letter-spacing:0.03em;border-bottom:1px solid #262c35;">항목</th>
+          <th style="width:210px;text-align:left;padding:11px 14px;font-size:11px;font-weight:600;color:#69707b;letter-spacing:0.03em;border-bottom:1px solid #262c35;">구분</th>
+          <th style="width:135px;text-align:left;padding:11px 14px;font-size:11px;font-weight:600;color:#69707b;letter-spacing:0.03em;border-bottom:1px solid #262c35;">대상</th>
+          <th style="width:220px;text-align:left;padding:11px 14px;font-size:11px;font-weight:600;color:#69707b;letter-spacing:0.03em;border-bottom:1px solid #262c35;">확인 파일</th>
+          <th style="width:80px;text-align:right;padding:11px 14px;font-size:11px;font-weight:600;color:#69707b;letter-spacing:0.03em;border-bottom:1px solid #262c35;">완료</th>
+          <th style="width:125px;text-align:left;padding:11px 14px;font-size:11px;font-weight:600;color:#69707b;letter-spacing:0.03em;border-bottom:1px solid #262c35;">최근 저장</th>
+          <th style="width:145px;text-align:left;padding:11px 14px;font-size:11px;font-weight:600;color:#69707b;letter-spacing:0.03em;border-bottom:1px solid #262c35;">파일 적재</th>
+          <th style="width:305px;text-align:left;padding:11px 18px;font-size:11px;font-weight:600;color:#69707b;letter-spacing:0.03em;border-bottom:1px solid #262c35;">DB 적재</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr th:each="s : ${catalogStatuses}" style="border-bottom:1px solid #21262e;">
+          <td style="padding:12px 18px;color:#e7eaee;font-weight:600;vertical-align:top;">
+            <div style="white-space:normal;word-break:keep-all;line-height:1.35;" th:text="${s.name()}">KRAS 수신 원본</div>
+            <div style="font-size:11.5px;color:#69707b;margin-top:4px;font-weight:400;line-height:1.35;white-space:normal;word-break:keep-all;" th:text="${s.note()}"></div>
+          </td>
+          <td style="padding:12px 14px;color:#9aa2ad;font-size:12px;vertical-align:top;line-height:1.35;white-space:normal;word-break:keep-all;" th:text="${s.category()}"></td>
+          <td style="padding:12px 14px;color:#9aa2ad;font-family:'JetBrains Mono',monospace;font-size:12px;vertical-align:top;white-space:normal;overflow-wrap:anywhere;" th:text="${s.target()}"></td>
+          <td style="padding:12px 14px;color:#9aa2ad;font-family:'JetBrains Mono',monospace;font-size:12px;vertical-align:top;white-space:normal;overflow-wrap:anywhere;" th:text="${s.filePattern()}"></td>
+          <td style="padding:12px 14px;text-align:right;color:#e7eaee;font-variant-numeric:tabular-nums;vertical-align:top;white-space:nowrap;">
+            <span th:text="${s.completeCount()}">0</span><span style="color:#69707b;"> / </span><span th:text="${s.expectedCount()}">1</span>
+          </td>
+          <td style="padding:12px 14px;color:#9aa2ad;font-variant-numeric:tabular-nums;vertical-align:top;white-space:nowrap;"
+              th:text="${s.latestModified() != null ? #temporals.format(s.latestModified(), 'MM-dd HH:mm:ss') : '-'}"></td>
+          <td style="padding:12px 14px;vertical-align:top;">
+            <span th:if="${s.fileLoaded() && s.fileSynced()}"
+                  style="display:inline-flex;align-items:center;white-space:nowrap;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:600;background:#15291f;color:#5fc98a;">최근 동기화 확인</span>
+            <span th:if="${s.fileLoaded() && !s.fileSynced()}"
+                  style="display:inline-flex;align-items:center;white-space:nowrap;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:600;background:#2a2517;color:#d9b066;">이전 저장본</span>
+            <span th:if="${!s.fileLoaded() && s.exists()}"
+                  style="display:inline-flex;align-items:center;white-space:nowrap;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:600;background:#2a2517;color:#d9b066;">일부 파일</span>
+            <span th:if="${!s.exists()}"
+                  style="display:inline-flex;align-items:center;white-space:nowrap;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:600;background:#2a1a1a;color:#e88a82;">파일 없음</span>
+          </td>
+          <td style="padding:12px 18px;vertical-align:top;">
+            <span th:if="${s.dbLoaded()}"
+                  style="display:inline-flex;align-items:center;white-space:nowrap;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:600;background:#15291f;color:#5fc98a;">
+              <span th:text="${#numbers.formatInteger(s.dbRowCount(), 0, 'COMMA')}">0</span>건
+            </span>
+            <span th:if="${!s.dbLoaded()}"
+                  style="display:inline-flex;align-items:center;max-width:100%;white-space:normal;word-break:keep-all;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:600;background:#2a1a1a;color:#e88a82;"
+                  th:text="${s.dbMessage()}">미적재</span>
+            <div style="font-size:11px;color:#69707b;margin-top:5px;line-height:1.35;white-space:normal;overflow-wrap:anywhere;"
+                 th:text="${s.dbTargets()}">확인 DB</div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
   <!-- 실행 이력 -->
   <div style="font-size:14px;font-weight:700;color:#f3f5f7;margin-bottom:12px;">최근 실행 이력</div>
   <div style="background:#1a1f26;border:1px solid #262c35;border-radius:11px;overflow:hidden;">
