@@ -9,25 +9,17 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Controller
 @RequestMapping("/ods")
 public class OdsController {
 
-    private static final List<Map<String, String>> ODS_TABLES = List.of(
-        Map.of("name", "ods.lp_pa_cbnd",    "desc", "연속지적도",   "src", "KRAS"),
-        Map.of("name", "ods.lt_c_uzone",     "desc", "용도지역지구", "src", "KRAS"),
-        Map.of("name", "ods.land_frst_ledg", "desc", "토지기본정보", "src", "KRAS"),
-        Map.of("name", "ods.tl_spbd_buld",   "desc", "건물",         "src", "KAIS"),
-        Map.of("name", "ods.tl_sprd_manage", "desc", "도로구간",     "src", "KAIS"),
-        Map.of("name", "ods.tl_sprd_intrvl", "desc", "기초구간",     "src", "KAIS"),
-        Map.of("name", "ods.tl_sprd_crsrd",  "desc", "교차로",       "src", "KAIS"),
-        Map.of("name", "ods.tl_spbd_entrc",  "desc", "출입구",       "src", "KAIS")
+    private static final Pattern SAFE_NAME = Pattern.compile("^[a-zA-Z_][a-zA-Z0-9_]*$");
+    private static final Set<String> SYSTEM_SCHEMAS = Set.of(
+        "information_schema", "pg_catalog", "pg_toast", "pg_temp_1", "pg_toast_temp_1"
     );
-
-    private static final Set<String> TABLE_NAMES = ODS_TABLES.stream()
-        .map(t -> t.get("name")).collect(Collectors.toUnmodifiableSet());
 
     private final TargetDbService targetDbService;
     private final SyncStatusService statusService;
@@ -50,45 +42,83 @@ public class OdsController {
         return "ods";
     }
 
+    @GetMapping("/schemas")
+    @ResponseBody
+    public Map<String, Object> getSchemas(@RequestParam(defaultValue = "0") int idx) {
+        List<TargetDbService.ActiveTarget> targets = targetDbService.getActiveTargets();
+        if (idx < 0 || idx >= targets.size()) {
+            return Map.of("error", "대상 DB를 찾을 수 없습니다");
+        }
+        JdbcTemplate jdbc = targets.get(idx).jdbc();
+        try {
+            List<String> schemas = jdbc.queryForList(
+                "SELECT schema_name FROM information_schema.schemata " +
+                "WHERE schema_name NOT LIKE 'pg_%' " +
+                "AND schema_name NOT IN ('information_schema') " +
+                "ORDER BY schema_name",
+                String.class);
+            return Map.of("schemas", schemas);
+        } catch (Exception e) {
+            return Map.of("error", e.getMessage());
+        }
+    }
+
     @GetMapping("/tables")
     @ResponseBody
-    public Map<String, Object> getTables(@RequestParam(defaultValue = "0") int idx) {
+    public Map<String, Object> getTables(
+            @RequestParam(defaultValue = "0") int idx,
+            @RequestParam String schema) {
+
+        if (!SAFE_NAME.matcher(schema).matches() || SYSTEM_SCHEMAS.contains(schema)) {
+            return Map.of("error", "유효하지 않은 스키마명");
+        }
         List<TargetDbService.ActiveTarget> targets = targetDbService.getActiveTargets();
         if (idx < 0 || idx >= targets.size()) {
             return Map.of("error", "대상 DB를 찾을 수 없습니다");
         }
         JdbcTemplate jdbc = targets.get(idx).jdbc();
 
-        List<Map<String, Object>> tables = new ArrayList<>();
-        for (Map<String, String> tbl : ODS_TABLES) {
-            String tableName = tbl.get("name");
-            Map<String, Object> info = new LinkedHashMap<>();
-            info.put("name", tableName);
-            info.put("desc", tbl.get("desc"));
-            info.put("src", tbl.get("src"));
-            try {
-                Long count = jdbc.queryForObject("SELECT COUNT(*) FROM " + tableName, Long.class);
-                info.put("count", count);
-                info.put("exists", true);
-            } catch (Exception e) {
-                info.put("count", -1L);
-                info.put("exists", false);
+        try {
+            List<String> tableNames = jdbc.queryForList(
+                "SELECT table_name FROM information_schema.tables " +
+                "WHERE table_schema = ? AND table_type = 'BASE TABLE' " +
+                "ORDER BY table_name",
+                String.class, schema);
+
+            List<Map<String, Object>> tables = new ArrayList<>();
+            for (String tableName : tableNames) {
+                Map<String, Object> info = new LinkedHashMap<>();
+                info.put("name", tableName);
+                try {
+                    Long count = jdbc.queryForObject(
+                        "SELECT COUNT(*) FROM \"" + schema + "\".\"" + tableName + "\"", Long.class);
+                    info.put("count", count);
+                } catch (Exception e) {
+                    info.put("count", -1L);
+                }
+                tables.add(info);
             }
-            tables.add(info);
+            return Map.of("tables", tables);
+        } catch (Exception e) {
+            return Map.of("error", e.getMessage());
         }
-        return Map.of("tables", tables);
     }
 
     @GetMapping("/preview")
     @ResponseBody
     public Map<String, Object> getPreview(
             @RequestParam(defaultValue = "0") int idx,
+            @RequestParam String schema,
             @RequestParam String table,
             @RequestParam(defaultValue = "0") int page) {
 
-        if (!TABLE_NAMES.contains(table)) {
-            return Map.of("error", "유효하지 않은 테이블");
+        if (!SAFE_NAME.matcher(schema).matches() || SYSTEM_SCHEMAS.contains(schema)) {
+            return Map.of("error", "유효하지 않은 스키마명");
         }
+        if (!SAFE_NAME.matcher(table).matches()) {
+            return Map.of("error", "유효하지 않은 테이블명");
+        }
+
         List<TargetDbService.ActiveTarget> targets = targetDbService.getActiveTargets();
         if (idx < 0 || idx >= targets.size()) {
             return Map.of("error", "대상 DB를 찾을 수 없습니다");
@@ -97,7 +127,6 @@ public class OdsController {
 
         int pageSize = 20;
         int offset = page * pageSize;
-        String[] parts = table.split("\\.");
 
         try {
             List<String> columns = jdbc.queryForList(
@@ -105,7 +134,7 @@ public class OdsController {
                 "WHERE table_schema = ? AND table_name = ? " +
                 "AND udt_name NOT IN ('geometry','geography') " +
                 "ORDER BY ordinal_position",
-                String.class, parts[0], parts[1]);
+                String.class, schema, table);
 
             if (columns.isEmpty()) {
                 return Map.of("columns", List.of(), "rows", List.of(), "page", page, "hasMore", false);
@@ -116,7 +145,8 @@ public class OdsController {
                 .collect(Collectors.joining(", "));
 
             List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT " + colList + " FROM " + table + " ORDER BY 1 LIMIT ? OFFSET ?",
+                "SELECT " + colList + " FROM \"" + schema + "\".\"" + table + "\"" +
+                " ORDER BY 1 LIMIT ? OFFSET ?",
                 pageSize + 1, offset);
 
             boolean hasMore = rows.size() > pageSize;

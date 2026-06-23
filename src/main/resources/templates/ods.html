@@ -6,66 +6,73 @@
   <title>ODS</title>
   <th:block layout:fragment="head">
   <style>
-    .tab-btn {
+    .seg-btn {
       padding:7px 16px; border-radius:7px; font-size:13px; font-weight:500;
       border:1px solid #2e3640; background:#1a1f26; color:#9aa2ad;
       cursor:pointer; font-family:inherit; transition:all .15s;
     }
-    .tab-btn.active { border-color:#0e9b94; color:#66c4be; background:rgba(14,155,148,.12); font-weight:600; }
-    .tab-btn:hover:not(.active) { border-color:#3e4650; color:#cdd3db; }
+    .seg-btn.active { border-color:#0e9b94; color:#66c4be; background:rgba(14,155,148,.12); font-weight:600; }
+    .seg-btn:hover:not(.active) { border-color:#3e4650; color:#cdd3db; }
+
+    .schema-chip {
+      padding:5px 14px; border-radius:20px; font-size:12.5px; font-weight:500;
+      border:1px solid #2e3640; background:#1a1f26; color:#9aa2ad;
+      cursor:pointer; font-family:'JetBrains Mono',monospace; transition:all .15s;
+      white-space:nowrap;
+    }
+    .schema-chip.active { border-color:#0e9b94; color:#66c4be; background:rgba(14,155,148,.12); font-weight:600; }
+    .schema-chip:hover:not(.active) { border-color:#3e4650; color:#cdd3db; }
 
     .tbl-card {
       border:1px solid #232830; border-radius:10px; background:#171b21;
-      padding:16px 18px; cursor:pointer; transition:all .15s;
-      display:flex; flex-direction:column; gap:6px;
+      padding:14px 16px; cursor:pointer; transition:all .15s;
+      display:flex; flex-direction:column; gap:5px;
     }
     .tbl-card:hover { border-color:#2e3640; background:#1c212a; }
     .tbl-card.active { border-color:#0e9b94; background:rgba(14,155,148,.08); }
-    .tbl-card.missing { border-color:#3d2a2a; background:#1a1414; cursor:default; }
-    .tbl-name { font-size:12.5px; font-family:'JetBrains Mono',monospace; color:#e7eaee; }
-    .tbl-desc { font-size:12px; color:#9aa2ad; }
-    .tbl-count { font-size:22px; font-weight:700; color:#f3f5f7; letter-spacing:-0.02em; font-family:'JetBrains Mono',monospace; }
+    .tbl-card.no-data { cursor:default; opacity:.6; }
+    .tbl-name { font-size:12px; font-family:'JetBrains Mono',monospace; color:#e7eaee; word-break:break-all; }
+    .tbl-count { font-size:20px; font-weight:700; color:#f3f5f7; letter-spacing:-0.02em; font-family:'JetBrains Mono',monospace; }
     .tbl-count.zero { color:#5b626d; }
-    .tbl-count.missing { color:#e88a82; font-size:14px; }
-    .src-badge {
-      font-size:10.5px; font-weight:700; letter-spacing:.04em;
-      padding:2px 7px; border-radius:4px; align-self:flex-start;
-    }
-    .src-kras { background:rgba(14,155,148,.18); color:#66c4be; }
-    .src-kais { background:rgba(100,130,220,.18); color:#8eaaee; }
 
     .preview-wrap { border:1px solid #232830; border-radius:10px; background:#171b21; overflow:hidden; }
-    .preview-header { padding:12px 18px; border-bottom:1px solid #232830; display:flex; align-items:center; gap:12px; }
-    .preview-table-wrap { overflow-x:auto; max-height:420px; overflow-y:auto; }
+    .preview-header { padding:12px 18px; border-bottom:1px solid #232830; display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+    .preview-table-wrap { overflow-x:auto; max-height:400px; overflow-y:auto; }
     .preview-table { width:100%; border-collapse:collapse; font-size:12.5px; }
     .preview-table th { padding:8px 12px; background:#14171c; color:#69707b; font-weight:600;
                         border-bottom:1px solid #232830; white-space:nowrap; position:sticky; top:0; z-index:1; }
     .preview-table td { padding:6px 12px; border-bottom:1px solid #1e242c; color:#cdd3db;
-                        white-space:nowrap; max-width:260px; overflow:hidden; text-overflow:ellipsis; font-family:'JetBrains Mono',monospace; }
+                        white-space:nowrap; max-width:240px; overflow:hidden; text-overflow:ellipsis;
+                        font-family:'JetBrains Mono',monospace; font-size:12px; }
     .preview-table tr:last-child td { border-bottom:none; }
     .preview-table tr:hover td { background:#1c212a; }
-    .pager-btn { padding:5px 12px; border-radius:6px; border:1px solid #2e3640; background:#1a1f26;
-                 color:#9aa2ad; cursor:pointer; font-size:12.5px; font-family:inherit; }
+    .pager-btn { padding:4px 11px; border-radius:6px; border:1px solid #2e3640; background:#1a1f26;
+                 color:#9aa2ad; cursor:pointer; font-size:12px; font-family:inherit; }
     .pager-btn:hover:not(:disabled) { border-color:#0e9b94; color:#66c4be; }
     .pager-btn:disabled { opacity:.35; cursor:default; }
-    .spinner { width:18px; height:18px; border:2px solid #2e3640; border-top-color:#0e9b94;
-               border-radius:50%; animation:spin .7s linear infinite; }
+    .spinner { width:16px; height:16px; border:2px solid #2e3640; border-top-color:#0e9b94;
+               border-radius:50%; animation:spin .7s linear infinite; flex-shrink:0; }
     @keyframes spin { to { transform:rotate(360deg); } }
+    .empty-msg { padding:28px; text-align:center; font-size:13px; color:#5b626d; }
+    .section-label { font-size:11px; font-weight:700; color:#69707b; letter-spacing:.07em; text-transform:uppercase; }
   </style>
   </th:block>
 </head>
 <body>
 <main layout:fragment="content">
 
-  <!-- 헤더 -->
-  <div style="margin-bottom:24px;display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+  <!-- 페이지 헤더 -->
+  <div style="margin-bottom:22px;display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:10px;">
     <div>
-      <div style="font-size:19px;font-weight:700;color:#f3f5f7;letter-spacing:-0.01em;">ODS 데이터베이스</div>
-      <div style="font-size:12px;color:#69707b;margin-top:4px;">각 대상 DB의 ODS 스키마 테이블 현황 및 데이터 조회</div>
+      <div style="font-size:19px;font-weight:700;color:#f3f5f7;letter-spacing:-0.01em;">데이터베이스 조회</div>
+      <div style="font-size:12px;color:#69707b;margin-top:3px;">데이터베이스와 스키마를 선택하여 테이블 데이터를 조회합니다</div>
     </div>
-    <div id="refresh-area" style="display:flex;align-items:center;gap:8px;">
+    <div style="display:flex;align-items:center;gap:8px;">
       <span id="last-updated" style="font-size:11.5px;color:#5b626d;font-family:'JetBrains Mono',monospace;"></span>
-      <button onclick="reload()" style="padding:6px 14px;border-radius:7px;border:1px solid #2e3640;background:#1a1f26;color:#9aa2ad;cursor:pointer;font-size:12.5px;font-family:inherit;">↻ 새로고침</button>
+      <button onclick="reloadTables()" id="reload-btn"
+              style="padding:6px 14px;border-radius:7px;border:1px solid #2e3640;background:#1a1f26;color:#9aa2ad;cursor:pointer;font-size:12.5px;font-family:inherit;">
+        ↻ 새로고침
+      </button>
     </div>
   </div>
 
@@ -78,41 +85,58 @@
 
   <div th:unless="${#lists.isEmpty(targets)}">
 
-    <!-- 대상 DB 탭 -->
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:22px;" id="target-tabs">
-      <button th:each="t,i : ${targets}"
-              class="tab-btn"
-              th:classappend="${i.first} ? ' active' : ''"
-              th:attr="data-idx=${i.index}"
-              th:text="${t.name()}"
-              onclick="selectTarget(this)">DB</button>
+    <!-- ① 데이터베이스 선택 -->
+    <div style="margin-bottom:18px;">
+      <div class="section-label" style="margin-bottom:8px;">데이터베이스</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;" id="db-tabs">
+        <button th:each="t,i : ${targets}"
+                class="seg-btn"
+                th:classappend="${i.first} ? ' active' : ''"
+                th:attr="data-idx=${i.index}"
+                th:text="${t.name()}"
+                onclick="selectDb(this)">DB</button>
+      </div>
     </div>
 
-    <!-- 테이블 카드 그리드 -->
-    <div style="margin-bottom:8px;display:flex;align-items:center;gap:10px;">
-      <div style="font-size:11.5px;font-weight:700;color:#69707b;letter-spacing:.06em;text-transform:uppercase;">테이블 현황</div>
-      <div id="table-spinner" style="display:none;" class="spinner"></div>
-    </div>
-    <div id="table-grid"
-         style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px;margin-bottom:26px;">
-      <!-- AJAX로 채워짐 -->
+    <!-- ② 스키마 선택 -->
+    <div style="margin-bottom:18px;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+        <div class="section-label">스키마</div>
+        <div id="schema-spinner" style="display:none;" class="spinner"></div>
+      </div>
+      <div id="schema-bar" style="display:flex;gap:7px;flex-wrap:wrap;min-height:30px;">
+        <span style="font-size:12.5px;color:#5b626d;align-self:center;">DB를 선택하면 스키마 목록이 로드됩니다</span>
+      </div>
     </div>
 
-    <!-- 데이터 미리보기 -->
+    <!-- ③ 테이블 목록 -->
+    <div style="margin-bottom:18px;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+        <div class="section-label">테이블</div>
+        <div id="table-spinner" style="display:none;" class="spinner"></div>
+        <span id="table-count-label" style="font-size:11.5px;color:#5b626d;"></span>
+      </div>
+      <div id="table-grid"
+           style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px;">
+        <div class="empty-msg" style="grid-column:1/-1;">스키마를 선택하면 테이블 목록이 표시됩니다</div>
+      </div>
+    </div>
+
+    <!-- ④ 데이터 미리보기 -->
     <div id="preview-section" style="display:none;">
-      <div style="font-size:11.5px;font-weight:700;color:#69707b;letter-spacing:.06em;text-transform:uppercase;margin-bottom:10px;">데이터 미리보기</div>
+      <div class="section-label" style="margin-bottom:8px;">데이터 미리보기</div>
       <div class="preview-wrap">
         <div class="preview-header">
-          <span id="preview-title" style="font-family:'JetBrains Mono',monospace;font-size:13px;color:#e7eaee;"></span>
+          <span id="preview-title" style="font-family:'JetBrains Mono',monospace;font-size:13px;color:#e7eaee;font-weight:600;"></span>
           <div id="preview-spinner" style="display:none;" class="spinner"></div>
-          <div style="margin-left:auto;display:flex;align-items:center;gap:8px;">
-            <span id="preview-page-info" style="font-size:12px;color:#69707b;"></span>
+          <div style="margin-left:auto;display:flex;align-items:center;gap:7px;">
+            <span id="preview-page-info" style="font-size:12px;color:#69707b;font-family:'JetBrains Mono',monospace;"></span>
             <button class="pager-btn" id="btn-prev" onclick="changePage(-1)" disabled>← 이전</button>
             <button class="pager-btn" id="btn-next" onclick="changePage(1)" disabled>다음 →</button>
           </div>
         </div>
         <div class="preview-table-wrap">
-          <div id="preview-content" style="padding:20px;font-size:13px;color:#69707b;">테이블 카드를 클릭하면 데이터를 조회합니다.</div>
+          <div id="preview-content" class="empty-msg">테이블을 클릭하면 데이터를 조회합니다.</div>
         </div>
       </div>
     </div>
@@ -123,134 +147,178 @@
 
 <th:block layout:fragment="scripts">
 <script>
-  let currentTargetIdx = 0;
-  let currentTable     = null;
-  let currentPage      = 0;
-  let currentHasMore   = false;
+  let state = {
+    dbIdx:   0,
+    schema:  null,
+    table:   null,
+    page:    0,
+    hasMore: false,
+  };
 
-  /* ── 초기 로드 ─────────────────────────────────────── */
-  document.addEventListener('DOMContentLoaded', () => {
-    loadTables(0);
-  });
+  /* ── 초기 로드 ─────────────────────────────────────────── */
+  document.addEventListener('DOMContentLoaded', () => loadSchemas(0));
 
-  /* ── 대상 탭 선택 ──────────────────────────────────── */
-  function selectTarget(btn) {
-    document.querySelectorAll('#target-tabs .tab-btn').forEach(b => b.classList.remove('active'));
+  /* ── ① DB 선택 ────────────────────────────────────────── */
+  function selectDb(btn) {
+    document.querySelectorAll('#db-tabs .seg-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    currentTargetIdx = parseInt(btn.dataset.idx);
-    currentTable     = null;
-    currentPage      = 0;
-    document.getElementById('preview-section').style.display = 'none';
-    loadTables(currentTargetIdx);
+    state.dbIdx  = parseInt(btn.dataset.idx);
+    state.schema = null;
+    state.table  = null;
+    state.page   = 0;
+    clearSchemas();
+    clearTables();
+    hidePreview();
+    loadSchemas(state.dbIdx);
   }
 
-  /* ── 테이블 목록 로드 ──────────────────────────────── */
-  function loadTables(idx) {
-    const grid    = document.getElementById('table-grid');
-    const spinner = document.getElementById('table-spinner');
-    grid.innerHTML = '';
+  /* ── ② 스키마 로드 & 선택 ──────────────────────────────── */
+  function loadSchemas(idx) {
+    const bar     = document.getElementById('schema-bar');
+    const spinner = document.getElementById('schema-spinner');
+    bar.innerHTML = '';
     spinner.style.display = 'block';
 
-    fetch(`/ods/tables?idx=${idx}`)
+    fetch(`/ods/schemas?idx=${idx}`)
       .then(r => r.json())
       .then(data => {
         spinner.style.display = 'none';
-        if (data.error) { grid.innerHTML = `<div style="color:#e88a82;font-size:13px;">${data.error}</div>`; return; }
-        data.tables.forEach((t, i) => renderCard(t, i));
-        document.getElementById('last-updated').textContent = '조회: ' + new Date().toLocaleTimeString('ko-KR');
+        if (data.error) { bar.innerHTML = `<span style="color:#e88a82;font-size:13px;">${esc(data.error)}</span>`; return; }
+        if (!data.schemas.length) { bar.innerHTML = '<span style="font-size:12.5px;color:#5b626d;">스키마 없음</span>'; return; }
+        data.schemas.forEach((s, i) => {
+          const chip = document.createElement('button');
+          chip.className = 'schema-chip';
+          chip.textContent = s;
+          chip.onclick = () => selectSchema(chip, s);
+          bar.appendChild(chip);
+          if (i === 0) selectSchema(chip, s);
+        });
       })
-      .catch(e => { spinner.style.display = 'none'; grid.innerHTML = `<div style="color:#e88a82;">${e}</div>`; });
+      .catch(e => { spinner.style.display = 'none'; bar.innerHTML = `<span style="color:#e88a82;">${esc(String(e))}</span>`; });
   }
 
-  function renderCard(t, i) {
+  function selectSchema(chip, schema) {
+    document.querySelectorAll('#schema-bar .schema-chip').forEach(c => c.classList.remove('active'));
+    chip.classList.add('active');
+    if (state.schema === schema) return;
+    state.schema = schema;
+    state.table  = null;
+    state.page   = 0;
+    hidePreview();
+    loadTables(state.dbIdx, schema);
+  }
+
+  /* ── ③ 테이블 로드 & 선택 ──────────────────────────────── */
+  function loadTables(idx, schema) {
+    const grid    = document.getElementById('table-grid');
+    const spinner = document.getElementById('table-spinner');
+    const label   = document.getElementById('table-count-label');
+    grid.innerHTML = '';
+    label.textContent = '';
+    spinner.style.display = 'block';
+
+    fetch(`/ods/tables?idx=${idx}&schema=${encodeURIComponent(schema)}`)
+      .then(r => r.json())
+      .then(data => {
+        spinner.style.display = 'none';
+        if (data.error) { grid.innerHTML = `<div class="empty-msg" style="color:#e88a82;">${esc(data.error)}</div>`; return; }
+        if (!data.tables.length) { grid.innerHTML = '<div class="empty-msg">테이블 없음</div>'; return; }
+        label.textContent = data.tables.length + '개';
+        data.tables.forEach(t => renderCard(t));
+        document.getElementById('last-updated').textContent = new Date().toLocaleTimeString('ko-KR');
+      })
+      .catch(e => { spinner.style.display = 'none'; grid.innerHTML = `<div class="empty-msg" style="color:#e88a82;">${esc(String(e))}</div>`; });
+  }
+
+  function renderCard(t) {
     const grid = document.getElementById('table-grid');
-    const shortName = t.name.split('.')[1];
-    const countTxt = t.exists
-      ? (t.count >= 0 ? Number(t.count).toLocaleString() + ' 건' : '0 건')
-      : '테이블 없음';
-    const countClass = !t.exists ? 'missing' : (t.count === 0 ? 'zero' : '');
-    const cardClass  = !t.exists ? 'missing' : '';
-    const badgeClass = t.src === 'KRAS' ? 'src-kras' : 'src-kais';
+    const count = t.count >= 0 ? Number(t.count).toLocaleString() : '?';
+    const isZero = t.count === 0;
     const card = document.createElement('div');
-    card.className = `tbl-card ${cardClass}`;
+    card.className = 'tbl-card' + (isZero ? ' no-data' : '');
+    card.dataset.table = t.name;
     card.innerHTML = `
-      <span class="src-badge ${badgeClass}">${t.src}</span>
-      <div class="tbl-count ${countClass}">${countTxt}</div>
-      <div class="tbl-name">${shortName}</div>
-      <div class="tbl-desc">${t.desc}</div>`;
-    if (t.exists && t.count > 0) {
-      card.onclick = () => selectTable(t.name);
+      <div class="tbl-count ${isZero ? 'zero' : ''}">${count}<span style="font-size:12px;font-weight:400;color:#69707b;margin-left:4px;">건</span></div>
+      <div class="tbl-name">${esc(t.name)}</div>`;
+    if (!isZero && t.count > 0) {
+      card.onclick = () => {
+        document.querySelectorAll('.tbl-card').forEach(c => c.classList.remove('active'));
+        card.classList.add('active');
+        selectTable(t.name);
+      };
     }
-    if (t.name === currentTable) card.classList.add('active');
+    if (t.name === state.table) card.classList.add('active');
     grid.appendChild(card);
   }
 
-  /* ── 테이블 선택 → 미리보기 ────────────────────────── */
+  /* ── ④ 미리보기 ────────────────────────────────────────── */
   function selectTable(tableName) {
-    currentTable = tableName;
-    currentPage  = 0;
-    // 카드 active 표시 갱신
-    document.querySelectorAll('.tbl-card').forEach(c => c.classList.remove('active'));
-    event.currentTarget.classList.add('active');
-    document.getElementById('preview-section').style.display = 'block';
-    document.getElementById('preview-title').textContent = tableName;
+    state.table = tableName;
+    state.page  = 0;
+    showPreview(tableName);
     loadPreview();
+  }
+
+  function showPreview(tableName) {
+    document.getElementById('preview-section').style.display = 'block';
+    document.getElementById('preview-title').textContent = state.schema + '.' + tableName;
+  }
+
+  function hidePreview() {
+    document.getElementById('preview-section').style.display = 'none';
   }
 
   function changePage(delta) {
-    currentPage += delta;
+    state.page += delta;
     loadPreview();
   }
 
-  /* ── 미리보기 로드 ─────────────────────────────────── */
   function loadPreview() {
     const spinner = document.getElementById('preview-spinner');
     const content = document.getElementById('preview-content');
     spinner.style.display = 'block';
     content.innerHTML = '';
 
-    fetch(`/ods/preview?idx=${currentTargetIdx}&table=${encodeURIComponent(currentTable)}&page=${currentPage}`)
+    const url = `/ods/preview?idx=${state.dbIdx}&schema=${encodeURIComponent(state.schema)}&table=${encodeURIComponent(state.table)}&page=${state.page}`;
+    fetch(url)
       .then(r => r.json())
       .then(data => {
         spinner.style.display = 'none';
-        if (data.error) {
-          content.innerHTML = `<div style="padding:20px;color:#e88a82;">${data.error}</div>`;
-          return;
-        }
-        currentHasMore = data.hasMore;
+        if (data.error) { content.innerHTML = `<div class="empty-msg" style="color:#e88a82;">${esc(data.error)}</div>`; return; }
+        state.hasMore = data.hasMore;
         renderPreview(data);
       })
-      .catch(e => { spinner.style.display = 'none'; content.innerHTML = `<div style="padding:20px;color:#e88a82;">${e}</div>`; });
+      .catch(e => { spinner.style.display = 'none'; content.innerHTML = `<div class="empty-msg" style="color:#e88a82;">${esc(String(e))}</div>`; });
   }
 
   function renderPreview(data) {
-    const content = document.getElementById('preview-content');
+    const content  = document.getElementById('preview-content');
     const pageInfo = document.getElementById('preview-page-info');
     const btnPrev  = document.getElementById('btn-prev');
     const btnNext  = document.getElementById('btn-next');
 
-    if (!data.rows || data.rows.length === 0) {
-      content.innerHTML = '<div style="padding:20px;color:#69707b;">데이터가 없습니다.</div>';
+    if (!data.rows || !data.rows.length) {
+      content.innerHTML = '<div class="empty-msg">데이터가 없습니다.</div>';
       pageInfo.textContent = '';
-      btnPrev.disabled = true;
-      btnNext.disabled = true;
+      btnPrev.disabled = btnNext.disabled = true;
       return;
     }
 
-    const start = currentPage * 20 + 1;
+    const start = state.page * 20 + 1;
     const end   = start + data.rows.length - 1;
-    pageInfo.textContent = `${start} – ${end}행`;
-    btnPrev.disabled = currentPage <= 0;
-    btnNext.disabled = !currentHasMore;
+    pageInfo.textContent = `${start}–${end}행`;
+    btnPrev.disabled = state.page <= 0;
+    btnNext.disabled = !state.hasMore;
 
     let html = '<table class="preview-table"><thead><tr>';
-    data.columns.forEach(c => { html += `<th>${c}</th>`; });
+    data.columns.forEach(c => { html += `<th>${esc(c)}</th>`; });
     html += '</tr></thead><tbody>';
     data.rows.forEach(row => {
       html += '<tr>';
       row.forEach(cell => {
-        const val = cell == null ? '' : String(cell);
-        html += `<td title="${escHtml(val)}">${escHtml(val.length > 60 ? val.substring(0,60) + '…' : val)}</td>`;
+        const v = cell == null ? '' : String(cell);
+        const display = v.length > 60 ? v.substring(0, 60) + '…' : v;
+        html += `<td title="${esc(v)}">${esc(display)}</td>`;
       });
       html += '</tr>';
     });
@@ -258,10 +326,24 @@
     content.innerHTML = html;
   }
 
-  function reload() { loadTables(currentTargetIdx); }
+  /* ── 유틸 ─────────────────────────────────────────────── */
+  function reloadTables() {
+    if (state.schema) loadTables(state.dbIdx, state.schema);
+  }
 
-  function escHtml(s) {
-    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  function clearSchemas() {
+    document.getElementById('schema-bar').innerHTML =
+      '<span style="font-size:12.5px;color:#5b626d;align-self:center;">로딩 중…</span>';
+  }
+
+  function clearTables() {
+    document.getElementById('table-grid').innerHTML =
+      '<div class="empty-msg" style="grid-column:1/-1;">스키마를 선택하면 테이블 목록이 표시됩니다</div>';
+    document.getElementById('table-count-label').textContent = '';
+  }
+
+  function esc(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
 </script>
 </th:block>
