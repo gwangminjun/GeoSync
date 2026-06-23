@@ -27,6 +27,8 @@ public class DashboardController {
         model.addAttribute("orgCode", orgCode);
         model.addAttribute("krasRunning", statusService.isRunning("KRAS"));
         model.addAttribute("kaisRunning", statusService.isRunning("KAIS"));
+        model.addAttribute("krasCollectRunning", statusService.isRunning("KRAS_COLLECT"));
+        model.addAttribute("krasLoadRunning", statusService.isRunning("KRAS_LOAD"));
         model.addAttribute("krasLast", statusService.getLastRun("KRAS").orElse(null));
         model.addAttribute("kaisLast", statusService.getLastRun("KAIS").orElse(null));
         model.addAttribute("todaySuccess", statusService.todaySuccessCount());

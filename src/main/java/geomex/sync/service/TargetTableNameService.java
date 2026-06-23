@@ -10,12 +10,20 @@ public class TargetTableNameService {
     private String odsSchema;
 
     public String resolve(String configuredTableName) {
-        if (!StringUtils.hasText(configuredTableName) || !StringUtils.hasText(odsSchema)) {
-            return configuredTableName;
-        }
+        return resolve(configuredTableName, null);
+    }
+
+    public String resolve(String configuredTableName, String schemaOverride) {
+        if (!StringUtils.hasText(configuredTableName)) return configuredTableName;
+        String schema = StringUtils.hasText(schemaOverride) ? schemaOverride.trim()
+                      : (StringUtils.hasText(odsSchema) ? odsSchema.trim() : "ods");
         String tableName = configuredTableName.trim();
         int dot = tableName.lastIndexOf('.');
         String baseName = dot >= 0 ? tableName.substring(dot + 1) : tableName;
-        return odsSchema.trim() + "." + baseName;
+        return schema + "." + baseName;
+    }
+
+    public String getOdsSchema() {
+        return odsSchema;
     }
 }

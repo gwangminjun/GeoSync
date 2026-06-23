@@ -2,7 +2,19 @@
 <html xmlns:th="http://www.thymeleaf.org"
       xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
       layout:decorate="~{layout}" lang="ko">
-<head><title>대시보드</title></head>
+<head>
+<title>대시보드</title>
+<style>
+@keyframes krasBarSlide {
+  0%   { left: -45%; }
+  100% { left: 110%; }
+}
+@keyframes krasBarSpin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+</style>
+</head>
 <body>
 <main layout:fragment="content">
 
@@ -76,20 +88,55 @@
   </div>
 
   <!-- 수동 실행 버튼 -->
-  <div style="display:flex;gap:10px;margin-bottom:26px;">
+  <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:26px;align-items:center;">
+
+    <!-- KRAS 전체 (수집 + 적재) -->
     <form method="post" th:action="@{/sync/kras}" style="margin:0;">
       <button type="submit"
-              th:disabled="${krasRunning}"
+              th:disabled="${krasRunning or krasCollectRunning or krasLoadRunning}"
               th:style="${krasRunning} ? 'border:none;cursor:not-allowed;padding:10px 18px;border-radius:8px;font-size:13.5px;font-weight:600;font-family:inherit;background:#1e242c;color:#5b626d;' : 'border:none;cursor:pointer;padding:10px 18px;border-radius:8px;font-size:13.5px;font-weight:600;font-family:inherit;background:#0e9b94;color:#fff;'"
-              th:text="${krasRunning} ? 'KRAS 실행중...' : 'KRAS 수동 실행'">KRAS 수동 실행</button>
+              th:text="${krasRunning} ? 'KRAS 실행중...' : 'KRAS 전체'">KRAS 전체</button>
     </form>
+
+    <div style="width:1px;height:28px;background:#2e3640;margin:0 4px;"></div>
+
+    <!-- KRAS 수집 (API → 파일) -->
+    <form method="post" th:action="@{/sync/kras-collect}" style="margin:0;">
+      <button type="submit"
+              th:disabled="${krasCollectRunning or krasRunning}"
+              th:style="${krasCollectRunning} ? 'cursor:not-allowed;padding:10px 18px;border-radius:8px;font-size:13.5px;font-weight:600;font-family:inherit;background:#1e242c;color:#5b626d;border:1px solid #2e3640;' : 'cursor:pointer;padding:10px 18px;border-radius:8px;font-size:13.5px;font-weight:600;font-family:inherit;background:#1e242c;color:#66c4be;border:1px solid #2e3640;'"
+              th:text="${krasCollectRunning} ? 'KRAS 수집중...' : 'KRAS 수집'">KRAS 수집</button>
+    </form>
+
+    <!-- KRAS 적재 (파일 → DB) - 모달 트리거 -->
+    <button type="button"
+            id="krasLoadBtn"
+            th:disabled="${krasLoadRunning or krasRunning}"
+            th:style="${krasLoadRunning} ? 'cursor:not-allowed;padding:10px 18px;border-radius:8px;font-size:13.5px;font-weight:600;font-family:inherit;background:#1e242c;color:#5b626d;border:1px solid #2e3640;' : 'cursor:pointer;padding:10px 18px;border-radius:8px;font-size:13.5px;font-weight:600;font-family:inherit;background:#1e242c;color:#66c4be;border:1px solid #2e3640;'"
+            th:text="${krasLoadRunning} ? 'KRAS 적재중...' : 'KRAS 적재'"
+            onclick="openLoadModal()">KRAS 적재</button>
+
+    <div style="width:1px;height:28px;background:#2e3640;margin:0 4px;"></div>
+
+    <!-- KAIS -->
     <form method="post" th:action="@{/sync/kais}" style="margin:0;">
       <button type="submit"
               th:disabled="${kaisRunning}"
               th:style="${kaisRunning} ? 'cursor:not-allowed;padding:10px 18px;border-radius:8px;font-size:13.5px;font-weight:600;font-family:inherit;background:#1e242c;color:#5b626d;border:1px solid #2e3640;' : 'cursor:pointer;padding:10px 18px;border-radius:8px;font-size:13.5px;font-weight:600;font-family:inherit;background:#1e242c;color:#cdd3db;border:1px solid #2e3640;'"
               th:text="${kaisRunning} ? 'KAIS 실행중...' : 'KAIS 수동 실행'">KAIS 수동 실행</button>
     </form>
+
+    <div style="width:1px;height:28px;background:#2e3640;margin:0 4px;"></div>
+
+    <!-- 파일에서 적재 준비 -->
+    <button type="button"
+            style="cursor:pointer;padding:10px 18px;border-radius:8px;font-size:13.5px;font-weight:600;font-family:inherit;background:#1e242c;color:#8a919c;border:1px dashed #3a4250;"
+            onclick="scanWorkspace()">파일에서 적재 준비</button>
+
   </div>
+
+  <!-- 로딩바 컨테이너 -->
+  <div id="runningBars" style="display:flex;flex-direction:column;gap:10px;margin-bottom:26px;"></div>
 
   <!-- 카탈로그 기준 파일 저장 상태 -->
   <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:12px;">
@@ -194,6 +241,348 @@
       </tbody>
     </table>
   </div>
+
+  <!-- KRAS 적재 확인 모달 -->
+  <div id="loadModal" style="display:none;position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,0.6);align-items:center;justify-content:center;">
+    <div style="background:#1a1f26;border:1px solid #2e3640;border-radius:14px;padding:28px 32px;width:480px;max-width:90vw;max-height:80vh;overflow-y:auto;">
+
+      <div style="font-size:16px;font-weight:700;color:#f3f5f7;margin-bottom:6px;">KRAS 적재 확인</div>
+      <div style="font-size:12.5px;color:#69707b;margin-bottom:22px;">적재할 대상 DB와 스키마를 확인하고 수정 후 실행하세요.</div>
+
+      <form id="loadForm" method="post" action="/sync/kras-load">
+
+        <!-- 대상 DB -->
+        <div style="margin-bottom:20px;">
+          <div style="font-size:12px;font-weight:600;color:#8a919c;letter-spacing:0.04em;margin-bottom:10px;">대상 DB</div>
+          <div id="targetList" style="display:flex;flex-direction:column;gap:8px;">
+            <div style="color:#69707b;font-size:13px;">불러오는 중...</div>
+          </div>
+        </div>
+
+        <!-- 스키마 -->
+        <div style="margin-bottom:24px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+            <label style="font-size:12px;font-weight:600;color:#8a919c;letter-spacing:0.04em;">대상 스키마</label>
+            <span id="schemaLoadMsg" style="font-size:11.5px;color:#69707b;"></span>
+          </div>
+          <select name="schema" id="schemaSelect"
+                  style="width:100%;box-sizing:border-box;padding:9px 12px;border-radius:8px;border:1px solid #2e3640;background:#141820;color:#e7eaee;font-size:13.5px;font-family:inherit;outline:none;cursor:pointer;appearance:none;-webkit-appearance:none;">
+            <option value="">DB를 먼저 선택하세요</option>
+          </select>
+        </div>
+
+        <!-- 버튼 -->
+        <div style="display:flex;gap:10px;justify-content:flex-end;">
+          <button type="button" onclick="closeLoadModal()"
+                  style="padding:9px 20px;border-radius:8px;border:1px solid #2e3640;background:#1e242c;color:#cdd3db;font-size:13.5px;font-weight:600;font-family:inherit;cursor:pointer;">
+            취소
+          </button>
+          <button type="submit" id="loadConfirmBtn"
+                  style="padding:9px 20px;border-radius:8px;border:none;background:#0e9b94;color:#fff;font-size:13.5px;font-weight:600;font-family:inherit;cursor:pointer;">
+            적재 시작
+          </button>
+        </div>
+
+      </form>
+    </div>
+  </div>
+
+  <!-- 파일 스캔 결과 모달 -->
+  <div id="scanModal" style="display:none;position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,0.6);align-items:center;justify-content:center;">
+    <div style="background:#1a1f26;border:1px solid #2e3640;border-radius:14px;padding:28px 32px;width:520px;max-width:90vw;max-height:80vh;overflow-y:auto;">
+      <div style="font-size:16px;font-weight:700;color:#f3f5f7;margin-bottom:6px;">파일에서 적재 준비</div>
+      <div style="font-size:12.5px;color:#69707b;margin-bottom:18px;">workspace/kras 디렉토리의 SHP/TXT 파일을 읽어 JSON 캐시와 manifest를 생성합니다.</div>
+      <div id="scanResult" style="font-size:13px;line-height:1.8;color:#cdd3db;margin-bottom:20px;">스캔 중...</div>
+      <div style="display:flex;justify-content:flex-end;">
+        <button type="button" onclick="closeScanModal()"
+                style="padding:9px 20px;border-radius:8px;border:1px solid #2e3640;background:#1e242c;color:#cdd3db;font-size:13.5px;font-weight:600;font-family:inherit;cursor:pointer;">
+          닫기
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function scanWorkspace() {
+      var modal = document.getElementById('scanModal');
+      var result = document.getElementById('scanResult');
+      modal.style.display = 'flex';
+      result.innerHTML = '스캔 중...';
+
+      fetch('/sync/kras-scan-workspace', { method: 'POST' })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (data.error) {
+            result.innerHTML = '<span style="color:#e88a82;">오류: ' + escapeHtml(data.error) + '</span>';
+            return;
+          }
+          var msgs = (data.messages || []).map(function(m) {
+            var color = m.startsWith('✓') ? '#5fc98a' : m.startsWith('✗') ? '#e88a82' : '#9aa2ad';
+            return '<div style="color:' + color + ';">' + escapeHtml(m) + '</div>';
+          }).join('');
+          var summary = '<div style="margin-top:12px;padding:10px 12px;border-radius:8px;background:#141820;color:#66c4be;font-weight:600;">'
+            + '총 ' + data.fileCount + '개 파일, ' + (data.rowCount || 0).toLocaleString() + '건 준비 완료'
+            + '</div>';
+          result.innerHTML = msgs + summary;
+        })
+        .catch(function(e) {
+          result.innerHTML = '<span style="color:#e88a82;">요청 실패: ' + escapeHtml(String(e)) + '</span>';
+        });
+    }
+
+    function closeScanModal() {
+      document.getElementById('scanModal').style.display = 'none';
+    }
+
+    document.getElementById('scanModal').addEventListener('click', function(e) {
+      if (e.target === this) closeScanModal();
+    });
+
+    var _defaultSchema = 'ods';
+
+    function openLoadModal() {
+      var modal = document.getElementById('loadModal');
+      modal.style.display = 'flex';
+      setSchemaSelect([], '불러오는 중...', null);
+
+      fetch('/sync/kras-load-options')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          _defaultSchema = data.schema || 'ods';
+          var list = document.getElementById('targetList');
+          list.innerHTML = '';
+          var targets = data.targets || [];
+          if (targets.length === 0) {
+            list.innerHTML = '<div style="color:#e88a82;font-size:13px;">설정된 DB가 없습니다.</div>';
+            setSchemaSelect([], '선택 가능한 DB 없음', null);
+            return;
+          }
+          targets.forEach(function(t) {
+            var row = document.createElement('label');
+            row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;border:1px solid #2e3640;background:#141820;cursor:pointer;';
+            row.innerHTML =
+              '<input type="checkbox" name="targetIdx" value="' + t.idx + '" checked ' +
+                'style="width:15px;height:15px;accent-color:#0e9b94;cursor:pointer;" ' +
+                'onchange="onTargetChange()">' +
+              '<div>' +
+                '<div style="font-size:13px;font-weight:600;color:#e7eaee;">' + escapeHtml(t.name) + '</div>' +
+                '<div style="font-size:11.5px;color:#69707b;font-family:monospace;margin-top:2px;">' + escapeHtml(t.url) + '</div>' +
+              '</div>';
+            list.appendChild(row);
+          });
+          // 첫 번째 DB 선택 상태로 스키마 로드
+          onTargetChange();
+        })
+        .catch(function() {
+          document.getElementById('targetList').innerHTML =
+            '<div style="color:#e88a82;font-size:13px;">DB 목록을 불러오지 못했습니다.</div>';
+          setSchemaSelect([], '불러오기 실패', null);
+        });
+    }
+
+    function onTargetChange() {
+      var checkboxes = document.querySelectorAll('#targetList input[type="checkbox"]');
+      var firstChecked = null;
+      checkboxes.forEach(function(cb) {
+        if (cb.checked && firstChecked === null) firstChecked = cb.value;
+      });
+
+      if (firstChecked === null) {
+        setSchemaSelect([], 'DB를 선택하세요', null);
+        return;
+      }
+
+      setSchemaSelect([], '불러오는 중...', null);
+      fetch('/ods/schemas?idx=' + firstChecked)
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (data.error) {
+            setSchemaSelect([], '스키마 조회 실패: ' + data.error, null);
+            return;
+          }
+          setSchemaSelect(data.schemas || [], '', _defaultSchema);
+        })
+        .catch(function() {
+          setSchemaSelect([], '스키마 조회 실패', null);
+        });
+    }
+
+    function setSchemaSelect(schemas, msg, selectValue) {
+      var sel = document.getElementById('schemaSelect');
+      var msgEl = document.getElementById('schemaLoadMsg');
+      msgEl.textContent = msg || '';
+      sel.innerHTML = '';
+      if (schemas.length === 0) {
+        var opt = document.createElement('option');
+        opt.value = '';
+        opt.textContent = msg || '스키마 없음';
+        sel.appendChild(opt);
+        sel.disabled = true;
+        return;
+      }
+      sel.disabled = false;
+      schemas.forEach(function(s) {
+        var opt = document.createElement('option');
+        opt.value = s;
+        opt.textContent = s;
+        if (s === selectValue) opt.selected = true;
+        sel.appendChild(opt);
+      });
+      // selectValue 미일치 시 첫 항목 선택
+      if (!sel.value && schemas.length > 0) sel.value = schemas[0];
+    }
+
+    function closeLoadModal() {
+      document.getElementById('loadModal').style.display = 'none';
+    }
+
+    document.getElementById('loadModal').addEventListener('click', function(e) {
+      if (e.target === this) closeLoadModal();
+    });
+
+    function escapeHtml(s) {
+      return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    /* ── 로딩바 폴링 ─────────────────────────────────── */
+    var _pollTimer   = null;
+    var _startTimes  = {};   // type → Date (null = not running)
+    var _elapsedTimer = null;
+
+    var _barLabels = {
+      'KRAS':         'KRAS 전체',
+      'KRAS_COLLECT': 'KRAS 수집',
+      'KRAS_LOAD':    'KRAS 적재',
+      'KAIS':         'KAIS'
+    };
+    var _barColors = {
+      'KRAS':         '#0e9b94',
+      'KRAS_COLLECT': '#66c4be',
+      'KRAS_LOAD':    '#66c4be',
+      'KAIS':         '#8a919c'
+    };
+
+    // Thymeleaf로 주입된 초기 실행 상태
+    var _initRunning = {
+      'KRAS':         /*[[${krasRunning}]]*/        false,
+      'KRAS_COLLECT': /*[[${krasCollectRunning}]]*/ false,
+      'KRAS_LOAD':    /*[[${krasLoadRunning}]]*/    false,
+      'KAIS':         /*[[${kaisRunning}]]*/        false
+    };
+
+    function startPolling() {
+      if (_pollTimer) return;
+      _pollTimer = setInterval(pollStatus, 2000);
+      pollStatus();
+      _elapsedTimer = setInterval(tickElapsed, 1000);
+    }
+
+    function stopPolling() {
+      if (_pollTimer)   { clearInterval(_pollTimer);   _pollTimer = null; }
+      if (_elapsedTimer){ clearInterval(_elapsedTimer); _elapsedTimer = null; }
+    }
+
+    function pollStatus() {
+      fetch('/sync/status')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          var anyRunning = false;
+          var anyFinished = false;
+
+          Object.keys(_barLabels).forEach(function(type) {
+            var info = data[type] || {};
+            var wasRunning = _startTimes[type] != null;
+            var isNowRunning = !!info.running;
+
+            if (isNowRunning) {
+              anyRunning = true;
+              if (!wasRunning) {
+                _startTimes[type] = info.startedAt ? new Date(info.startedAt) : new Date();
+                showBar(type);
+              }
+            } else {
+              if (wasRunning) {
+                anyFinished = true;
+                _startTimes[type] = null;
+                removeBar(type);
+              }
+            }
+          });
+
+          if (!anyRunning) {
+            stopPolling();
+            if (anyFinished) {
+              setTimeout(function() { location.reload(); }, 600);
+            }
+          }
+        })
+        .catch(function() { /* 네트워크 오류는 무시 */ });
+    }
+
+    function showBar(type) {
+      var container = document.getElementById('runningBars');
+      if (document.getElementById('bar_' + type)) return;
+      var color = _barColors[type] || '#69707b';
+      var card = document.createElement('div');
+      card.id = 'bar_' + type;
+      card.style.cssText =
+        'background:#1a1f26;border:1px solid #262c35;border-radius:11px;padding:14px 20px;';
+      card.innerHTML =
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">' +
+          '<div style="display:flex;align-items:center;gap:10px;">' +
+            '<div style="width:14px;height:14px;border-radius:50%;border:2px solid ' + color + ';' +
+              'border-top-color:transparent;animation:krasBarSpin 0.8s linear infinite;flex-shrink:0;"></div>' +
+            '<span style="font-size:13.5px;font-weight:600;color:#e7eaee;">' +
+              escapeHtml(_barLabels[type] || type) + ' 실행 중' +
+            '</span>' +
+          '</div>' +
+          '<span id="elapsed_' + type + '" ' +
+            'style="font-size:12px;color:#69707b;font-variant-numeric:tabular-nums;font-family:monospace;">00:00</span>' +
+        '</div>' +
+        '<div style="height:3px;background:#1e242c;border-radius:99px;overflow:hidden;position:relative;">' +
+          '<div style="position:absolute;top:0;height:100%;width:45%;' +
+            'background:linear-gradient(90deg,transparent 0%,' + color + ' 50%,transparent 100%);' +
+            'animation:krasBarSlide 1.5s ease-in-out infinite;"></div>' +
+        '</div>';
+      container.appendChild(card);
+    }
+
+    function removeBar(type) {
+      var el = document.getElementById('bar_' + type);
+      if (el) el.parentNode.removeChild(el);
+    }
+
+    function tickElapsed() {
+      var now = new Date();
+      Object.keys(_startTimes).forEach(function(type) {
+        if (!_startTimes[type]) return;
+        var elapsed = Math.floor((now - _startTimes[type]) / 1000);
+        var h = Math.floor(elapsed / 3600);
+        var m = Math.floor((elapsed % 3600) / 60);
+        var s = elapsed % 60;
+        var label = h > 0
+          ? pad(h) + ':' + pad(m) + ':' + pad(s)
+          : pad(m) + ':' + pad(s);
+        var el = document.getElementById('elapsed_' + type);
+        if (el) el.textContent = label;
+      });
+    }
+
+    function pad(n) { return n < 10 ? '0' + n : String(n); }
+
+    // 페이지 로드 시 이미 실행 중인 작업이 있으면 즉시 폴링 시작
+    document.addEventListener('DOMContentLoaded', function() {
+      var anyRunning = false;
+      Object.keys(_initRunning).forEach(function(type) {
+        if (_initRunning[type]) {
+          anyRunning = true;
+          _startTimes[type] = new Date(); // 시작 시각 미확정 → 폴링 후 보정
+          showBar(type);
+        }
+      });
+      if (anyRunning) startPolling();
+    });
+  </script>
 
 </main>
 </body>

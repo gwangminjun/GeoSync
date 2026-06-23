@@ -39,7 +39,17 @@ public class OdsRepository {
      */
     public int replaceAllTo(JdbcTemplate targetJdbc, SyncTableDef def, String orgCode,
                             int targetEpsg, List<Map<String, Object>> rows) {
-        String targetTableName = tableNameService.resolve(def.tgtTableName);
+        return replaceAllTo(targetJdbc, def, orgCode, targetEpsg, rows, null);
+    }
+
+    public int replaceAllTo(JdbcTemplate targetJdbc, SyncTableDef def, String orgCode,
+                            int targetEpsg, List<Map<String, Object>> rows, String schemaOverride) {
+        String targetTableName = tableNameService.resolve(def.tgtTableName, schemaOverride);
+
+        if (!targetTableName.equals(def.tgtTableName)) {
+            ensureTableExists(targetJdbc, targetTableName, def.tgtTableName);
+        }
+
         String deleteSql = "DELETE FROM " + targetTableName + " WHERE org_cd = ?";
         targetJdbc.update(deleteSql, orgCode);
 
@@ -54,11 +64,20 @@ public class OdsRepository {
                 targetJdbc.update(insertSql, params);
                 count++;
             } catch (Exception e) {
-                log.warn("[{}] INSERT 실패 (row={}): {}", def.tgtTableName, row, e.getMessage());
+                log.warn("[{}] INSERT 실패 (row={}): {}", targetTableName, row, e.getMessage());
             }
         }
-        log.info("[{}] org_cd={} → {}건 저장", def.tgtTableName, orgCode, count);
+        log.info("[{}] org_cd={} → {}건 저장", targetTableName, orgCode, count);
         return count;
+    }
+
+    private void ensureTableExists(JdbcTemplate targetJdbc, String targetTableName, String sourceTableName) {
+        String schema = targetTableName.contains(".")
+                ? targetTableName.substring(0, targetTableName.indexOf('.'))
+                : "public";
+        targetJdbc.execute("CREATE SCHEMA IF NOT EXISTS " + schema);
+        targetJdbc.execute("CREATE TABLE IF NOT EXISTS " + targetTableName +
+                           " (LIKE " + sourceTableName + " INCLUDING ALL)");
     }
 
     private String buildInsertSql(SyncTableDef def, String targetTableName, int epsg) {

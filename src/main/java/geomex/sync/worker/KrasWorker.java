@@ -23,8 +23,10 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -40,6 +42,7 @@ public class KrasWorker {
     private final SyncStatusService statusService;
     private final TargetDbService targetDbService;
     private final KrasFileWriter fileWriter;
+    private final KrasFileReader fileReader;
     private final KrasGpkiService gpkiService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -61,13 +64,14 @@ public class KrasWorker {
     public KrasWorker(TableMapper tableMapper, OdsRepository odsRepository,
                       CoordTransformer coordTransformer, SyncStatusService statusService,
                       TargetDbService targetDbService, KrasFileWriter fileWriter,
-                      KrasGpkiService gpkiService) {
+                      KrasFileReader fileReader, KrasGpkiService gpkiService) {
         this.tableMapper = tableMapper;
         this.odsRepository = odsRepository;
         this.coordTransformer = coordTransformer;
         this.statusService = statusService;
         this.targetDbService = targetDbService;
         this.fileWriter = fileWriter;
+        this.fileReader = fileReader;
         this.gpkiService = gpkiService;
     }
 
@@ -83,11 +87,13 @@ public class KrasWorker {
                 return;
             }
             List<SyncTableDef> tableDefs = tableMapper.load(configPath);
+            Map<String, List<String>> manifest = new LinkedHashMap<>();
             for (SyncTableDef def : tableDefs) {
-                int saved = processTable(def);
+                int saved = processTable(def, manifest);
                 if (saved >= 0) totalSuccess += saved;
                 else totalError++;
             }
+            fileWriter.writeManifest(manifest);
             log.info("[KRAS] 동기화 완료 (success={}, error={})", totalSuccess, totalError);
         } catch (Exception e) {
             log.error("[KRAS] 동기화 중 오류: {}", e.getMessage(), e);
@@ -95,6 +101,139 @@ public class KrasWorker {
         } finally {
             statusService.recordEnd("KRAS", totalSuccess, totalError, failed);
         }
+    }
+
+    public void runCollect() {
+        log.info("[KRAS] 수집 시작 (API → 파일, url={})", gatewayUrl);
+        statusService.recordStart("KRAS_COLLECT");
+        int totalSuccess = 0, totalError = 0;
+        boolean failed = false;
+        Map<String, List<String>> manifest = new LinkedHashMap<>();
+        try {
+            if (!checkConnection()) {
+                log.error("[KRAS] 연결 확인 실패 — 수집 중단");
+                failed = true;
+                return;
+            }
+            List<SyncTableDef> tableDefs = tableMapper.load(configPath);
+            for (SyncTableDef def : tableDefs) {
+                try {
+                    List<String> fileBaseNames = collectTable(def);
+                    manifest.put(def.srcTableName, fileBaseNames);
+                    totalSuccess += fileBaseNames.size();
+                } catch (Exception e) {
+                    log.error("[KRAS] {} 수집 실패: {}", def.srcTableName, e.getMessage());
+                    totalError++;
+                }
+            }
+            fileWriter.writeManifest(manifest);
+            log.info("[KRAS] 수집 완료 (success={}, error={})", totalSuccess, totalError);
+        } catch (Exception e) {
+            log.error("[KRAS] 수집 중 오류: {}", e.getMessage(), e);
+            failed = true;
+        } finally {
+            statusService.recordEnd("KRAS_COLLECT", totalSuccess, totalError, failed);
+        }
+    }
+
+    public void runLoad() {
+        runLoad(null, null);
+    }
+
+    public void runLoad(List<Integer> targetIndices, String schemaOverride) {
+        log.info("[KRAS] 적재 시작 (파일 → DB, schema={}, targets={})",
+                schemaOverride != null ? schemaOverride : "기본",
+                targetIndices != null ? targetIndices : "전체");
+        statusService.recordStart("KRAS_LOAD");
+        int totalSuccess = 0, totalError = 0;
+        boolean failed = false;
+        try {
+            List<TargetDbService.ActiveTarget> allTargets = targetDbService.getConfiguredTargets();
+            List<JdbcTemplate> selectedJdbcs = selectTargets(allTargets, targetIndices);
+            if (selectedJdbcs.isEmpty()) {
+                log.warn("[KRAS] 선택된 대상 DB 없음 — 적재 중단");
+                failed = true;
+                return;
+            }
+
+            Map<String, List<String>> manifest = fileReader.readManifest();
+            List<SyncTableDef> tableDefs = tableMapper.load(configPath);
+            for (SyncTableDef def : tableDefs) {
+                List<String> fileBaseNames = manifest.getOrDefault(def.srcTableName, List.of());
+                if (fileBaseNames.isEmpty()) {
+                    log.warn("[KRAS] {} 에 대한 수집 파일 없음 — 건너뜀", def.srcTableName);
+                    continue;
+                }
+                try {
+                    int saved = loadTable(def, fileBaseNames, selectedJdbcs, schemaOverride);
+                    if (saved >= 0) totalSuccess += saved;
+                    else totalError++;
+                } catch (Exception e) {
+                    log.error("[KRAS] {} 적재 실패: {}", def.srcTableName, e.getMessage());
+                    totalError++;
+                }
+            }
+            log.info("[KRAS] 적재 완료 (success={}, error={})", totalSuccess, totalError);
+        } catch (IOException e) {
+            log.error("[KRAS] 매니페스트 읽기 실패: {}", e.getMessage());
+            failed = true;
+        } catch (Exception e) {
+            log.error("[KRAS] 적재 중 오류: {}", e.getMessage(), e);
+            failed = true;
+        } finally {
+            statusService.recordEnd("KRAS_LOAD", totalSuccess, totalError, failed);
+        }
+    }
+
+    private List<JdbcTemplate> selectTargets(List<TargetDbService.ActiveTarget> all, List<Integer> indices) {
+        if (indices == null || indices.isEmpty()) {
+            return all.stream().map(TargetDbService.ActiveTarget::jdbc).toList();
+        }
+        return indices.stream()
+                .filter(i -> i >= 0 && i < all.size())
+                .map(i -> all.get(i).jdbc())
+                .toList();
+    }
+
+    private List<String> collectTable(SyncTableDef def) {
+        List<String> written = new ArrayList<>();
+        if (def.srcTableName.startsWith("USEZONE:")) {
+            List<String> layerNames = fetchAvailableUsezoneLayers();
+            for (String layerName : layerNames) {
+                List<Map<String, Object>> rows = fetchFeatures(layerName, def);
+                fileWriter.write(layerName, def, rows);
+                fileWriter.writeJson(layerName, rows);
+                written.add(toFileBaseName(layerName));
+            }
+        } else {
+            List<Map<String, Object>> rows = fetchFeatures(def.srcTableName, def);
+            fileWriter.write(def.srcTableName, def, rows);
+            fileWriter.writeJson(def.srcTableName, rows);
+            written.add(toFileBaseName(def.srcTableName));
+        }
+        return written;
+    }
+
+    private int loadTable(SyncTableDef def, List<String> fileBaseNames,
+                          List<JdbcTemplate> targets, String schemaOverride) throws IOException {
+        List<Map<String, Object>> rows = new ArrayList<>();
+        for (String baseName : fileBaseNames) {
+            rows.addAll(fileReader.readJson(baseName));
+        }
+        if (targets.isEmpty()) {
+            log.warn("[KRAS] 활성 대상 DB 없음 — {} 저장 건너뜀", def.tgtTableName);
+            return 0;
+        }
+        int saved = 0;
+        for (JdbcTemplate jdbc : targets) {
+            saved = odsRepository.replaceAllTo(jdbc, def, orgCode, coordTransformer.getTargetEpsg(), rows, schemaOverride);
+        }
+        return saved;
+    }
+
+    private String toFileBaseName(String layerName) {
+        String name = layerName.contains(":") ? layerName.substring(layerName.indexOf(':') + 1) : layerName;
+        return name.toLowerCase();
     }
 
     private boolean checkConnection() {
@@ -120,7 +259,8 @@ public class KrasWorker {
         }
     }
 
-    private int processTable(SyncTableDef def) {
+    private int processTable(SyncTableDef def, Map<String, List<String>> manifest) {
+        List<String> written = new ArrayList<>();
         List<Map<String, Object>> rows;
         if (def.srcTableName.startsWith("USEZONE:")) {
             List<String> layerNames = fetchAvailableUsezoneLayers();
@@ -128,12 +268,17 @@ public class KrasWorker {
             for (String layerName : layerNames) {
                 List<Map<String, Object>> layerRows = fetchFeatures(layerName, def);
                 fileWriter.write(layerName, def, layerRows);
+                fileWriter.writeJson(layerName, layerRows);
+                written.add(toFileBaseName(layerName));
                 rows.addAll(layerRows);
             }
         } else {
             rows = fetchFeatures(def.srcTableName, def);
             fileWriter.write(def.srcTableName, def, rows);
+            fileWriter.writeJson(def.srcTableName, rows);
+            written.add(toFileBaseName(def.srcTableName));
         }
+        manifest.put(def.srcTableName, written);
         return saveToAllTargets(def, rows);
     }
 

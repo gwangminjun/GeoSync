@@ -9,6 +9,7 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 @Component
@@ -22,6 +23,8 @@ public class SyncScheduler {
     // 중복 실행 방지 플래그
     private final AtomicBoolean krasRunning = new AtomicBoolean(false);
     private final AtomicBoolean kaisRunning = new AtomicBoolean(false);
+    private final AtomicBoolean krasCollectRunning = new AtomicBoolean(false);
+    private final AtomicBoolean krasLoadRunning = new AtomicBoolean(false);
 
     @Value("${sync.enabled:true}")
     private boolean syncEnabled;
@@ -61,6 +64,36 @@ public class SyncScheduler {
         }
     }
 
+    public void runKrasCollect() {
+        if (!syncEnabled) return;
+        if (!krasCollectRunning.compareAndSet(false, true)) {
+            log.warn("[KRAS] 수집 이미 진행 중 — 스킵");
+            return;
+        }
+        try {
+            krasWorker.runCollect();
+        } finally {
+            krasCollectRunning.set(false);
+        }
+    }
+
+    public void runKrasLoad() {
+        runKrasLoad(null, null);
+    }
+
+    public void runKrasLoad(List<Integer> targetIndices, String schemaOverride) {
+        if (!syncEnabled) return;
+        if (!krasLoadRunning.compareAndSet(false, true)) {
+            log.warn("[KRAS] 적재 이미 진행 중 — 스킵");
+            return;
+        }
+        try {
+            krasWorker.runLoad(targetIndices, schemaOverride);
+        } finally {
+            krasLoadRunning.set(false);
+        }
+    }
+
     // 웹 UI 수동 트리거용 (별도 스레드, AtomicBoolean 동일 적용)
     @Async
     public void triggerKrasAsync() {
@@ -70,5 +103,20 @@ public class SyncScheduler {
     @Async
     public void triggerKaisAsync() {
         runKais();
+    }
+
+    @Async
+    public void triggerKrasCollectAsync() {
+        runKrasCollect();
+    }
+
+    @Async
+    public void triggerKrasLoadAsync() {
+        runKrasLoad(null, null);
+    }
+
+    @Async
+    public void triggerKrasLoadAsync(List<Integer> targetIndices, String schemaOverride) {
+        runKrasLoad(targetIndices, schemaOverride);
     }
 }

@@ -39,6 +39,11 @@ public class SyncStatusService {
         return running.containsKey(type);
     }
 
+    public java.time.LocalDateTime getRunningStartTime(String type) {
+        SyncHistory h = running.get(type);
+        return h != null ? h.startTime() : null;
+    }
+
     public List<SyncHistory> getRecentHistory(int limit) {
         Deque<SyncHistory> combined = new ArrayDeque<>();
         running.values().forEach(combined::addFirst); // 실행 중인 항목 상단에 표시

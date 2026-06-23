@@ -13,6 +13,7 @@ import org.geotools.feature.simple.SimpleFeatureTypeBuilder;
 import org.geotools.referencing.CRS;
 import org.locationtech.jts.geom.*;
 import org.locationtech.jts.io.WKTReader;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -21,6 +22,8 @@ import org.springframework.stereotype.Component;
 import java.io.*;
 import java.nio.charset.Charset;
 import java.nio.file.*;
+import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -28,6 +31,7 @@ import java.util.stream.Collectors;
 public class KrasFileWriter {
 
     private static final Logger log = LoggerFactory.getLogger(KrasFileWriter.class);
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Value("${kras.work-dir:./workspace/kras}")
     private String workDir;
@@ -49,6 +53,33 @@ public class KrasFileWriter {
             log.debug("[KRAS] 파일 저장: {}/{}", orgCode, fileName);
         } catch (Exception e) {
             log.warn("[KRAS] 파일 저장 실패 ({}): {}", layerName, e.getMessage());
+        }
+    }
+
+    public void writeJson(String layerName, List<Map<String, Object>> rows) {
+        if (rows.isEmpty()) return;
+        try {
+            Path dir = Path.of(workDir, orgCode);
+            Files.createDirectories(dir);
+            String fileName = toFileName(layerName);
+            objectMapper.writeValue(dir.resolve(fileName + ".json").toFile(), rows);
+            log.debug("[KRAS] JSON 캐시 저장: {}/{}.json", orgCode, fileName);
+        } catch (Exception e) {
+            log.warn("[KRAS] JSON 캐시 저장 실패 ({}): {}", layerName, e.getMessage());
+        }
+    }
+
+    public void writeManifest(Map<String, List<String>> tableToFiles) {
+        try {
+            Path dir = Path.of(workDir, orgCode);
+            Files.createDirectories(dir);
+            Map<String, Object> manifest = new LinkedHashMap<>();
+            manifest.put("collectedAt", LocalDateTime.now().toString());
+            manifest.put("tables", tableToFiles);
+            objectMapper.writeValue(dir.resolve("_manifest.json").toFile(), manifest);
+            log.info("[KRAS] 수집 매니페스트 저장: {} 테이블", tableToFiles.size());
+        } catch (Exception e) {
+            log.warn("[KRAS] 매니페스트 저장 실패: {}", e.getMessage());
         }
     }
 
