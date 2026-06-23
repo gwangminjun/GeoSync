@@ -1,7 +1,6 @@
 package geomex.sync.worker;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import geomex.sync.geo.CoordTransformer;
 import geomex.sync.mapper.TableMapper;
 import geomex.sync.model.ColumnDef;
 import geomex.sync.model.SyncTableDef;
@@ -33,20 +32,16 @@ public class KrasWorkspaceScanner {
 
     private static final Logger log = LoggerFactory.getLogger(KrasWorkspaceScanner.class);
 
-    private static final int SHP_EPSG = 5174;
-
     private final TableMapper tableMapper;
     private final KrasFileWriter fileWriter;
     private final RuntimeSettingsService settings;
-    private final CoordTransformer coordTransformer;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public KrasWorkspaceScanner(TableMapper tableMapper, KrasFileWriter fileWriter,
-                                RuntimeSettingsService settings, CoordTransformer coordTransformer) {
+                                RuntimeSettingsService settings) {
         this.tableMapper = tableMapper;
         this.fileWriter = fileWriter;
         this.settings = settings;
-        this.coordTransformer = coordTransformer;
     }
 
     public record ScanResult(int fileCount, int rowCount, List<String> messages) {}
@@ -248,13 +243,6 @@ public class KrasWorkspaceScanner {
 
                     if (geomCol != null) {
                         Geometry geom = (Geometry) feature.getDefaultGeometry();
-                        if (geom != null) {
-                            try {
-                                geom = coordTransformer.transform(geom, SHP_EPSG);
-                            } catch (Exception e) {
-                                log.warn("[Scanner] 좌표 변환 실패 (EPSG:{} → 5174): {}", SHP_EPSG, e.getMessage());
-                            }
-                        }
                         row.put(geomCol.srcName, geom != null ? wktWriter.write(geom) : null);
                     }
 

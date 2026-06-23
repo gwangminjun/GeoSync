@@ -100,7 +100,7 @@ public class KrasFileWriter {
 
         SimpleFeatureTypeBuilder tb = new SimpleFeatureTypeBuilder();
         tb.setName(fileName);
-        tb.setCRS(CRS.decode("EPSG:5176"));
+        tb.setCRS(CRS.decode("EPSG:5174"));
         tb.add("the_geom", resolveGeomClass(def.geomType));
         for (ColumnDef col : def.columns) {
             if (col.isGeometry) continue;

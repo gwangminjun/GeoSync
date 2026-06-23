@@ -23,8 +23,10 @@ public class CoordTransformer {
 
     private static final Logger log = LoggerFactory.getLogger(CoordTransformer.class);
 
-    // 저장 좌표계: EPSG:5174 (Bessel 중부원점, SHP 원본 좌표계)
-    private static final int TARGET_EPSG = 5174;
+    // 변환 좌표계: EPSG:5176 (Bessel 동부원점, 기존 GEOMEX-SYNC-HOME 중간 변환 좌표계)
+    private static final int TARGET_EPSG = 5176;
+    // DB 저장 좌표계: EPSG:5186 (Korea 2000 중부원점)
+    private static final int STORAGE_EPSG = 5186;
 
     // transform 캐시 (소스 EPSG → MathTransform)
     private final Map<Integer, MathTransform> transformCache = new ConcurrentHashMap<>();
@@ -81,5 +83,9 @@ public class CoordTransformer {
 
     public int getTargetEpsg() {
         return TARGET_EPSG;
+    }
+
+    public int getStorageEpsg() {
+        return STORAGE_EPSG;
     }
 }

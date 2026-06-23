@@ -100,19 +100,25 @@ public class OdsRepository {
 
     public int replaceAllTo(JdbcTemplate targetJdbc, SyncTableDef def, String orgCode,
                             int targetEpsg, List<Map<String, Object>> rows, String schemaOverride) {
-        return replaceAllTo(targetJdbc, def, orgCode, targetEpsg, rows, schemaOverride, null);
+        return replaceAllTo(targetJdbc, def, orgCode, targetEpsg, targetEpsg, rows, schemaOverride, null);
     }
 
     public int replaceAllTo(JdbcTemplate targetJdbc, SyncTableDef def, String orgCode,
                             int targetEpsg, List<Map<String, Object>> rows, String schemaOverride,
                             String progressType) {
+        return replaceAllTo(targetJdbc, def, orgCode, targetEpsg, targetEpsg, rows, schemaOverride, progressType);
+    }
+
+    public int replaceAllTo(JdbcTemplate targetJdbc, SyncTableDef def, String orgCode,
+                            int sourceEpsg, int storageEpsg, List<Map<String, Object>> rows,
+                            String schemaOverride, String progressType) {
         String targetTableName = tableNameService.resolve(def.tgtTableName, schemaOverride);
         String sqlTableName = qualifiedTableName(targetTableName);
         String databaseName = currentDatabase(targetJdbc);
         log.info("[{}] database={} org_cd={} save start (rows={})",
                 targetTableName, databaseName, orgCode, rows.size());
 
-        ensureTableExists(targetJdbc, targetTableName, sqlTableName, def, targetEpsg);
+        ensureTableExists(targetJdbc, targetTableName, sqlTableName, def, storageEpsg);
         log.info("[{}] database={} table verified", targetTableName, databaseName);
 
         String deleteSql = "DELETE FROM " + sqlTableName + " WHERE " + quoteIdent("org_cd") + " = ?";
@@ -125,7 +131,7 @@ public class OdsRepository {
 
         if (rows.isEmpty()) return 0;
 
-        String insertSql = buildInsertSql(def, sqlTableName, targetEpsg);
+        String insertSql = buildInsertSql(def, sqlTableName, sourceEpsg, storageEpsg);
         boolean hasOrgCd = def.columns.stream().anyMatch(c -> "org_cd".equals(c.tgtName));
 
         List<Object[]> allParams = new ArrayList<>(rows.size());
@@ -276,7 +282,7 @@ public class OdsRepository {
         };
     }
 
-    private String buildInsertSql(SyncTableDef def, String sqlTableName, int epsg) {
+    private String buildInsertSql(SyncTableDef def, String sqlTableName, int sourceEpsg, int storageEpsg) {
         List<ColumnDef> cols = def.columns;
 
         StringBuilder colList = new StringBuilder();
@@ -288,7 +294,14 @@ public class OdsRepository {
                 valList.append(", ");
             }
             colList.append(quoteIdent(col.tgtName));
-            valList.append(col.isGeometry ? "ST_GeomFromText(?, " + epsg + ")" : "?");
+            if (col.isGeometry) {
+                String geomExpr = sourceEpsg != storageEpsg
+                        ? "ST_Transform(ST_GeomFromText(?, " + sourceEpsg + "), " + storageEpsg + ")"
+                        : "ST_GeomFromText(?, " + storageEpsg + ")";
+                valList.append(geomExpr);
+            } else {
+                valList.append("?");
+            }
         }
 
         boolean hasOrgCd = cols.stream().anyMatch(c -> "org_cd".equals(c.tgtName));

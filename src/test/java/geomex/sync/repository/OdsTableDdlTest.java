@@ -19,7 +19,7 @@ class OdsTableDdlTest {
         assertThat(ddl).startsWith("CREATE TABLE IF NOT EXISTS custom_schema.tl_spbd_buld");
         assertThat(ddl).contains("buld_sttus character varying(40)");
         assertThat(ddl).contains("zip character varying(7)");
-        assertThat(ddl).contains("_geometry geometry(MultiPolygon,5176)");
+        assertThat(ddl).contains("_geometry geometry(MultiPolygon,5186)");
         assertThat(ddl).contains("CONSTRAINT tl_spbd_buld_pkey PRIMARY KEY (_gid)");
     }
 

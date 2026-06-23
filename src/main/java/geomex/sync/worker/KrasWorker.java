@@ -272,7 +272,7 @@ public class KrasWorker {
             log.info("[KRAS] loading {} into target {} (schema={})",
                     def.tgtTableName, ts.target().label(), ts.schema() != null ? ts.schema() : "default");
             saved = odsRepository.replaceAllTo(ts.target().jdbc(), def, settings.orgCode(),
-                    coordTransformer.getTargetEpsg(), rows, ts.schema(), "KRAS_LOAD");
+                    KRAS_EPSG, coordTransformer.getStorageEpsg(), rows, ts.schema(), "KRAS_LOAD");
         }
         return saved;
     }
@@ -339,7 +339,7 @@ public class KrasWorker {
         for (TargetDbService.ActiveTarget target : targets) {
             log.info("[KRAS] loading {} into target {}", def.tgtTableName, target.label());
             saved = odsRepository.replaceAllTo(target.jdbc(), def, settings.orgCode(),
-                    coordTransformer.getTargetEpsg(), rows, null, "KRAS");
+                    KRAS_EPSG, coordTransformer.getStorageEpsg(), rows, null, "KRAS");
         }
         return saved;
     }
@@ -407,7 +407,7 @@ public class KrasWorker {
             if (col.isGeometry) {
                 String wkt = feature.path("wkt").asText(null);
                 if (wkt != null) {
-                    row.put(col.srcName, coordTransformer.transformWkt(wkt, KRAS_EPSG));
+                    row.put(col.srcName, wkt);
                 }
             } else {
                 JsonNode val = feature.path(col.srcName);

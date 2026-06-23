@@ -112,7 +112,8 @@ public class KaisWorker {
             }
             int saved = 0;
             for (JdbcTemplate jdbc : targets) {
-                saved = odsRepository.replaceAllTo(jdbc, def, orgCode, coordTransformer.getTargetEpsg(), rows);
+                saved = odsRepository.replaceAllTo(jdbc, def, orgCode,
+                        coordTransformer.getTargetEpsg(), coordTransformer.getStorageEpsg(), rows, null, null);
             }
             log.info("[KAIS] {} → {}건 처리 (대상 DB {}개)", def.tgtTableName, saved, targets.size());
             return saved;
