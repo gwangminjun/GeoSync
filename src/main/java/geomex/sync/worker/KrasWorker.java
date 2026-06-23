@@ -38,6 +38,7 @@ public class KrasWorker {
     private final CoordTransformer coordTransformer;
     private final SyncStatusService statusService;
     private final TargetDbService targetDbService;
+    private final KrasFileWriter fileWriter;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Value("${kras.url}")
@@ -57,12 +58,13 @@ public class KrasWorker {
 
     public KrasWorker(TableMapper tableMapper, OdsRepository odsRepository,
                       CoordTransformer coordTransformer, SyncStatusService statusService,
-                      TargetDbService targetDbService) {
+                      TargetDbService targetDbService, KrasFileWriter fileWriter) {
         this.tableMapper = tableMapper;
         this.odsRepository = odsRepository;
         this.coordTransformer = coordTransformer;
         this.statusService = statusService;
         this.targetDbService = targetDbService;
+        this.fileWriter = fileWriter;
     }
 
     public void run() {
@@ -116,10 +118,13 @@ public class KrasWorker {
             List<String> layerNames = fetchAvailableUsezoneLayers();
             rows = new ArrayList<>();
             for (String layerName : layerNames) {
-                rows.addAll(fetchFeatures(layerName, def));
+                List<Map<String, Object>> layerRows = fetchFeatures(layerName, def);
+                fileWriter.write(layerName, def, layerRows);
+                rows.addAll(layerRows);
             }
         } else {
             rows = fetchFeatures(def.srcTableName, def);
+            fileWriter.write(def.srcTableName, def, rows);
         }
         return saveToAllTargets(def, rows);
     }

@@ -9,5 +9,11 @@ bin/nssm.exe
 logs/
 KAIS_WORK/
 conf/application.yml
+workspace/kras/**/*.shp
+workspace/kras/**/*.dbf
+workspace/kras/**/*.shx
+workspace/kras/**/*.prj
+workspace/kras/**/*.fix
+workspace/kras/**/*.txt
 .idea/
 *.iml
