@@ -72,8 +72,38 @@ public class KrasCatalogStatusService {
                         "lt_c_uzone.gmx", Set.of(".gmx"), lastSuccess,
                         "lt_c_uzone"));
         statuses.add(legacyStatus(groups, "참조", "건물통합", "f_fac_building",
-                        "f_fac_building.*", Set.of(".shp", ".dbf", ".gmx"), lastSuccess,
+                        "f_fac_building.*", Set.of(".shp", ".dbf"), lastSuccess,
                         "f_fac_building"));
+        statuses.add(legacyStatus(groups, "도로명주소", "건물", "tl_spbd_buld",
+                        "tl_spbd_buld.*", Set.of(".shp", ".dbf"), lastSuccess,
+                        "tl_spbd_buld"));
+        statuses.add(legacyStatus(groups, "도로명주소", "출입구", "tl_spbd_entrc",
+                        "tl_spbd_entrc.*", Set.of(".shp", ".dbf"), lastSuccess,
+                        "tl_spbd_entrc"));
+        statuses.add(legacyStatus(groups, "도로명주소", "장비구역", "tl_spbd_eqb",
+                        "tl_spbd_eqb.*", Set.of(".shp", ".dbf"), lastSuccess,
+                        "tl_spbd_eqb"));
+        statuses.add(legacyStatus(groups, "도로명주소", "접촉점", "tl_spot_cntc",
+                        "tl_spot_cntc.*", Set.of(".shp", ".dbf"), lastSuccess,
+                        "tl_spot_cntc"));
+        statuses.add(legacyStatus(groups, "도로명주소", "시설위치", "tl_spot_fcltylc",
+                        "tl_spot_fcltylc.*", Set.of(".shp", ".dbf"), lastSuccess,
+                        "tl_spot_fcltylc"));
+        statuses.add(legacyStatus(groups, "도로명주소", "교차로", "tl_sprd_crsrd",
+                        "tl_sprd_crsrd.*", Set.of(".shp", ".dbf"), lastSuccess,
+                        "tl_sprd_crsrd"));
+        statuses.add(legacyStatus(groups, "도로명주소", "구간", "tl_sprd_intrvl",
+                        "tl_sprd_intrvl.*", Set.of(".shp", ".dbf"), lastSuccess,
+                        "tl_sprd_intrvl"));
+        statuses.add(legacyStatus(groups, "도로명주소", "도로관리", "tl_sprd_manage",
+                        "tl_sprd_manage.*", Set.of(".shp", ".dbf"), lastSuccess,
+                        "tl_sprd_manage"));
+        statuses.add(legacyStatus(groups, "도로명주소", "도로구역", "tl_sprd_rw",
+                        "tl_sprd_rw.*", Set.of(".shp", ".dbf"), lastSuccess,
+                        "tl_sprd_rw"));
+        statuses.add(legacyStatus(groups, "KRAS 수신 원본", "공시지가", "anvm_jiga",
+                        "abpd_pann_jiga.*", Set.of(".txt"), lastSuccess,
+                        "abpd_pann_jiga"));
         return statuses;
     }
 
