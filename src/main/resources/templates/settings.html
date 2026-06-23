@@ -178,52 +178,6 @@
         </div>
       </div>
 
-      <div style="display:flex;flex-direction:column;gap:12px;margin-top:4px;padding-top:14px;border-top:1px solid #262c35;">
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
-          <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#cdd3db;font-weight:600;">
-            <input type="checkbox" name="gpki_enabled"
-                   th:checked="${values['gpki_enabled'] == 'true'}"
-                   style="width:16px;height:16px;accent-color:#0e9b94;cursor:pointer;">
-            GPKI 인증 사용
-          </label>
-          <div style="display:flex;align-items:center;gap:8px;">
-            <button type="button" class="btn-ghost" onclick="testGpki()">GPKI 상태 확인</button>
-            <span id="gpki-test-result" class="test-result"></span>
-          </div>
-        </div>
-
-        <div style="display:grid;grid-template-columns:minmax(180px,1fr) minmax(220px,2fr) minmax(160px,1fr);gap:14px;">
-          <div>
-            <label class="gs-label">GPKI ID</label>
-            <input class="gs-input mono" type="text" name="gpki_id"
-                   th:value="${values['gpki_id']}" placeholder="SVR4970076001">
-          </div>
-          <div>
-            <label class="gs-label">GPKI 폴더</label>
-            <input class="gs-input mono" type="text" name="gpki_home_dir"
-                   th:value="${values['gpki_home_dir']}" placeholder="./gpki">
-          </div>
-          <div>
-            <label class="gs-label">비밀번호 파일</label>
-            <input class="gs-input mono" type="text" name="gpki_password_file"
-                   th:value="${values['gpki_password_file']}" placeholder="password.txt">
-          </div>
-        </div>
-
-        <div style="display:grid;grid-template-columns:minmax(220px,1fr) minmax(180px,1fr);gap:14px;align-items:end;">
-          <div>
-            <label class="gs-label">인증서 비밀번호 직접 입력</label>
-            <input class="gs-input mono" type="password" name="gpki_password"
-                   placeholder="비워두면 GPKI 폴더의 비밀번호 파일 사용">
-          </div>
-          <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#9aa2ad;font-weight:600;padding-bottom:8px;">
-            <input type="checkbox" name="gpki_decrypt_response"
-                   th:checked="${values['gpki_decrypt_response'] != 'false'}"
-                   style="width:16px;height:16px;accent-color:#0e9b94;cursor:pointer;">
-            응답 복호화
-          </label>
-        </div>
-      </div>
     </div>
 
     <!-- ── KAIS ── -->
@@ -455,25 +409,6 @@
     b.append('kras_conn_sys_id', connId);
     b.append('kras_chk_pnu', chkPnu);
     callTest('/settings/test-kras', b, res);
-  }
-
-  /* ── 페이지 초기화 ────────────────────────────────────────── */
-  function testGpki() {
-    const res = document.getElementById('gpki-test-result');
-    res.textContent = 'checking...';
-    res.style.color = '#69707b';
-    fetch('/api/gpki/status')
-      .then(r => r.json())
-      .then(d => {
-        const ok = d.enabled && d.homeDirPresent && d.licensePathPresent &&
-                   d.certPathPresent && d.keyPathPresent && d.passwordPresent && d.apiLoadable;
-        res.textContent = ok ? 'OK' : 'CHECK';
-        res.style.color = ok ? '#5fc98a' : '#d9b066';
-      })
-      .catch(() => {
-        res.textContent = 'FAIL';
-        res.style.color = '#e88a82';
-      });
   }
 
   function checkOdsSchema(targetIndex) {

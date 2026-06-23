@@ -67,18 +67,11 @@ public class SettingsController {
             try {
                 String content = Files.readString(configFile, StandardCharsets.UTF_8);
                 Map<String, Object> root = readYamlRoot(content);
-                Map<String, Object> kras = childMap(root, "kras");
-                Map<String, Object> gpki = childMap(kras, "gpki");
                 Map<String, Object> ods = childMap(root, "ods");
                 values.put("kras_url",         extractYamlValue(content, "url",        "kras"));
                 values.put("kras_conn_sys_id", extractYamlValue(content, "conn-sys-id","kras"));
                 values.put("kras_chk_pnu",     extractYamlValue(content, "chk-pnu",   "kras"));
                 values.put("kras_schedule",    extractYamlValue(content, "schedule",   "kras"));
-                values.put("gpki_enabled",     yamlValue(gpki, "enabled", "false"));
-                values.put("gpki_id",          yamlValue(gpki, "id", ""));
-                values.put("gpki_home_dir",    yamlValue(gpki, "home-dir", "./gpki"));
-                values.put("gpki_password_file", yamlValue(gpki, "password-file", "password.txt"));
-                values.put("gpki_decrypt_response", yamlValue(gpki, "decrypt-response", "true"));
                 values.put("ods_schema",       yamlValue(ods, "schema", "ods"));
                 values.put("kais_work_dir",    extractYamlValue(content, "work-dir",   "kais"));
                 values.put("kais_schedule",    extractYamlValue(content, "schedule",   "kais"));
@@ -93,11 +86,6 @@ public class SettingsController {
                 log.warn("설정 파일 읽기 실패: {}", e.getMessage());
             }
         }
-        values.putIfAbsent("gpki_enabled", "false");
-        values.putIfAbsent("gpki_id", "");
-        values.putIfAbsent("gpki_home_dir", "./gpki");
-        values.putIfAbsent("gpki_password_file", "password.txt");
-        values.putIfAbsent("gpki_decrypt_response", "true");
         values.putIfAbsent("ods_schema", "ods");
 
         model.addAttribute("currentPage", "settings");
@@ -385,14 +373,7 @@ public class SettingsController {
           .append("  url: ").append(safe(p.get("kras_url"))).append("\n")
           .append("  conn-sys-id: ").append(safe(p.get("kras_conn_sys_id"))).append("\n")
           .append("  chk-pnu: \"").append(safe(p.get("kras_chk_pnu"))).append("\"\n")
-          .append("  schedule: '").append(safe(p.get("kras_schedule"))).append("'\n")
-          .append("  gpki:\n")
-          .append("    enabled: ").append(p.containsKey("gpki_enabled") ? "true" : "false").append("\n")
-          .append("    id: ").append(safe(p.get("gpki_id"))).append("\n")
-          .append("    home-dir: ").append(safe(p.get("gpki_home_dir"))).append("\n")
-          .append("    password-file: ").append(safe(p.get("gpki_password_file"))).append("\n")
-          .append("    password: ").append(safe(p.get("gpki_password"))).append("\n")
-          .append("    decrypt-response: ").append(p.containsKey("gpki_decrypt_response") ? "true" : "false").append("\n\n")
+          .append("  schedule: '").append(safe(p.get("kras_schedule"))).append("'\n\n")
           .append("kais:\n")
           .append("  work-dir: ").append(safe(p.get("kais_work_dir"))).append("\n")
           .append("  schedule: '").append(safe(p.get("kais_schedule"))).append("'\n\n")

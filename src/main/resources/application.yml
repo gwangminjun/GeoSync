@@ -22,13 +22,6 @@ kras:
   schedule: ${KRAS_SCHEDULE:0 30 4 * * *}
   timeout-seconds: 300
   work-dir: ${KRAS_WORK_DIR:./workspace/kras}
-  gpki:
-    enabled: false
-    id:
-    home-dir: ./gpki
-    password-file: password.txt
-    password:
-    decrypt-response: true
 
 kais:
   work-dir: ${KAIS_WORK_DIR:./KAIS_WORK}
