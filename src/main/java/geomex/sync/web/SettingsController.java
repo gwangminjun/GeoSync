@@ -1,5 +1,13 @@
 package geomex.sync.web;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.apache.hc.client5.http.classic.methods.HttpPost;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
+import org.apache.hc.client5.http.impl.classic.HttpClients;
+import org.apache.hc.core5.http.ContentType;
+import org.apache.hc.core5.http.io.entity.StringEntity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -14,6 +22,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import org.yaml.snakeyaml.Yaml;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -32,9 +41,18 @@ import java.util.regex.Pattern;
 public class SettingsController {
 
     private static final Logger log = LoggerFactory.getLogger(SettingsController.class);
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Value("${spring.config.location:conf/application.yml}")
     private String configLocation;
+
+    @Value("${kras.chk-pnu:4687025625111190010}")
+    private String defaultChkPnu;
+
+    @Value("${sync.org-code:46870}")
+    private String orgCode;
+
+    // ── GET /settings ────────────────────────────────────────────────────────
 
     @GetMapping
     public String settingsPage(Model model) {
@@ -47,9 +65,15 @@ public class SettingsController {
                 String content = Files.readString(configFile, StandardCharsets.UTF_8);
                 values.put("kras_url",         extractYamlValue(content, "url",        "kras"));
                 values.put("kras_conn_sys_id", extractYamlValue(content, "conn-sys-id","kras"));
+                values.put("kras_chk_pnu",     extractYamlValue(content, "chk-pnu",   "kras"));
                 values.put("kras_schedule",    extractYamlValue(content, "schedule",   "kras"));
                 values.put("kais_work_dir",    extractYamlValue(content, "work-dir",   "kais"));
                 values.put("kais_schedule",    extractYamlValue(content, "schedule",   "kais"));
+
+                // chk-pnu fallback
+                if (values.get("kras_chk_pnu").isEmpty()) {
+                    values.put("kras_chk_pnu", defaultChkPnu);
+                }
 
                 targets = readTargets(content);
             } catch (IOException e) {
@@ -63,6 +87,8 @@ public class SettingsController {
         model.addAttribute("targets", targets);
         return "settings";
     }
+
+    // ── POST /settings/test-db ───────────────────────────────────────────────
 
     @PostMapping("/test-db")
     @ResponseBody
@@ -87,6 +113,49 @@ public class SettingsController {
             return Map.of("success", false, "message", e.getMessage());
         }
     }
+
+    // ── POST /settings/test-kras ─────────────────────────────────────────────
+
+    @PostMapping("/test-kras")
+    @ResponseBody
+    public Map<String, Object> testKrasConnection(
+            @RequestParam String kras_url,
+            @RequestParam String kras_conn_sys_id,
+            @RequestParam(required = false, defaultValue = "") String kras_chk_pnu) {
+        String url     = kras_url.trim();
+        String connId  = kras_conn_sys_id.trim();
+        String chkPnu  = kras_chk_pnu.isBlank() ? defaultChkPnu : kras_chk_pnu.trim();
+
+        try {
+            ObjectNode req = objectMapper.createObjectNode();
+            req.put("service",   "CHECK");
+            req.put("connSysId", connId);
+            req.put("orgCode",   orgCode);
+            req.put("chkPnu",    chkPnu);
+
+            try (CloseableHttpClient client = HttpClients.createDefault()) {
+                HttpPost post = new HttpPost(url);
+                post.setEntity(new StringEntity(objectMapper.writeValueAsString(req),
+                        ContentType.APPLICATION_JSON));
+
+                return client.execute(post, response -> {
+                    try (InputStream is = response.getEntity().getContent()) {
+                        JsonNode res = objectMapper.readTree(is);
+                        String code = res.path("resultCode").asText("");
+                        String msg  = res.path("resultMsg").asText("");
+                        boolean ok  = "00".equals(code);
+                        return ok
+                            ? Map.of("success", true,  "message", "연결 성공 (code=" + code + ")")
+                            : Map.of("success", false, "message", "서버 응답 오류: " + code + " — " + msg);
+                    }
+                });
+            }
+        } catch (Exception e) {
+            return Map.of("success", false, "message", e.getMessage());
+        }
+    }
+
+    // ── POST /settings ───────────────────────────────────────────────────────
 
     @PostMapping
     public String saveSettings(
@@ -140,7 +209,6 @@ public class SettingsController {
         Matcher m = p.matcher(searchIn);
         if (!m.find()) return "";
         String raw = m.group(1).trim();
-        // 따옴표 제거 (buildYaml이 다시 인용 처리하므로 중복 방지)
         if (raw.length() >= 2) {
             char f = raw.charAt(0), l = raw.charAt(raw.length() - 1);
             if ((f == '"' && l == '"') || (f == '\'' && l == '\'')) {
@@ -152,32 +220,29 @@ public class SettingsController {
 
     private String buildYaml(Map<String, String> p) {
         int count = Integer.parseInt(p.getOrDefault("tgt_count", "0"));
-
         StringBuilder sb = new StringBuilder();
 
         // spring.datasource — 첫 번째 활성 target 과 동기화
         for (int i = 0; i < count; i++) {
             String host = safe(p.get("tgt_host_" + i));
             if (host.isEmpty()) continue;
-            String port    = safe(p.get("tgt_port_" + i));
-            String dbname  = safe(p.get("tgt_dbname_" + i));
-            String user    = safe(p.get("tgt_user_" + i));
-            String pass    = safe(p.get("tgt_pass_" + i));
             sb.append("spring:\n  datasource:\n")
-              .append("    url: jdbc:postgresql://").append(host).append(":").append(port)
-              .append("/").append(dbname).append("\n")
-              .append("    username: ").append(user).append("\n")
-              .append("    password: ").append(pass).append("\n\n");
+              .append("    url: jdbc:postgresql://").append(host).append(":")
+              .append(safe(p.get("tgt_port_" + i))).append("/")
+              .append(safe(p.get("tgt_dbname_" + i))).append("\n")
+              .append("    username: ").append(safe(p.get("tgt_user_" + i))).append("\n")
+              .append("    password: ").append(safe(p.get("tgt_pass_" + i))).append("\n\n");
             break;
         }
 
         sb.append("kras:\n")
           .append("  url: ").append(safe(p.get("kras_url"))).append("\n")
           .append("  conn-sys-id: ").append(safe(p.get("kras_conn_sys_id"))).append("\n")
-          .append("  schedule: \"").append(safe(p.get("kras_schedule"))).append("\"\n\n")
+          .append("  chk-pnu: \"").append(safe(p.get("kras_chk_pnu"))).append("\"\n")
+          .append("  schedule: '").append(safe(p.get("kras_schedule"))).append("'\n\n")
           .append("kais:\n")
           .append("  work-dir: ").append(safe(p.get("kais_work_dir"))).append("\n")
-          .append("  schedule: \"").append(safe(p.get("kais_schedule"))).append("\"\n\n")
+          .append("  schedule: '").append(safe(p.get("kais_schedule"))).append("'\n\n")
           .append("targets:\n");
 
         for (int i = 0; i < count; i++) {
