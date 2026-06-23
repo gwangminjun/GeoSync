@@ -113,13 +113,25 @@ public class SyncController {
             TargetDbService.ActiveTarget t = targets.get(i);
             targetList.add(Map.of("idx", i, "name", t.name(), "url", sanitizeUrl(t.url())));
         }
-        // manifest에서 파일 단위 목록 조회 (table → [file, ...] 구조를 flat하게)
-        List<Map<String, String>> files = new ArrayList<>();
+
+        // manifest 우선 로드, 없으면 빈 맵
+        Map<String, java.util.List<String>> merged = new java.util.LinkedHashMap<>();
         try {
-            fileReader.readManifest().forEach((table, fileNames) ->
-                fileNames.forEach(f -> files.add(Map.of("table", table, "file", f)))
-            );
+            merged.putAll(fileReader.readManifest());
         } catch (Exception ignored) {}
+
+        // 워크스페이스에서 파일 탐색 후 manifest에 없는 항목 보완
+        try {
+            workspaceScanner.discoverWorkspaceFiles().forEach((table, files) -> {
+                if (!merged.containsKey(table)) merged.put(table, files);
+            });
+        } catch (Exception ignored) {}
+
+        List<Map<String, String>> files = new ArrayList<>();
+        merged.forEach((table, fileNames) ->
+            fileNames.forEach(f -> files.add(Map.of("table", table, "file", f)))
+        );
+
         return ResponseEntity.ok(Map.of(
             "targets", targetList,
             "schema", tableNameService.getOdsSchema(),

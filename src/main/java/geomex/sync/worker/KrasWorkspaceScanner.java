@@ -46,6 +46,42 @@ public class KrasWorkspaceScanner {
 
     public record ScanResult(int fileCount, int rowCount, List<String> messages) {}
 
+    /**
+     * 워크스페이스 디렉토리를 탐색하여 base-tables.xml 정의와 매칭되는 파일 목록을 반환한다.
+     * manifest 파일 쓰기 없이 현재 상태를 조회만 한다.
+     * 결과 형식: srcTableName → List&lt;fileBaseName&gt;
+     */
+    public Map<String, List<String>> discoverWorkspaceFiles() {
+        Path dir = Path.of(settings.krasWorkDir(), settings.orgCode());
+        Map<String, List<String>> result = new LinkedHashMap<>();
+        if (!Files.isDirectory(dir)) return result;
+
+        Set<String> claimed = new LinkedHashSet<>();
+        try {
+            List<SyncTableDef> defs = tableMapper.load(settings.krasConfig());
+
+            for (SyncTableDef def : defs) {
+                if (def.srcTableName.startsWith("USEZONE:")) continue;
+                String baseName = findFile(dir, def, claimed);
+                if (baseName != null) {
+                    result.put(def.srcTableName, List.of(baseName));
+                    claimed.add(baseName);
+                }
+            }
+
+            for (SyncTableDef def : defs) {
+                if (!def.srcTableName.startsWith("USEZONE:")) continue;
+                List<String> usezoneFiles = findUsezoneFiles(dir, claimed);
+                if (!usezoneFiles.isEmpty()) {
+                    result.put(def.srcTableName, usezoneFiles);
+                }
+            }
+        } catch (Exception e) {
+            log.warn("[Scanner] 워크스페이스 탐색 실패: {}", e.getMessage());
+        }
+        return result;
+    }
+
     public ScanResult buildManifest() {
         Path dir = Path.of(settings.krasWorkDir(), settings.orgCode());
         List<String> messages = new ArrayList<>();
