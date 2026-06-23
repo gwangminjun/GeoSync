@@ -8,6 +8,9 @@ import geomex.sync.mapper.TableMapper;
 import geomex.sync.model.ColumnDef;
 import geomex.sync.model.SyncTableDef;
 import geomex.sync.repository.OdsRepository;
+import geomex.sync.service.SyncStatusService;
+import geomex.sync.service.TargetDbService;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.apache.hc.client5.http.classic.methods.HttpPost;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
 import org.apache.hc.client5.http.impl.classic.HttpClients;
@@ -33,6 +36,8 @@ public class KrasWorker {
     private final TableMapper tableMapper;
     private final OdsRepository odsRepository;
     private final CoordTransformer coordTransformer;
+    private final SyncStatusService statusService;
+    private final TargetDbService targetDbService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Value("${kras.url}")
@@ -51,25 +56,39 @@ public class KrasWorker {
     private String orgCode;
 
     public KrasWorker(TableMapper tableMapper, OdsRepository odsRepository,
-                      CoordTransformer coordTransformer) {
+                      CoordTransformer coordTransformer, SyncStatusService statusService,
+                      TargetDbService targetDbService) {
         this.tableMapper = tableMapper;
         this.odsRepository = odsRepository;
         this.coordTransformer = coordTransformer;
+        this.statusService = statusService;
+        this.targetDbService = targetDbService;
     }
 
     public void run() {
         log.info("[KRAS] 동기화 시작 (url={})", gatewayUrl);
-
-        if (!checkConnection()) {
-            log.error("[KRAS] 연결 확인 실패 — 동기화 중단");
-            return;
+        statusService.recordStart("KRAS");
+        int totalSuccess = 0, totalError = 0;
+        boolean failed = false;
+        try {
+            if (!checkConnection()) {
+                log.error("[KRAS] 연결 확인 실패 — 동기화 중단");
+                failed = true;
+                return;
+            }
+            List<SyncTableDef> tableDefs = tableMapper.load(configPath);
+            for (SyncTableDef def : tableDefs) {
+                int saved = processTable(def);
+                if (saved >= 0) totalSuccess += saved;
+                else totalError++;
+            }
+            log.info("[KRAS] 동기화 완료 (success={}, error={})", totalSuccess, totalError);
+        } catch (Exception e) {
+            log.error("[KRAS] 동기화 중 오류: {}", e.getMessage(), e);
+            failed = true;
+        } finally {
+            statusService.recordEnd("KRAS", totalSuccess, totalError, failed);
         }
-
-        List<SyncTableDef> tableDefs = tableMapper.load(configPath);
-        for (SyncTableDef def : tableDefs) {
-            processTable(def);
-        }
-        log.info("[KRAS] 동기화 완료");
     }
 
     private boolean checkConnection() {
@@ -91,31 +110,31 @@ public class KrasWorker {
         }
     }
 
-    private void processTable(SyncTableDef def) {
-        // USEZONE:LSMD_CONT_XXXXX 형태의 레이어명 처리
-        String layerName = def.srcTableName.contains("XXXXX")
-                ? fetchUszoneLayerNames(def)
-                : def.srcTableName;
-
-        if (layerName == null) return;
-
-        // USEZONE 레이어는 여러 개를 합쳐서 하나의 테이블에 저장
+    private int processTable(SyncTableDef def) {
+        List<Map<String, Object>> rows;
         if (def.srcTableName.startsWith("USEZONE:")) {
-            processUsezoneTable(def);
+            List<String> layerNames = fetchAvailableUsezoneLayers();
+            rows = new ArrayList<>();
+            for (String layerName : layerNames) {
+                rows.addAll(fetchFeatures(layerName, def));
+            }
         } else {
-            List<Map<String, Object>> rows = fetchFeatures(layerName, def);
-            odsRepository.replaceAll(def, orgCode, coordTransformer.getTargetEpsg(), rows);
+            rows = fetchFeatures(def.srcTableName, def);
         }
+        return saveToAllTargets(def, rows);
     }
 
-    private void processUsezoneTable(SyncTableDef def) {
-        List<String> layerNames = fetchAvailableUsezoneLayers();
-        List<Map<String, Object>> allRows = new ArrayList<>();
-
-        for (String layerName : layerNames) {
-            allRows.addAll(fetchFeatures(layerName, def));
+    private int saveToAllTargets(SyncTableDef def, List<Map<String, Object>> rows) {
+        List<JdbcTemplate> targets = targetDbService.getActiveTemplates();
+        if (targets.isEmpty()) {
+            log.warn("[KRAS] 활성 대상 DB 없음 — {} 저장 건너뜀", def.tgtTableName);
+            return 0;
         }
-        odsRepository.replaceAll(def, orgCode, coordTransformer.getTargetEpsg(), allRows);
+        int saved = 0;
+        for (JdbcTemplate jdbc : targets) {
+            saved = odsRepository.replaceAllTo(jdbc, def, orgCode, coordTransformer.getTargetEpsg(), rows);
+        }
+        return saved;
     }
 
     private List<String> fetchAvailableUsezoneLayers() {
@@ -136,11 +155,6 @@ public class KrasWorker {
             log.error("[KRAS] 레이어 목록 조회 실패: {}", e.getMessage());
             return List.of();
         }
-    }
-
-    private String fetchUszoneLayerNames(SyncTableDef def) {
-        // USEZONE:LSMD_CONT_XXXXX → 실제 레이어 목록 조회로 대체
-        return "USEZONE_AGGREGATE";
     }
 
     private List<Map<String, Object>> fetchFeatures(String layerName, SyncTableDef def) {

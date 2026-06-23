@@ -23,13 +23,21 @@ public class OdsRepository {
     }
 
     /**
-     * 대상 테이블에서 기관코드 전체 삭제 후 배치 INSERT
+     * 대상 테이블에서 기관코드 전체 삭제 후 배치 INSERT (Spring primary DataSource 사용)
      */
     @Transactional
     public int replaceAll(SyncTableDef def, String orgCode, int targetEpsg,
                           List<Map<String, Object>> rows) {
+        return replaceAllTo(jdbc, def, orgCode, targetEpsg, rows);
+    }
+
+    /**
+     * 지정된 JdbcTemplate에 기관코드 전체 삭제 후 배치 INSERT (다중 DB 대상용)
+     */
+    public int replaceAllTo(JdbcTemplate targetJdbc, SyncTableDef def, String orgCode,
+                            int targetEpsg, List<Map<String, Object>> rows) {
         String deleteSql = "DELETE FROM " + def.tgtTableName + " WHERE org_cd = ?";
-        jdbc.update(deleteSql, orgCode);
+        targetJdbc.update(deleteSql, orgCode);
 
         if (rows.isEmpty()) return 0;
 
@@ -39,7 +47,7 @@ public class OdsRepository {
         for (Map<String, Object> row : rows) {
             Object[] params = buildParams(def, row, orgCode);
             try {
-                jdbc.update(insertSql, params);
+                targetJdbc.update(insertSql, params);
                 count++;
             } catch (Exception e) {
                 log.warn("[{}] INSERT 실패 (row={}): {}", def.tgtTableName, row, e.getMessage());

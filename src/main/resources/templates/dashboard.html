@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}" lang="ko">
+<head><title>대시보드</title></head>
+<body>
+<main layout:fragment="content">
+
+  <!-- 알림 -->
+  <div th:if="${message}"
+       style="margin-bottom:16px;padding:12px 16px;border-radius:9px;background:#1a2a1e;border:1px solid #2a3d2e;font-size:13.5px;color:#5fc98a;"
+       th:text="${message}"></div>
+
+  <!-- 헤더 -->
+  <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:18px;">
+    <div style="font-size:19px;font-weight:700;color:#f3f5f7;letter-spacing:-0.01em;">동기화 현황</div>
+    <div style="font-size:12px;color:#69707b;font-variant-numeric:tabular-nums;"
+         th:text="'최근 갱신 ' + ${#temporals.format(#temporals.createNow(), 'yyyy-MM-dd HH:mm:ss')}"></div>
+  </div>
+
+  <!-- 스탯 카드 4개 -->
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px;">
+
+    <!-- KRAS 마지막 실행 -->
+    <div style="background:#1a1f26;border:1px solid #262c35;border-radius:11px;padding:18px;">
+      <div style="font-size:11.5px;color:#69707b;font-weight:600;">KRAS 마지막 실행</div>
+      <div th:if="${krasLast != null}">
+        <div style="font-size:18px;font-weight:600;color:#e7eaee;margin-top:11px;font-variant-numeric:tabular-nums;"
+             th:text="${#temporals.format(krasLast.startTime(), 'MM-dd HH:mm')}"></div>
+        <div style="margin-top:11px;">
+          <span th:if="${krasLast.status() == 'SUCCESS'}"
+                style="padding:3px 9px;border-radius:6px;font-size:11px;font-weight:600;background:#15291f;color:#5fc98a;">완료</span>
+          <span th:if="${krasLast.status() == 'RUNNING'}"
+                style="padding:3px 9px;border-radius:6px;font-size:11px;font-weight:600;background:#2a2517;color:#d9b066;">실행중</span>
+          <span th:if="${krasLast.status() == 'FAILED'}"
+                style="padding:3px 9px;border-radius:6px;font-size:11px;font-weight:600;background:#2a1a1a;color:#e88a82;">실패</span>
+        </div>
+      </div>
+      <div th:unless="${krasLast != null}" style="font-size:13px;color:#5b626d;margin-top:11px;">기록 없음</div>
+    </div>
+
+    <!-- KAIS 마지막 실행 -->
+    <div style="background:#1a1f26;border:1px solid #262c35;border-radius:11px;padding:18px;">
+      <div style="font-size:11.5px;color:#69707b;font-weight:600;">KAIS 마지막 실행</div>
+      <div th:if="${kaisLast != null}">
+        <div style="font-size:18px;font-weight:600;color:#e7eaee;margin-top:11px;font-variant-numeric:tabular-nums;"
+             th:text="${#temporals.format(kaisLast.startTime(), 'MM-dd HH:mm')}"></div>
+        <div style="margin-top:11px;">
+          <span th:if="${kaisLast.status() == 'SUCCESS'}"
+                style="padding:3px 9px;border-radius:6px;font-size:11px;font-weight:600;background:#15291f;color:#5fc98a;">완료</span>
+          <span th:if="${kaisLast.status() == 'RUNNING'}"
+                style="padding:3px 9px;border-radius:6px;font-size:11px;font-weight:600;background:#2a2517;color:#d9b066;">실행중</span>
+          <span th:if="${kaisLast.status() == 'FAILED'}"
+                style="padding:3px 9px;border-radius:6px;font-size:11px;font-weight:600;background:#2a1a1a;color:#e88a82;">실패</span>
+        </div>
+      </div>
+      <div th:unless="${kaisLast != null}" style="font-size:13px;color:#5b626d;margin-top:11px;">기록 없음</div>
+    </div>
+
+    <!-- 오늘 처리 건수 -->
+    <div style="background:#1a1f26;border:1px solid #262c35;border-radius:11px;padding:18px;">
+      <div style="font-size:11.5px;color:#69707b;font-weight:600;">오늘 처리 건수</div>
+      <div style="font-size:29px;font-weight:700;color:#0e9b94;margin-top:9px;font-variant-numeric:tabular-nums;letter-spacing:-0.02em;">
+        <span th:text="${#numbers.formatInteger(todaySuccess, 0, 'COMMA')}">0</span><span style="font-size:14px;font-weight:500;color:#69707b;margin-left:3px;">건</span>
+      </div>
+    </div>
+
+    <!-- 오늘 오류 건수 -->
+    <div th:style="${todayError > 0} ? 'background:#1a1f26;border:1px solid #3a2a28;border-radius:11px;padding:18px;' : 'background:#1a1f26;border:1px solid #262c35;border-radius:11px;padding:18px;'">
+      <div style="font-size:11.5px;color:#69707b;font-weight:600;">오늘 오류 건수</div>
+      <div th:style="${todayError > 0} ? 'font-size:29px;font-weight:700;color:#e88a82;margin-top:9px;font-variant-numeric:tabular-nums;letter-spacing:-0.02em;' : 'font-size:29px;font-weight:700;color:#69707b;margin-top:9px;font-variant-numeric:tabular-nums;letter-spacing:-0.02em;'">
+        <span th:text="${todayError}">0</span><span style="font-size:14px;font-weight:500;color:#69707b;margin-left:3px;">건</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- 수동 실행 버튼 -->
+  <div style="display:flex;gap:10px;margin-bottom:26px;">
+    <form method="post" th:action="@{/sync/kras}" style="margin:0;">
+      <button type="submit"
+              th:disabled="${krasRunning}"
+              th:style="${krasRunning} ? 'border:none;cursor:not-allowed;padding:10px 18px;border-radius:8px;font-size:13.5px;font-weight:600;font-family:inherit;background:#1e242c;color:#5b626d;' : 'border:none;cursor:pointer;padding:10px 18px;border-radius:8px;font-size:13.5px;font-weight:600;font-family:inherit;background:#0e9b94;color:#fff;'"
+              th:text="${krasRunning} ? 'KRAS 실행중...' : 'KRAS 수동 실행'">KRAS 수동 실행</button>
+    </form>
+    <form method="post" th:action="@{/sync/kais}" style="margin:0;">
+      <button type="submit"
+              th:disabled="${kaisRunning}"
+              th:style="${kaisRunning} ? 'cursor:not-allowed;padding:10px 18px;border-radius:8px;font-size:13.5px;font-weight:600;font-family:inherit;background:#1e242c;color:#5b626d;border:1px solid #2e3640;' : 'cursor:pointer;padding:10px 18px;border-radius:8px;font-size:13.5px;font-weight:600;font-family:inherit;background:#1e242c;color:#cdd3db;border:1px solid #2e3640;'"
+              th:text="${kaisRunning} ? 'KAIS 실행중...' : 'KAIS 수동 실행'">KAIS 수동 실행</button>
+    </form>
+  </div>
+
+  <!-- 실행 이력 -->
+  <div style="font-size:14px;font-weight:700;color:#f3f5f7;margin-bottom:12px;">최근 실행 이력</div>
+  <div style="background:#1a1f26;border:1px solid #262c35;border-radius:11px;overflow:hidden;">
+    <table style="width:100%;border-collapse:collapse;font-size:13px;">
+      <thead>
+        <tr style="background:#171b21;">
+          <th style="text-align:left;padding:11px 18px;font-size:11px;font-weight:600;color:#69707b;letter-spacing:0.03em;border-bottom:1px solid #262c35;">시각</th>
+          <th style="text-align:left;padding:11px 14px;font-size:11px;font-weight:600;color:#69707b;letter-spacing:0.03em;border-bottom:1px solid #262c35;">종류</th>
+          <th style="text-align:left;padding:11px 14px;font-size:11px;font-weight:600;color:#69707b;letter-spacing:0.03em;border-bottom:1px solid #262c35;">상태</th>
+          <th style="text-align:right;padding:11px 14px;font-size:11px;font-weight:600;color:#69707b;letter-spacing:0.03em;border-bottom:1px solid #262c35;">처리 건수</th>
+          <th style="text-align:right;padding:11px 14px;font-size:11px;font-weight:600;color:#69707b;letter-spacing:0.03em;border-bottom:1px solid #262c35;">오류</th>
+          <th style="text-align:right;padding:11px 18px;font-size:11px;font-weight:600;color:#69707b;letter-spacing:0.03em;border-bottom:1px solid #262c35;">소요 시간</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr th:each="h : ${history}" style="border-bottom:1px solid #21262e;">
+          <td style="padding:12px 18px;color:#9aa2ad;font-variant-numeric:tabular-nums;"
+              th:text="${#temporals.format(h.startTime(), 'MM-dd HH:mm:ss')}"></td>
+          <td style="padding:12px 14px;">
+            <span style="padding:2px 8px;border-radius:6px;font-size:11px;font-weight:600;background:#232830;color:#aab1bb;"
+                  th:text="${h.type()}"></span>
+          </td>
+          <td style="padding:12px 14px;">
+            <span th:if="${h.status() == 'SUCCESS'}"
+                  style="padding:3px 9px;border-radius:999px;font-size:11px;font-weight:600;background:#15291f;color:#5fc98a;">완료</span>
+            <span th:if="${h.status() == 'RUNNING'}"
+                  style="padding:3px 9px;border-radius:999px;font-size:11px;font-weight:600;background:#2a2517;color:#d9b066;">실행중</span>
+            <span th:if="${h.status() == 'FAILED'}"
+                  style="padding:3px 9px;border-radius:999px;font-size:11px;font-weight:600;background:#2a1a1a;color:#e88a82;">실패</span>
+          </td>
+          <td style="padding:12px 14px;text-align:right;color:#e7eaee;font-weight:600;font-variant-numeric:tabular-nums;"
+              th:text="${#numbers.formatInteger(h.successCount(), 0, 'COMMA')}"></td>
+          <td style="padding:12px 14px;text-align:right;font-variant-numeric:tabular-nums;"
+              th:style="${h.errorCount() > 0} ? 'padding:12px 14px;text-align:right;color:#e88a82;font-variant-numeric:tabular-nums;' : 'padding:12px 14px;text-align:right;color:#69707b;font-variant-numeric:tabular-nums;'"
+              th:text="${h.errorCount()}"></td>
+          <td style="padding:12px 18px;text-align:right;color:#9aa2ad;font-variant-numeric:tabular-nums;"
+              th:text="${h.elapsedSeconds()}"></td>
+        </tr>
+        <tr th:if="${#lists.isEmpty(history)}">
+          <td colspan="6" style="padding:24px;text-align:center;color:#5b626d;">실행 이력이 없습니다.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+</main>
+</body>
+</html>

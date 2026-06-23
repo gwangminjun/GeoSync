@@ -5,6 +5,7 @@ import geomex.sync.worker.KrasWorker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -58,5 +59,16 @@ public class SyncScheduler {
         } finally {
             kaisRunning.set(false);
         }
+    }
+
+    // 웹 UI 수동 트리거용 (별도 스레드, AtomicBoolean 동일 적용)
+    @Async
+    public void triggerKrasAsync() {
+        runKras();
+    }
+
+    @Async
+    public void triggerKaisAsync() {
+        runKais();
     }
 }

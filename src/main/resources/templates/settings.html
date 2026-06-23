@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}" lang="ko">
+<head>
+  <title>설정</title>
+  <th:block layout:fragment="head">
+  <style>
+    .gs-input {
+      width:100%; padding:8px 10px; border-radius:7px;
+      border:1px solid #2e3640; background:#1a1f26; color:#e7eaee;
+      font-size:13px; font-family:inherit; box-sizing:border-box;
+      transition:border-color .15s;
+    }
+    .gs-input:focus { border-color:#0e9b94; outline:none; }
+    .gs-input.mono { font-family:'JetBrains Mono',monospace; }
+    .gs-label { font-size:12px; color:#9aa2ad; font-weight:600; margin-bottom:5px; display:block; }
+    .gs-section { font-size:11.5px; font-weight:700; color:#69707b; letter-spacing:.06em;
+                  border-bottom:1px solid #262c35; padding-bottom:8px; text-transform:uppercase; }
+    /* targets table */
+    .tgt-table { width:100%; border-collapse:collapse; font-size:12.5px; }
+    .tgt-table th { padding:7px 8px; color:#69707b; font-weight:600; text-align:left;
+                    border-bottom:1px solid #262c35; white-space:nowrap; }
+    .tgt-table td { padding:5px 5px; vertical-align:middle; }
+    .tgt-table tr.tgt-row:hover td { background:#1a1f26; }
+    .btn-ghost { border:1px solid #2e3640; background:#1a1f26; color:#9aa2ad; cursor:pointer;
+                 padding:6px 12px; border-radius:7px; font-size:12.5px; font-family:inherit; white-space:nowrap; }
+    .btn-ghost:hover { border-color:#0e9b94; color:#0e9b94; }
+    .btn-danger { border:1px solid #3d2a2a; background:transparent; color:#e88a82; cursor:pointer;
+                  padding:5px 10px; border-radius:7px; font-size:12px; font-family:inherit; }
+    .btn-danger:hover { background:#2a1a1a; }
+    .btn-teal { border:none; background:#0e9b94; color:#fff; cursor:pointer;
+                padding:10px 22px; border-radius:8px; font-size:13.5px; font-weight:600; font-family:inherit; }
+    .test-result { font-size:12px; font-family:'JetBrains Mono',monospace; margin-left:6px; }
+  </style>
+  </th:block>
+</head>
+<body>
+<main layout:fragment="content">
+
+  <div style="margin-bottom:20px;">
+    <div style="font-size:19px;font-weight:700;color:#f3f5f7;letter-spacing:-0.01em;">설정 관리</div>
+    <div style="font-size:12px;color:#69707b;margin-top:4px;font-family:'JetBrains Mono',monospace;"
+         th:text="'설정 파일: ' + ${configPath}"></div>
+  </div>
+
+  <div th:if="${success}"
+       style="margin-bottom:16px;padding:12px 16px;border-radius:9px;background:#1a2a1e;border:1px solid #2a3d2e;font-size:13px;color:#5fc98a;"
+       th:text="${success}"></div>
+  <div th:if="${error}"
+       style="margin-bottom:16px;padding:12px 16px;border-radius:9px;background:#2a1a1a;border:1px solid #3d2a2a;font-size:13px;color:#e88a82;"
+       th:text="${error}"></div>
+
+  <form method="post" th:action="@{/settings}" style="display:flex;flex-direction:column;gap:26px;">
+
+    <!-- ── 대상 DB 서버 ── -->
+    <div style="display:flex;flex-direction:column;gap:14px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <div class="gs-section" style="border:none;padding:0;">대상 DB 서버</div>
+        <button type="button" class="btn-ghost" onclick="addTargetRow()">+ 추가</button>
+      </div>
+
+      <div style="overflow-x:auto;">
+        <table class="tgt-table">
+          <thead>
+            <tr>
+              <th>이름</th>
+              <th>호스트 (IP)</th>
+              <th style="width:70px;">포트</th>
+              <th>데이터베이스</th>
+              <th>사용자</th>
+              <th>비밀번호</th>
+              <th style="width:44px;text-align:center;">활성</th>
+              <th style="width:160px;"></th>
+            </tr>
+          </thead>
+          <tbody id="tgt-tbody">
+            <tr th:each="t,i : ${targets}" class="tgt-row" th:attr="data-idx=${i.index}">
+              <td><input class="gs-input" type="text"
+                         th:name="'tgt_name_' + ${i.index}" th:value="${t.name}" placeholder="메인DB"></td>
+              <td><input class="gs-input mono" type="text"
+                         th:name="'tgt_host_' + ${i.index}" th:value="${t.host}" placeholder="110.20.1.218"></td>
+              <td><input class="gs-input mono" type="text"
+                         th:name="'tgt_port_' + ${i.index}" th:value="${t.port}" placeholder="5432"></td>
+              <td><input class="gs-input mono" type="text"
+                         th:name="'tgt_dbname_' + ${i.index}" th:value="${t.dbname}" placeholder="ygspdb"></td>
+              <td><input class="gs-input" type="text"
+                         th:name="'tgt_user_' + ${i.index}" th:value="${t.username}"></td>
+              <td><input class="gs-input mono" type="password"
+                         th:name="'tgt_pass_' + ${i.index}" th:value="${t.password}"></td>
+              <td style="text-align:center;">
+                <input type="checkbox"
+                       th:name="'tgt_enabled_' + ${i.index}"
+                       th:checked="${t.enabled}"
+                       style="width:16px;height:16px;accent-color:#0e9b94;cursor:pointer;">
+              </td>
+              <td style="white-space:nowrap;">
+                <button type="button" class="btn-ghost"
+                        th:onclick="'testTarget(' + ${i.index} + ')'">테스트</button>
+                <button type="button" class="btn-danger"
+                        th:onclick="'removeRow(this)'">✕</button>
+                <span th:id="'res-' + ${i.index}" class="test-result"></span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <input type="hidden" name="tgt_count" id="tgt_count"
+             th:value="${#lists.size(targets)}">
+    </div>
+
+    <!-- ── KRAS ── -->
+    <div style="display:flex;flex-direction:column;gap:14px;">
+      <div class="gs-section">KRAS</div>
+      <div style="display:flex;gap:14px;">
+        <div style="flex:2;">
+          <label class="gs-label">KRAS URL</label>
+          <input class="gs-input mono" type="text" name="kras_url" th:value="${values['kras_url']}">
+        </div>
+        <div style="flex:1;">
+          <label class="gs-label">연결 시스템 ID</label>
+          <input class="gs-input mono" type="text" name="kras_conn_sys_id" th:value="${values['kras_conn_sys_id']}">
+        </div>
+        <div style="flex:1;">
+          <label class="gs-label">스케줄 (cron)</label>
+          <input class="gs-input mono" type="text" name="kras_schedule"
+                 th:value="${values['kras_schedule']}" placeholder="0 30 4 * * *">
+        </div>
+      </div>
+    </div>
+
+    <!-- ── KAIS ── -->
+    <div style="display:flex;flex-direction:column;gap:14px;">
+      <div class="gs-section">KAIS</div>
+      <div style="display:flex;gap:14px;">
+        <div style="flex:2;">
+          <label class="gs-label">KAIS 작업 디렉토리</label>
+          <input class="gs-input mono" type="text" name="kais_work_dir"
+                 th:value="${values['kais_work_dir']}" placeholder="./KAIS_WORK">
+        </div>
+        <div style="flex:1;">
+          <label class="gs-label">스케줄 (cron)</label>
+          <input class="gs-input mono" type="text" name="kais_schedule"
+                 th:value="${values['kais_schedule']}" placeholder="0 30 3 * * *">
+        </div>
+      </div>
+    </div>
+
+    <!-- 저장 버튼 -->
+    <div style="display:flex;gap:10px;padding-top:4px;">
+      <button type="submit" class="btn-teal">저장</button>
+      <a th:href="@{/settings}"
+         style="cursor:pointer;padding:10px 22px;border-radius:8px;font-size:13.5px;font-weight:600;
+                font-family:inherit;background:transparent;color:#9aa2ad;border:1px solid #2e3640;">
+        취소</a>
+    </div>
+
+  </form>
+</main>
+
+<th:block layout:fragment="scripts">
+<script th:inline="javascript">
+  // 현재 행 수를 초기화 (Thymeleaf에서 주입)
+  let rowCount = [[${#lists.size(targets)}]];
+
+  function addTargetRow() {
+    const idx = rowCount++;
+    document.getElementById('tgt_count').value = rowCount;
+    const tr = document.createElement('tr');
+    tr.className = 'tgt-row';
+    tr.dataset.idx = idx;
+    tr.innerHTML = `
+      <td><input class="gs-input" type="text" name="tgt_name_${idx}" placeholder="메인DB"></td>
+      <td><input class="gs-input mono" type="text" name="tgt_host_${idx}" placeholder="110.20.1.218"></td>
+      <td><input class="gs-input mono" type="text" name="tgt_port_${idx}" placeholder="5432" value="5432"></td>
+      <td><input class="gs-input mono" type="text" name="tgt_dbname_${idx}" placeholder="ygspdb"></td>
+      <td><input class="gs-input" type="text" name="tgt_user_${idx}"></td>
+      <td><input class="gs-input mono" type="password" name="tgt_pass_${idx}"></td>
+      <td style="text-align:center;">
+        <input type="checkbox" name="tgt_enabled_${idx}" checked
+               style="width:16px;height:16px;accent-color:#0e9b94;cursor:pointer;">
+      </td>
+      <td style="white-space:nowrap;">
+        <button type="button" class="btn-ghost" onclick="testTarget(${idx})">테스트</button>
+        <button type="button" class="btn-danger" onclick="removeRow(this)">✕</button>
+        <span id="res-${idx}" class="test-result"></span>
+      </td>`;
+    document.getElementById('tgt-tbody').appendChild(tr);
+  }
+
+  function removeRow(btn) {
+    btn.closest('tr').remove();
+    // 남은 행 인덱스 재정렬
+    reindex();
+  }
+
+  function reindex() {
+    const rows = document.querySelectorAll('#tgt-tbody tr.tgt-row');
+    rows.forEach((tr, newIdx) => {
+      tr.dataset.idx = newIdx;
+      tr.querySelectorAll('input[name]').forEach(input => {
+        input.name = input.name.replace(/_\d+$/, '_' + newIdx);
+      });
+      const resSpan = tr.querySelector('[id^="res-"]');
+      if (resSpan) resSpan.id = 'res-' + newIdx;
+      const testBtn = tr.querySelector('button.btn-ghost');
+      if (testBtn) testBtn.setAttribute('onclick', 'testTarget(' + newIdx + ')');
+    });
+    rowCount = rows.length;
+    document.getElementById('tgt_count').value = rowCount;
+  }
+
+  function testTarget(idx) {
+    const host   = document.querySelector(`[name=tgt_host_${idx}]`).value.trim();
+    const port   = document.querySelector(`[name=tgt_port_${idx}]`).value.trim() || '5432';
+    const dbname = document.querySelector(`[name=tgt_dbname_${idx}]`).value.trim();
+    const user   = document.querySelector(`[name=tgt_user_${idx}]`).value.trim();
+    const pw     = document.querySelector(`[name=tgt_pass_${idx}]`).value;
+    const res    = document.getElementById('res-' + idx);
+
+    if (!host || !dbname || !user) {
+      res.textContent = '호스트/DB/사용자 필수';
+      res.style.color = '#d9b066';
+      return;
+    }
+    res.textContent = '테스트 중…';
+    res.style.color = '#69707b';
+
+    const body = new FormData();
+    body.append('db_host', host);
+    body.append('db_port', port);
+    body.append('db_name', dbname);
+    body.append('db_user', user);
+    body.append('db_password', pw);
+
+    fetch('/settings/test-db', { method: 'POST', body })
+      .then(r => r.json())
+      .then(data => {
+        res.textContent = data.success ? '✓ ' + data.message : '✗ ' + data.message;
+        res.style.color  = data.success ? '#5fc98a' : '#e88a82';
+      })
+      .catch(() => {
+        res.textContent = '✗ 요청 실패';
+        res.style.color  = '#e88a82';
+      });
+  }
+</script>
+</th:block>
+</body>
+</html>

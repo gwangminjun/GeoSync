@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}" lang="ko">
+<head><title>로그</title></head>
+<body>
+<main layout:fragment="content">
+
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+    <div>
+      <div style="font-size:19px;font-weight:700;color:#f3f5f7;letter-spacing:-0.01em;">실시간 로그</div>
+      <div style="font-size:12px;color:#69707b;margin-top:3px;">최근 200줄 · 5초마다 갱신</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <span style="font-size:13px;color:#9aa2ad;">자동 스크롤</span>
+      <div id="scrollTrack"
+           style="width:38px;height:21px;border-radius:99px;position:relative;transition:background .15s;cursor:pointer;background:#0e9b94;"
+           onclick="toggleScroll()">
+        <div id="scrollKnob"
+             style="position:absolute;top:2px;left:19px;width:17px;height:17px;border-radius:99px;background:#fff;transition:left .15s;"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="logBox"
+       style="background:#0e1116;border:1px solid #232830;border-radius:11px;padding:16px 18px;height:520px;overflow:auto;font-family:'JetBrains Mono',monospace;font-size:12.5px;line-height:1.65;"></div>
+
+</main>
+
+<th:block layout:fragment="scripts">
+<script th:inline="none">
+  const LV_COLOR = { INFO:'#9aa2ad', DEBUG:'#69707b', WARN:'#d9b066', ERROR:'#e88a82', OK:'#5fc98a' };
+  let autoScroll = true;
+
+  function toggleScroll() {
+    autoScroll = !autoScroll;
+    document.getElementById('scrollTrack').style.background = autoScroll ? '#0e9b94' : '#2e3640';
+    document.getElementById('scrollKnob').style.left = autoScroll ? '19px' : '2px';
+  }
+
+  function parseLine(raw) {
+    const m = raw.match(/\[(INFO|DEBUG|WARN|ERROR)\]/);
+    const lv = m ? m[1] : 'INFO';
+    const color = LV_COLOR[lv] || '#9aa2ad';
+    const parts = raw.split(/\[(INFO|DEBUG|WARN|ERROR)\]\s*/);
+    const time = parts[0].trim();
+    const msg = parts[2] ? parts[2].trim() : (parts[1] || raw);
+    return { time, lv, color, msg };
+  }
+
+  function renderLogs(text) {
+    const box = document.getElementById('logBox');
+    const lines = text.split('\n').filter(l => l.trim());
+    box.innerHTML = lines.map(raw => {
+      const { time, lv, color, msg } = parseLine(raw);
+      return `<div style="display:flex;gap:12px;padding:1px 0;">` +
+        `<span style="color:#5b626d;flex:none;font-variant-numeric:tabular-nums;min-width:155px;">${escHtml(time)}</span>` +
+        `<span style="font-weight:600;flex:none;width:50px;color:${color};">${lv}</span>` +
+        `<span style="color:#aab1bb;">${escHtml(msg)}</span>` +
+        `</div>`;
+    }).join('');
+    if (autoScroll) box.scrollTop = box.scrollHeight;
+  }
+
+  function escHtml(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  function loadLog() {
+    fetch('/logs/content')
+      .then(r => r.text())
+      .then(renderLogs)
+      .catch(() => {});
+  }
+
+  loadLog();
+  setInterval(loadLog, 5000);
+</script>
+</th:block>
+</body>
+</html>

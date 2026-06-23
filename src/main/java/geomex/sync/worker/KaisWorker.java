@@ -5,6 +5,9 @@ import geomex.sync.mapper.TableMapper;
 import geomex.sync.model.ColumnDef;
 import geomex.sync.model.SyncTableDef;
 import geomex.sync.repository.OdsRepository;
+import geomex.sync.service.SyncStatusService;
+import geomex.sync.service.TargetDbService;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.geotools.api.data.SimpleFeatureSource;
 import org.geotools.api.feature.simple.SimpleFeature;
 import org.geotools.data.shapefile.ShapefileDataStore;
@@ -33,6 +36,8 @@ public class KaisWorker {
     private final TableMapper tableMapper;
     private final OdsRepository odsRepository;
     private final CoordTransformer coordTransformer;
+    private final SyncStatusService statusService;
+    private final TargetDbService targetDbService;
 
     @Value("${kais.work-dir:./KAIS_WORK}")
     private String workDir;
@@ -44,28 +49,43 @@ public class KaisWorker {
     private String orgCode;
 
     public KaisWorker(TableMapper tableMapper, OdsRepository odsRepository,
-                      CoordTransformer coordTransformer) {
+                      CoordTransformer coordTransformer, SyncStatusService statusService,
+                      TargetDbService targetDbService) {
         this.tableMapper = tableMapper;
         this.odsRepository = odsRepository;
         this.coordTransformer = coordTransformer;
+        this.statusService = statusService;
+        this.targetDbService = targetDbService;
     }
 
     public void run() {
         log.info("[KAIS] 동기화 시작 (workDir={})", workDir);
-        List<SyncTableDef> tableDefs = tableMapper.load(configPath);
-
-        for (SyncTableDef def : tableDefs) {
-            File shpFile = findShpFile(def.srcTableName);
-            if (shpFile == null) {
-                log.warn("[KAIS] SHP 파일 없음: {}", def.srcTableName);
-                continue;
+        statusService.recordStart("KAIS");
+        int totalSuccess = 0, totalError = 0;
+        boolean failed = false;
+        try {
+            List<SyncTableDef> tableDefs = tableMapper.load(configPath);
+            for (SyncTableDef def : tableDefs) {
+                File shpFile = findShpFile(def.srcTableName);
+                if (shpFile == null) {
+                    log.warn("[KAIS] SHP 파일 없음: {}", def.srcTableName);
+                    totalError++;
+                    continue;
+                }
+                int saved = processShp(def, shpFile);
+                if (saved >= 0) totalSuccess += saved;
+                else totalError++;
             }
-            processShp(def, shpFile);
+            log.info("[KAIS] 동기화 완료 (success={}, error={})", totalSuccess, totalError);
+        } catch (Exception e) {
+            log.error("[KAIS] 동기화 중 오류: {}", e.getMessage(), e);
+            failed = true;
+        } finally {
+            statusService.recordEnd("KAIS", totalSuccess, totalError, failed);
         }
-        log.info("[KAIS] 동기화 완료");
     }
 
-    private void processShp(SyncTableDef def, File shpFile) {
+    private int processShp(SyncTableDef def, File shpFile) {
         ShapefileDataStore store = null;
         try {
             store = new ShapefileDataStore(shpFile.toURI().toURL());
@@ -85,11 +105,21 @@ public class KaisWorker {
                 }
             }
 
-            int saved = odsRepository.replaceAll(def, orgCode, coordTransformer.getTargetEpsg(), rows);
-            log.info("[KAIS] {} → {}건 처리", def.tgtTableName, saved);
+            List<JdbcTemplate> targets = targetDbService.getActiveTemplates();
+            if (targets.isEmpty()) {
+                log.warn("[KAIS] 활성 대상 DB 없음 — {} 저장 건너뜀", def.tgtTableName);
+                return 0;
+            }
+            int saved = 0;
+            for (JdbcTemplate jdbc : targets) {
+                saved = odsRepository.replaceAllTo(jdbc, def, orgCode, coordTransformer.getTargetEpsg(), rows);
+            }
+            log.info("[KAIS] {} → {}건 처리 (대상 DB {}개)", def.tgtTableName, saved, targets.size());
+            return saved;
 
         } catch (Exception e) {
             log.error("[KAIS] {} 처리 실패: {}", def.tgtTableName, e.getMessage(), e);
+            return -1;
         } finally {
             if (store != null) store.dispose();
         }

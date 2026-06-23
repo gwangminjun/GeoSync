@@ -1,0 +1,106 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<sync-tables>
+<!-- 연속주제 시작 -->
+<!-- 연속주제는 web에서 먼저 레이어목록을 받아서 처리하도록 구성함. -->
+
+
+<!-- mt_usezone_cd 테이블을 새로 구성함  -->
+<!-- conn_sys_id 는 sync.properties에서  기타 파라메타는  하드코딩 -->
+	<table type='MULTIPOLYGON'>
+		<src-table-name>USEZONE:LSMD_CONT_XXXXX</src-table-name>		
+		<tgt-table-name>ods.lt_c_uzone</tgt-table-name>		
+		<columns>
+			<column><src name='mnum' type='STRING' size='33' /></column>
+			<column>
+				<src name='geometry' type='MULTIPOLYGON' size='0' />
+				<tgt name='_geometry' type='MULTIPOLYGON' size='0' />
+			</column>
+		</columns>
+	</table>
+
+<!-- 공시지가 -->
+  <!--   <table type='ATTRIBUTE' mode='S:-1:-1:1'>
+		<src-table-name>ABPD_PANN_JIGA</src-table-name>
+		<tgt-base-column>base_year</tgt-base-column>
+		<tgt-table-name>ods.anvm_jiga</tgt-table-name>
+		<columns>
+		    <column><src name='pnu' type='STRING' size='19' /><tgt name='land_cd' type='STRING' size='19' /></column>
+			<column><src name='base_year' type='STRING' size='4' /><tgt name='base_year' type='STRING' size='4' /></column>
+			<column><src name='stdmt' type='STRING' size='2' /><tgt name='base_mon' type='STRING' size='2' /></column>				
+			<column><src name='pnilp' type='LONG' size='10' /><tgt name='jiga' type='LONG' size='10' /></column>	
+			<column><src name='pjji_yn' type='STRING' size='1' /><tgt name='pyo_yn' type='STRING' size='1' /></column>	
+		</columns>
+	</table> -->
+	
+ <!-- 토지기본정보 파일 -->
+	<table type='ATTRIBUTE' mode='S:-1:-1:1'>
+		<src-table-name>ABPM_LAND_FRST_LEDG</src-table-name>
+		<tgt-table-name>ods.land_frst_ledg</tgt-table-name>
+		<columns>
+		    <column><src name='adm_sec_cd' type='STRING' size='5' /></column>
+			<column><src name='land_loc_cd' type='STRING' size='5' /></column>
+			<column><src name='ledg_gbn' type='STRING' size='1' /></column>				
+			<column><src name='bobn' type='STRING' size='4' /></column>	
+			<column><src name='bubn' type='STRING' size='4' /></column>	
+			<column><src name='jimok' type='STRING' size='2' /></column>
+			<column><src name='parea' type='DOUBLE' size='13,2' /></column>
+			<column><src name='owngbn' type='STRING' size='2' /></column>
+		</columns>
+	</table>
+
+    <!-- KRAS 연속지적 -->
+    <!-- conn_sys_id는 sync.properties에 설정,  기타 파라메타는  하드코딩 -->
+	<!-- src-table-name는 레이어명 -->
+
+	<table type='MULTIPOLYGON' mode='S:-1:-1:1'>
+		<src-table-name>LSMD_CONT_LDREG</src-table-name>		
+		<tgt-table-name>ods.lp_pa_cbnd</tgt-table-name>
+		<columns>
+		    <column><src name='pnu' type='STRING' size='19' /></column>
+			<column><src name='jibun' type='STRING' size='15' /></column>
+			<column><src name='bchk' type='STRING' size='2' /></column>				
+			<column>
+			    <src name='xgeometry' type='MULTIPOLYGON' size='' />
+				<tgt name='_geometry' type='MULTIPOLYGON' size='' />
+			</column>
+		</columns>
+	</table>
+
+<!-- 건물통합1000 -->
+	<!--<table type='MULTIPOLYGON' mode='S:-1:-1:1'>
+		<src-table-name>F_FAC_BUILDING</src-table-name>
+		<tgt-table-name>ods.f_fac_building</tgt-table-name>
+		<columns>
+			<column>
+				<src name='geometry' type='MULTIPOLYGON' size='0' />
+				<tgt name='_geometry' type='MULTIPOLYGON' size='0' />
+			</column>
+			<column><src name='ufid' type='STRING' size='28' /></column>
+			<column><src name='bld_nm' type='STRING' size='150' /></column>
+			<column><src name='dong_nm' type='STRING' size='150' /></column>
+			<column><src name='grnd_flr' type='INTEGER' size='5' /></column>
+			<column><src name='ugrnd_flr' type='INTEGER' size='5' /></column>
+			<column><src name='pnu' type='STRING' size='19' /></column>
+			<column><src name='archarea' type='DOUBLE' size='28,9' /></column>
+			<column><src name='totalarea' type='DOUBLE' size='28,9' /></column>
+			<column><src name='platarea' type='DOUBLE' size='28,9' /></column>
+			<column><src name='height' type='DOUBLE' size='28,9' /></column>
+			<column><src name='strct_cd' type='STRING' size='2' /></column>
+			<column><src name='usability' type='STRING' size='5' /></column>
+			<column><src name='bc_rat' type='DOUBLE' size='28,9' /></column>
+			<column><src name='vl_rat' type='DOUBLE' size='28,9' /></column>
+			<column><src name='bldrgst_pk' type='STRING' size='28' /></column>
+			<column><src name='useapr_day' type='STRING' size='8' /></column>
+			<column><src name='regist_day' type='STRING' size='8' /></column>
+			<column><src name='gb_cd' type='STRING' size='2' /></column>
+			<column><src name='viol_bd_yn' type='STRING' size='1' /></column>
+			<column><src name='bldg_pnu' type='STRING' size='19' /></column>
+			<column>
+			     <src name='bldg_pnu_y' type='STRING' size='1' />
+				 <tgt name='bldg_pnu_yn' type='STRING' size='1' />
+			</column>
+			<column><src name='bld_unlice' type='STRING' size='1' /></column>
+			<column><src name='bd_mgt_sn' type='STRING' size='25' /></column>
+		</columns>
+	</table> -->
+</sync-tables>

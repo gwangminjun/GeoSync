@@ -8,8 +8,8 @@ group = 'geomex'
 version = '1.0.0'
 
 java {
-    sourceCompatibility = JavaVersion.VERSION_21
-    targetCompatibility = JavaVersion.VERSION_21
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
 }
 
 ext {
@@ -22,12 +22,25 @@ repositories {
 }
 
 dependencies {
-    implementation 'org.springframework.boot:spring-boot-starter'
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-thymeleaf'
+    implementation 'org.springframework.boot:spring-boot-starter-jdbc'
+    implementation 'nz.net.ultraq.thymeleaf:thymeleaf-layout-dialect:3.3.0'
 
-    // GeoTools: SHP 읽기 + EPSG 좌표변환
-    implementation "org.geotools:gt-shapefile:${geotoolsVersion}"
-    implementation "org.geotools:gt-referencing:${geotoolsVersion}"
-    implementation "org.geotools:gt-epsg-hsql:${geotoolsVersion}"
+    // GeoTools: SHP 읽기 + EPSG 좌표변환 (JAI 래스터 처리 불필요하므로 제외)
+    implementation("org.geotools:gt-shapefile:${geotoolsVersion}") {
+        exclude group: 'javax.media', module: 'jai_core'
+        exclude group: 'javax.media', module: 'jai_codec'
+        exclude group: 'javax.media', module: 'jai_imageio'
+    }
+    implementation("org.geotools:gt-referencing:${geotoolsVersion}") {
+        exclude group: 'javax.media', module: 'jai_core'
+        exclude group: 'javax.media', module: 'jai_codec'
+    }
+    implementation("org.geotools:gt-epsg-hsql:${geotoolsVersion}") {
+        exclude group: 'javax.media', module: 'jai_core'
+        exclude group: 'javax.media', module: 'jai_codec'
+    }
 
     // PostgreSQL + PostGIS
     runtimeOnly 'org.postgresql:postgresql:42.7.4'
@@ -49,11 +62,13 @@ bootJar {
 
 // ── Step 8에서 추가: jlink 최소 JRE 생성 ──────────────────────────────────
 tasks.register('createMinimalJre', Exec) {
-    def javaHome = System.getenv('JAVA_HOME') ?: ''
+    // 프로젝트 내 jdk/ 우선, 없으면 JAVA_HOME 사용
+    def localJdk = file("${rootDir}/jdk")
+    def javaHome = localJdk.exists() ? localJdk.absolutePath : (System.getenv('JAVA_HOME') ?: '')
     def outputDir = layout.buildDirectory.dir('jre').get().asFile
 
     doFirst {
-        if (!javaHome) throw new GradleException('JAVA_HOME 환경변수를 설정하세요 (JDK 21 경로)')
+        if (!javaHome) throw new GradleException('프로젝트 jdk/ 폴더 또는 JAVA_HOME 환경변수를 설정하세요')
         outputDir.deleteDir()
     }
 
@@ -87,6 +102,10 @@ tasks.register('jlinkZip', Zip) {
     from('scripts') {
         into 'bin'
         include '*.bat'
+    }
+    from('bin') {
+        into 'bin'
+        include 'nssm.exe'
     }
     from('conf') {
         into 'conf'

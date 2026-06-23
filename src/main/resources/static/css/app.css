@@ -1,0 +1,19 @@
+.log-box {
+  height: 70vh;
+  overflow-y: auto;
+  font-size: 0.78rem;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.navbar-brand {
+  letter-spacing: 1px;
+}
+
+.card {
+  transition: box-shadow .15s ease;
+}
+
+.card:hover {
+  box-shadow: 0 2px 8px rgba(0,0,0,.12);
+}

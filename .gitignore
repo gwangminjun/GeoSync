@@ -1,6 +1,9 @@
 .gradle/
 build/
 jre/
+jdk/
+nssm-*.zip
+bin/nssm.exe
 *.class
 *.log
 logs/

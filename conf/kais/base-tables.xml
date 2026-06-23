@@ -1,0 +1,246 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sync-tables>	
+	<!-- 건물 -->
+	    <table type='MULTIPOLYGON' mode='S:-1:-1:1'>
+			<src-table-name>tl_spbd_buld</src-table-name>
+			<tgt-table-name>ods.tl_spbd_buld</tgt-table-name>
+			<src-clause><![CDATA[sig_cd='46870']]></src-clause>
+			<columns>
+				<column key='true'><src name='bul_man_no' type='INTEGER' size='7' /></column>
+				<column key='true'><src name='sig_cd' type='STRING' size='5' /></column>
+				<column><src name='rn_cd' type='STRING' size='7' /></column>
+				<column key='true'><src name='rds_man_no' type='INTEGER' size='12' /></column>
+				<column><src name='bsi_int_sn' type='INTEGER' size='10' /></column>
+				<column><src name='eqb_man_sn' type='INTEGER' size='10' /></column>
+				<column><src name='buld_se_cd' type='STRING' size='1' /></column>
+				<column><src name='buld_mnnm' type='INTEGER' size='5' /></column>
+				<column><src name='buld_slno' type='INTEGER' size='5' /></column>
+				<column><src name='buld_nm' type='STRING' size='200' /></column>
+				<column><src name='bul_eng_nm' type='STRING' size='40' /></column>
+				<column><src name='buld_nm_dc' type='STRING' size='100' /></column>
+				<column><src name='bdtyp_cd' type='STRING' size='5' /></column>
+				<column><src name='bul_dpn_se' type='STRING' size='1' /></column>
+				<column><src name='gro_flo_co' type='INTEGER' size='3' /></column>
+				<column><src name='und_flo_co' type='INTEGER' size='3' /></column>
+				<column><src name='pos_bul_nm' type='STRING' size='40' /></column>
+				<column><src name='emd_cd' type='STRING' size='3' /></column>
+				<column><src name='li_cd' type='STRING' size='2' /></column>
+				<column><src name='mntn_yn' type='STRING' size='1' /></column>
+				<column><src name='lnbr_mnnm' type='INTEGER' size='4' /></column>
+				<column><src name='lnbr_slno' type='INTEGER' size='4' /></column>
+				<column><src name='ntfc_de' type='STRING' size='8' /></column>
+				<column><src name='mvm_res_cd' type='STRING' size='10' /></column>
+				<column><src name='mvmn_resn' type='STRING' size='254' /></column>
+				<column><src name='mvmn_de' type='STRING' size='8' /></column>
+				<column><src name='opert_de' type='STRING' size='14' /></column>
+				<column><src name='bsi_zon_no' type='STRING' size='5' /></column>
+				<column><src name='bd_mgt_sn' type='STRING' size='25' /></column>		
+     			<column>
+				    <src name='xgeometry' type='MULTIPOLYGON' size='' />
+					<tgt name='_geometry' type='MULTIPOLYGON' size='' />
+				</column>
+				<column>
+				    <src name='&apos;46870&apos;' type='STRING' size='5' />
+				    <tgt name='org_cd' type='STRING' size='5' />
+				</column>
+			</columns>
+		</table>
+		
+		<!-- 건물군 -->
+		<table type='MULTIPOLYGON' mode='S:-1:-1:1'>
+			<src-table-name>tl_spbd_eqb</src-table-name>
+			<tgt-table-name>ods.tl_spbd_eqb</tgt-table-name>
+			<src-clause><![CDATA[sig_cd='46870']]></src-clause>
+			<columns>
+				<column key='true'><src name='sig_cd' type='STRING' size='5' /></column>
+				<column key='true'><src name='eqb_man_sn' type='INTEGER' size='10' /></column>
+				<column><src name='opert_de' type='STRING' size='14' /></column>
+				<column>
+				    <src name='xgeometry' type='MULTIPOLYGON' size='' />
+					<tgt name='_geometry' type='MULTIPOLYGON' size='' />
+				</column>
+				<column>
+				    <src name='&apos;46870&apos;' type='STRING' size='5' />
+				    <tgt name='org_cd' type='STRING' size='5' />
+				</column>
+			</columns>
+		</table>
+		
+		<!-- 도로구간 -->
+		<table type='MULTILINESTRING' mode='S:-1:-1:1'>
+			<src-table-name>tl_sprd_manage</src-table-name>
+			<tgt-table-name>ods.tl_sprd_manage</tgt-table-name>
+			<src-clause><![CDATA[sig_cd='46870']]></src-clause>
+			<columns>
+				<column key='true'><src name='sig_cd' type='STRING' size='5' /></column>
+				<column key='true'><src name='rds_man_no' type='INTEGER' size='12' /></column>
+				<column><src name='rn' type='STRING' size='80' /></column>
+				<column><src name='rn_cd' type='STRING' size='7' /></column>
+				<column><src name='eng_rn' type='STRING' size='80' /></column>
+				<column><src name='ntfc_de' type='STRING' size='8' /></column>
+				<column><src name='wdr_rd_cd' type='STRING' size='10' /></column>
+				<column><src name='roa_cls_se' type='STRING' size='2' /></column>
+				<column><src name='rds_dpn_se' type='STRING' size='1' /></column>
+				<column><src name='rbp_cn' type='STRING' size='80' /></column>
+				<column><src name='rep_cn' type='STRING' size='80' /></column>
+				<column><src name='road_bt' type='DOUBLE' size='10,3' /></column>
+				<column><src name='road_lt' type='DOUBLE' size='10,3' /></column>
+				<column><src name='bsi_int' type='STRING' size='5' /></column>
+				<column><src name='alwnc_resn' type='STRING' size='254' /></column>
+				<column><src name='alwnc_de' type='STRING' size='8' /></column>
+				<column><src name='mvm_res_cd' type='STRING' size='10' /></column>
+				<column><src name='mvmn_resn' type='STRING' size='254' /></column>
+				<column><src name='mvmn_de' type='STRING' size='8' /></column>
+				<column><src name='opert_de' type='STRING' size='14' /></column>
+	     		<column>
+				    <src name='xgeometry' type='MULTILINESTRING' size='' />
+					<tgt name='_geometry' type='MULTILINESTRING' size='' />
+				</column>
+				<column>
+				    <src name='&apos;46870&apos;' type='STRING' size='5' />
+				    <tgt name='org_cd' type='STRING' size='5' />
+				</column>			
+			</columns>
+		</table>
+		
+		<!-- 실폭도로 -->
+		<table type='MULTIPOLYGON' mode='S:-1:-1:1'>
+			<src-table-name>tl_sprd_rw</src-table-name>
+			<tgt-table-name>ods.tl_sprd_rw</tgt-table-name>
+			<src-clause><![CDATA[sig_cd='46870']]></src-clause>
+			<columns>
+			    <column key='true'><src name='sig_cd' type='STRING' size='5' /></column>
+				<column key='true'><src name='rw_sn' type='INTEGER' size='12' /></column>
+				<column><src name='opert_de' type='STRING' size='14' /></column>
+				<column>
+				    <src name='xgeometry' type='MULTIPOLYGON' size='' />
+					<tgt name='_geometry' type='MULTIPOLYGON' size='' />
+				</column>
+				<column>
+				    <src name='&apos;46870&apos;' type='STRING' size='5' />
+				    <tgt name='org_cd' type='STRING' size='5' />
+				</column>
+			</columns>
+		</table>		
+
+		<!-- 시설물 위치 -->
+		<!-- <table type='POINT' mode='S:-1:-1:1'>
+			<src-table-name>tl_spot_fcltylc</src-table-name>
+			<tgt-table-name>ods.tl_spot_fcltylc</tgt-table-name>
+			<columns>
+				<column key='true'><src name='sig_cd' type='STRING' size='5' /></column>
+				<column key='true'><src name='fclty_sn' type='INTEGER' size='12' /></column>
+				<column><src name='pil_man_no' type='STRING' size='20' /></column>
+				<column><src name='ins_fcl_se' type='STRING' size='9' /></column>
+				<column><src name='ima_fil_sn' type='INTEGER' size='11' /></column>
+				<column><src name='symbol_se' type='STRING' size='10' /></column>
+				<column><src name='bsi_zon_no' type='INTEGER' size='5' /></column>
+				<column><src name='rec_chc_de' type='STRING' size='8' /></column>
+				<column><src name='chc_stt_cd' type='STRING' size='10' /></column>
+				<column><src name='opert_de' type='STRING' size='14' /></column>
+				<column key='true'><src name='crsrd_sn' type='INTEGER' size='12' /></column>
+				<column><src name='rds_man_no' type='INTEGER' size='12' /></column>
+				<column>
+				    <src name='xgeometry' type='POINT' size='' />
+					<tgt name='_geometry' type='POINT' size='' />
+				</column>
+				<column>
+				    <src name='&apos;46870&apos;' type='STRING' size='5' />
+				    <tgt name='org_cd' type='STRING' size='5' />
+				</column>
+			</columns>
+		</table> -->		
+		
+		<!--기초구간 -->
+		<table type='MULTILINESTRING' mode='S:-1:-1:1'>
+			<src-table-name>tl_sprd_intrvl</src-table-name>		
+			<tgt-table-name>ods.tl_sprd_intrvl</tgt-table-name>
+			<src-clause><![CDATA[sig_cd='46870']]></src-clause>
+			<columns>
+				<column key='true'><src name='sig_cd' type='STRING' size='5' /></column>
+				<column key='true'><src name='rds_man_no' type='INTEGER' size='12' /></column>
+				<column key='true'><src name='bsi_int_sn' type='INTEGER' size='10' /></column>
+				<column><src name='odd_bsi_mn' type='INTEGER' size='4' /></column>
+				<column><src name='odd_bsi_sl' type='INTEGER' size='4' /></column>
+				<column><src name='eve_bsi_mn' type='INTEGER' size='4' /></column>
+				<column><src name='eve_bsi_sl' type='INTEGER' size='4' /></column>
+				<column><src name='opert_de' type='STRING' size='14' /></column>
+				<column>
+					<src name='xgeometry' type='MULTILINESTRING' size='' />
+					<tgt name='_geometry' type='MULTILINESTRING' size='' />
+				</column>
+				<column>
+				    <src name='&apos;46870&apos;' type='STRING' size='5' />
+				    <tgt name='org_cd' type='STRING' size='5' />
+				</column>
+			</columns>
+		</table>	
+		
+		<!-- 교차로 -->
+		<table type='POINT' mode='S:-1:-1:1'>
+			<src-table-name>tl_sprd_crsrd</src-table-name>
+			<tgt-table-name>ods.tl_sprd_crsrd</tgt-table-name>
+			<src-clause><![CDATA[sig_cd='46870']]></src-clause>
+			<columns>
+				<column key='true'><src name='sig_cd' type='STRING' size='5' /></column>
+				<column key='true'><src name='crsrd_sn' type='INTEGER' size='12' /></column>
+				<column><src name='kor_crsrd' type='STRING' size='100' /></column>
+				<column><src name='eng_crsrd' type='STRING' size='100' /></column>
+				<column><src name='opert_de' type='STRING' size='14' /></column>
+				<column>
+				    <src name='xgeometry' type='POINT' size='' />
+					<tgt name='_geometry' type='POINT' size='' />
+				</column>
+				<column>
+				    <src name='&apos;46870&apos;' type='STRING' size='5' />
+				    <tgt name='org_cd' type='STRING' size='5' />
+				</column>
+			</columns>
+		</table>	
+		
+		<!-- 연결선 -->	
+		<!-- <table type='MULTILINESTRING' mode='S:-1:-1:1'>
+			<src-table-name>tl_spot_cntc</src-table-name>	
+			<tgt-table-name>ods.tl_spot_cntc</tgt-table-name>
+			<columns>
+				<column key='true'><src name='sig_cd' type='STRING' size='5' /></column>
+				<column key='true'><src name='ent_man_no' type='INTEGER' size='10' /></column>
+				<column><src name='rds_man_no' type='INTEGER' size='12' /></column>
+				<column><src name='bsi_int_sn' type='INTEGER' size='10' /></column>			
+				<column><src name='cnt_drc_ln' type='STRING' size='1' /></column>
+				<column><src name='cnt_dst_ln' type='STRING' size='10' /></column>		
+				<column><src name='opert_de' type='STRING' size='14' /></column>			
+				<column>
+					<src name='xgeometry' type='MULTILINESTRING' size='' />
+					<tgt name='_geometry' type='MULTILINESTRING' size='' />
+				</column>
+				<column>
+				    <src name='&apos;46870&apos;' type='STRING' size='5' />
+				    <tgt name='org_cd' type='STRING' size='5' />
+				</column>
+			</columns>
+		</table> -->		
+		
+		<!-- 출입구 -->
+       <table type='POINT' mode='S:-1:-1:1'>
+			<src-table-name>tl_spbd_entrc</src-table-name>
+			<tgt-table-name>ods.tl_spbd_entrc</tgt-table-name>
+			<src-clause><![CDATA[sig_cd='46870']]></src-clause>
+			<columns>
+			    <column key='true'><src name='sig_cd' type='STRING' size='5' /></column>
+			    <column key='true'><src name='ent_man_no' type='INTEGER' size='10' /></column>
+			    <column><src name='eqb_man_sn' type='INTEGER' size='10' /></column>
+			    <column><src name='bul_man_no' type='INTEGER' size='7' /></column>
+				<column><src name='entrc_se' type='STRING' size='2' /></column>
+				<column><src name='opert_de' type='STRING' size='14' /></column>
+   		        <column>
+				    <src name='xgeometry' type='POINT' size='' />
+					<tgt name='_geometry' type='POINT' size='' />
+				</column>
+				<column>
+				    <src name='&apos;46870&apos;' type='STRING' size='5' />
+				    <tgt name='org_cd' type='STRING' size='5' />
+				</column>
+			</columns>
+		</table>        
+</sync-tables>

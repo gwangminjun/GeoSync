@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title layout:title-pattern="$CONTENT_TITLE — GeoSync">GeoSync</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0;}
+    html,body{background:#14171c;font-family:Pretendard,system-ui,sans-serif;color:#e7eaee;-webkit-font-smoothing:antialiased;}
+    a{text-decoration:none;color:inherit;}
+    input,button{outline:none;font-family:inherit;}
+    ::placeholder{color:#5b626d;}
+    *::-webkit-scrollbar{width:8px;height:8px;}
+    *::-webkit-scrollbar-thumb{background:#2e3640;border-radius:8px;border:2px solid #14171c;}
+    *::-webkit-scrollbar-track{background:transparent;}
+  </style>
+  <th:block layout:fragment="head"></th:block>
+</head>
+<body>
+
+<!-- ===== nav ===== -->
+<div style="border-bottom:1px solid #232830;background:#171b21;position:sticky;top:0;z-index:10;">
+  <div style="max-width:1200px;margin:0 auto;display:flex;align-items:center;gap:18px;padding:0 28px;height:60px;">
+    <div style="font-size:18px;font-weight:800;color:#f3f5f7;letter-spacing:-0.02em;">
+      Geo<span style="color:#0e9b94;">Sync</span>
+    </div>
+    <div style="font-size:12px;color:#69707b;" th:text="'기관코드 ' + ${orgCode}">기관코드 46870</div>
+
+    <div style="display:flex;gap:7px;margin-left:6px;">
+      <!-- KRAS 상태 -->
+      <span th:if="${krasRunning}"
+            style="display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;font-size:11px;font-weight:600;background:#2a2517;color:#d9b066;">
+        <span style="width:6px;height:6px;border-radius:99px;background:#c08a2a;"></span>KRAS 실행중
+      </span>
+      <span th:unless="${krasRunning}"
+            style="display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;font-size:11px;font-weight:600;background:#1e242c;color:#9aa2ad;">
+        <span style="width:6px;height:6px;border-radius:99px;background:#69707b;"></span>KRAS 대기
+      </span>
+      <!-- KAIS 상태 -->
+      <span th:if="${kaisRunning}"
+            style="display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;font-size:11px;font-weight:600;background:#2a2517;color:#d9b066;">
+        <span style="width:6px;height:6px;border-radius:99px;background:#c08a2a;"></span>KAIS 실행중
+      </span>
+      <span th:unless="${kaisRunning}"
+            style="display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;font-size:11px;font-weight:600;background:#1e242c;color:#9aa2ad;">
+        <span style="width:6px;height:6px;border-radius:99px;background:#69707b;"></span>KAIS 대기
+      </span>
+    </div>
+
+    <div style="margin-left:auto;display:flex;gap:2px;font-size:13.5px;">
+      <a th:href="@{/}"
+         th:style="${currentPage == 'dashboard'} ? 'padding:8px 14px;border-radius:8px;font-weight:600;color:#66c4be;background:rgba(14,155,148,0.16);' : 'padding:8px 14px;border-radius:8px;font-weight:500;color:#8a919c;'">
+        대시보드</a>
+      <a th:href="@{/logs}"
+         th:style="${currentPage == 'logs'} ? 'padding:8px 14px;border-radius:8px;font-weight:600;color:#66c4be;background:rgba(14,155,148,0.16);' : 'padding:8px 14px;border-radius:8px;font-weight:500;color:#8a919c;'">
+        로그</a>
+      <a th:href="@{/settings}"
+         th:style="${currentPage == 'settings'} ? 'padding:8px 14px;border-radius:8px;font-weight:600;color:#66c4be;background:rgba(14,155,148,0.16);' : 'padding:8px 14px;border-radius:8px;font-weight:500;color:#8a919c;'">
+        설정</a>
+    </div>
+  </div>
+</div>
+
+<main layout:fragment="content" style="max-width:1200px;margin:0 auto;padding:30px 28px 44px;">
+</main>
+
+<th:block layout:fragment="scripts"></th:block>
+</body>
+</html>
