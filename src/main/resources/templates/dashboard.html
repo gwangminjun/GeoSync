@@ -251,10 +251,10 @@
 
       <form id="loadForm" method="post" action="/sync/kras-load">
 
-        <!-- 대상 DB -->
+        <!-- 대상 DB (각 DB별 스키마 포함) -->
         <div style="margin-bottom:20px;">
           <div style="font-size:12px;font-weight:600;color:#8a919c;letter-spacing:0.04em;margin-bottom:10px;">대상 DB</div>
-          <div id="targetList" style="display:flex;flex-direction:column;gap:8px;">
+          <div id="targetList" style="display:flex;flex-direction:column;gap:10px;">
             <div style="color:#69707b;font-size:13px;">불러오는 중...</div>
           </div>
         </div>
@@ -274,18 +274,6 @@
             <div style="color:#69707b;font-size:13px;">불러오는 중...</div>
           </div>
           <div id="fileSelectionSummary" style="margin-top:8px;font-size:11.5px;color:#69707b;"></div>
-        </div>
-
-        <!-- 스키마 -->
-        <div style="margin-bottom:24px;">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
-            <label style="font-size:12px;font-weight:600;color:#8a919c;letter-spacing:0.04em;">대상 스키마</label>
-            <span id="schemaLoadMsg" style="font-size:11.5px;color:#69707b;"></span>
-          </div>
-          <select name="schema" id="schemaSelect"
-                  style="width:100%;box-sizing:border-box;padding:9px 12px;border-radius:8px;border:1px solid #2e3640;background:#141820;color:#e7eaee;font-size:13.5px;font-family:inherit;outline:none;cursor:pointer;appearance:none;-webkit-appearance:none;">
-            <option value="">DB를 먼저 선택하세요</option>
-          </select>
         </div>
 
         <!-- 버튼 -->
@@ -373,22 +361,38 @@
           var targets = data.targets || [];
           if (targets.length === 0) {
             list.innerHTML = '<div style="color:#e88a82;font-size:13px;">설정된 DB가 없습니다.</div>';
-            setSchemaSelect([], '선택 가능한 DB 없음', null);
           } else {
             targets.forEach(function(t) {
-              var row = document.createElement('label');
-              row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;border:1px solid #2e3640;background:#141820;cursor:pointer;';
-              row.innerHTML =
+              var wrapper = document.createElement('div');
+              wrapper.style.cssText = 'border:1px solid #2e3640;border-radius:8px;background:#141820;overflow:hidden;';
+
+              var labelRow = document.createElement('label');
+              labelRow.style.cssText = 'display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer;';
+              labelRow.innerHTML =
                 '<input type="checkbox" name="targetIdx" value="' + t.idx + '" checked ' +
-                  'style="width:15px;height:15px;accent-color:#0e9b94;cursor:pointer;" ' +
-                  'onchange="onTargetChange()">' +
-                '<div>' +
+                  'style="width:15px;height:15px;accent-color:#0e9b94;cursor:pointer;flex-shrink:0;" ' +
+                  'onchange="onTargetCheck(this)">' +
+                '<div style="flex:1;min-width:0;">' +
                   '<div style="font-size:13px;font-weight:600;color:#e7eaee;">' + escapeHtml(t.name) + '</div>' +
-                  '<div style="font-size:11.5px;color:#69707b;font-family:monospace;margin-top:2px;">' + escapeHtml(t.url) + '</div>' +
+                  '<div style="font-size:11.5px;color:#69707b;font-family:monospace;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml(t.url) + '</div>' +
                 '</div>';
-              list.appendChild(row);
+
+              var schemaRow = document.createElement('div');
+              schemaRow.id = 'schemaRow_' + t.idx;
+              schemaRow.style.cssText = 'display:flex;align-items:center;gap:8px;padding:8px 12px;border-top:1px solid #262c35;background:#111520;';
+              schemaRow.innerHTML =
+                '<span style="font-size:11.5px;color:#5b626d;white-space:nowrap;">스키마</span>' +
+                '<select name="schema_' + t.idx + '" id="schemaSelect_' + t.idx + '" ' +
+                  'style="flex:1;padding:5px 8px;border-radius:6px;border:1px solid #2e3640;background:#141820;color:#e7eaee;font-size:12.5px;font-family:inherit;outline:none;cursor:pointer;appearance:none;-webkit-appearance:none;">' +
+                  '<option value="">불러오는 중...</option>' +
+                '</select>';
+
+              wrapper.appendChild(labelRow);
+              wrapper.appendChild(schemaRow);
+              list.appendChild(wrapper);
+
+              fetchSchemas(t.idx, _defaultSchema);
             });
-            onTargetChange();
           }
 
           // 파일 목록 렌더링 (테이블별 그룹)
@@ -468,56 +472,46 @@
       updateFileSummary();
     }
 
-    function onTargetChange() {
-      var checkboxes = document.querySelectorAll('#targetList input[type="checkbox"]');
-      var firstChecked = null;
-      checkboxes.forEach(function(cb) {
-        if (cb.checked && firstChecked === null) firstChecked = cb.value;
-      });
-
-      if (firstChecked === null) {
-        setSchemaSelect([], 'DB를 선택하세요', null);
-        return;
+    function onTargetCheck(cb) {
+      var idx = cb.value;
+      var schemaRow = document.getElementById('schemaRow_' + idx);
+      if (schemaRow) {
+        schemaRow.style.display = cb.checked ? 'flex' : 'none';
       }
-
-      setSchemaSelect([], '불러오는 중...', null);
-      fetch('/ods/schemas?idx=' + firstChecked)
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
-          if (data.error) {
-            setSchemaSelect([], '스키마 조회 실패: ' + data.error, null);
-            return;
-          }
-          setSchemaSelect(data.schemas || [], '', _defaultSchema);
-        })
-        .catch(function() {
-          setSchemaSelect([], '스키마 조회 실패', null);
-        });
     }
 
-    function setSchemaSelect(schemas, msg, selectValue) {
-      var sel = document.getElementById('schemaSelect');
-      var msgEl = document.getElementById('schemaLoadMsg');
-      msgEl.textContent = msg || '';
-      sel.innerHTML = '';
-      if (schemas.length === 0) {
-        var opt = document.createElement('option');
-        opt.value = '';
-        opt.textContent = msg || '스키마 없음';
-        sel.appendChild(opt);
-        sel.disabled = true;
-        return;
-      }
-      sel.disabled = false;
-      schemas.forEach(function(s) {
-        var opt = document.createElement('option');
-        opt.value = s;
-        opt.textContent = s;
-        if (s === selectValue) opt.selected = true;
-        sel.appendChild(opt);
-      });
-      // selectValue 미일치 시 첫 항목 선택
-      if (!sel.value && schemas.length > 0) sel.value = schemas[0];
+    function fetchSchemas(idx, defaultSchema) {
+      var sel = document.getElementById('schemaSelect_' + idx);
+      if (!sel) return;
+      sel.innerHTML = '<option value="">불러오는 중...</option>';
+      sel.disabled = true;
+      fetch('/ods/schemas?idx=' + idx)
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          sel.innerHTML = '';
+          var schemas = data.schemas || [];
+          if (schemas.length === 0) {
+            var opt = document.createElement('option');
+            opt.value = '';
+            opt.textContent = '스키마 없음';
+            sel.appendChild(opt);
+            sel.disabled = true;
+            return;
+          }
+          sel.disabled = false;
+          schemas.forEach(function(s) {
+            var opt = document.createElement('option');
+            opt.value = s;
+            opt.textContent = s;
+            if (s === defaultSchema) opt.selected = true;
+            sel.appendChild(opt);
+          });
+          if (!sel.value && schemas.length > 0) sel.value = schemas[0];
+        })
+        .catch(function() {
+          sel.innerHTML = '<option value="">조회 실패</option>';
+          sel.disabled = true;
+        });
     }
 
     function closeLoadModal() {

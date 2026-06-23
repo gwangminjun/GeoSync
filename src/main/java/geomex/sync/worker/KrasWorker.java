@@ -80,7 +80,7 @@ public class KrasWorker {
                 failed = true;
                 return;
             }
-            recreateSchemaTables(targets, null);
+            recreateSchemaTables(buildTargetsWithSchema(targets, null, null));
             statusService.startProgress("KRAS", tableDefs.size(), "");
             Map<String, List<String>> manifest = new LinkedHashMap<>();
             int completed = 0;
@@ -141,7 +141,7 @@ public class KrasWorker {
     }
 
     public void runLoad() {
-        runLoad(null, null, null);
+        runLoad(null, (Map<Integer, String>) null, null);
     }
 
     public void runLoad(List<Integer> targetIndices, String schemaOverride) {
@@ -149,8 +149,12 @@ public class KrasWorker {
     }
 
     public void runLoad(List<Integer> targetIndices, String schemaOverride, java.util.Set<String> fileFilter) {
-        log.info("[KRAS] 적재 시작 (파일 → DB, schema={}, targets={}, files={})",
-                schemaOverride != null ? schemaOverride : "기본",
+        // 단일 스키마를 모든 타겟에 일괄 적용 (스케줄 실행용)
+        runLoad(targetIndices, (Map<Integer, String>) null, fileFilter);
+    }
+
+    public void runLoad(List<Integer> targetIndices, Map<Integer, String> schemaMap, java.util.Set<String> fileFilter) {
+        log.info("[KRAS] 적재 시작 (파일 → DB, targets={}, files={})",
                 targetIndices != null ? targetIndices : "전체",
                 fileFilter != null ? fileFilter : "전체");
         statusService.recordStart("KRAS_LOAD");
@@ -158,8 +162,8 @@ public class KrasWorker {
         boolean failed = false;
         try {
             List<TargetDbService.ActiveTarget> allTargets = targetDbService.getConfiguredTargets();
-            List<TargetDbService.ActiveTarget> selectedTargets = selectTargets(allTargets, targetIndices);
-            if (selectedTargets.isEmpty()) {
+            List<TargetWithSchema> selected = buildTargetsWithSchema(allTargets, targetIndices, schemaMap);
+            if (selected.isEmpty()) {
                 log.warn("[KRAS] 선택된 대상 DB 없음 — 적재 중단");
                 failed = true;
                 return;
@@ -169,15 +173,15 @@ public class KrasWorker {
             List<SyncTableDef> tableDefs = tableMapper.load(settings.krasConfig());
             if (fileFilter == null || fileFilter.isEmpty()) {
                 // 전체 적재: 모든 테이블 DROP + 재생성
-                recreateSchemaTables(selectedTargets, schemaOverride);
+                recreateSchemaTables(selected);
             } else {
                 // 선택 적재: 적재할 테이블만 DROP → replaceAllTo의 ensureTableExists가 새 SRID로 재생성
                 for (SyncTableDef def : tableDefs) {
                     boolean willLoad = manifest.getOrDefault(def.srcTableName, List.of())
                             .stream().anyMatch(fileFilter::contains);
                     if (willLoad) {
-                        for (TargetDbService.ActiveTarget target : selectedTargets) {
-                            odsRepository.dropTable(target.jdbc(), def.tgtTableName, schemaOverride);
+                        for (TargetWithSchema ts : selected) {
+                            odsRepository.dropTable(ts.target().jdbc(), def.tgtTableName, ts.schema());
                         }
                     }
                 }
@@ -197,7 +201,7 @@ public class KrasWorker {
                 }
                 statusService.updateProgress("KRAS_LOAD", completedFiles, (int) totalFiles, def.tgtTableName);
                 try {
-                    int saved = loadTable(def, fileBaseNames, selectedTargets, schemaOverride);
+                    int saved = loadTable(def, fileBaseNames, selected);
                     if (saved >= 0) totalSuccess += saved;
                     else totalError++;
                 } catch (Exception e) {
@@ -219,15 +223,20 @@ public class KrasWorker {
         }
     }
 
-    private List<TargetDbService.ActiveTarget> selectTargets(List<TargetDbService.ActiveTarget> all, List<Integer> indices) {
-        if (indices == null || indices.isEmpty()) {
-            return all;
+    private record TargetWithSchema(TargetDbService.ActiveTarget target, String schema) {}
+
+    private List<TargetWithSchema> buildTargetsWithSchema(
+            List<TargetDbService.ActiveTarget> all, List<Integer> indices, Map<Integer, String> schemaMap) {
+        List<TargetWithSchema> result = new ArrayList<>();
+        for (int i = 0; i < all.size(); i++) {
+            if (indices == null || indices.contains(i)) {
+                String schema = schemaMap != null ? schemaMap.get(i) : null;
+                result.add(new TargetWithSchema(all.get(i), schema));
+            }
         }
-        return indices.stream()
-                .filter(i -> i >= 0 && i < all.size())
-                .map(all::get)
-                .toList();
+        return result;
     }
+
 
     private List<String> collectTable(SyncTableDef def) {
         List<String> written = new ArrayList<>();
@@ -249,7 +258,7 @@ public class KrasWorker {
     }
 
     private int loadTable(SyncTableDef def, List<String> fileBaseNames,
-                          List<TargetDbService.ActiveTarget> targets, String schemaOverride) throws IOException {
+                          List<TargetWithSchema> targets) throws IOException {
         List<Map<String, Object>> rows = new ArrayList<>();
         for (String baseName : fileBaseNames) {
             rows.addAll(fileReader.readJson(baseName));
@@ -259,10 +268,11 @@ public class KrasWorker {
             return 0;
         }
         int saved = 0;
-        for (TargetDbService.ActiveTarget target : targets) {
-            log.info("[KRAS] loading {} into target {}", def.tgtTableName, target.label());
-            saved = odsRepository.replaceAllTo(target.jdbc(), def, settings.orgCode(),
-                    coordTransformer.getTargetEpsg(), rows, schemaOverride, "KRAS_LOAD");
+        for (TargetWithSchema ts : targets) {
+            log.info("[KRAS] loading {} into target {} (schema={})",
+                    def.tgtTableName, ts.target().label(), ts.schema() != null ? ts.schema() : "default");
+            saved = odsRepository.replaceAllTo(ts.target().jdbc(), def, settings.orgCode(),
+                    coordTransformer.getTargetEpsg(), rows, ts.schema(), "KRAS_LOAD");
         }
         return saved;
     }
@@ -334,11 +344,11 @@ public class KrasWorker {
         return saved;
     }
 
-    private void recreateSchemaTables(List<TargetDbService.ActiveTarget> targets, String schemaOverride) {
-        for (TargetDbService.ActiveTarget target : targets) {
+    private void recreateSchemaTables(List<TargetWithSchema> targets) {
+        for (TargetWithSchema ts : targets) {
             log.info("[KRAS] recreating sync tables on target {} (schema={})",
-                    target.label(), schemaOverride != null ? schemaOverride : "default");
-            odsRepository.recreateSchemaTables(target.jdbc(), schemaOverride);
+                    ts.target().label(), ts.schema() != null ? ts.schema() : "default");
+            odsRepository.recreateSchemaTables(ts.target().jdbc(), ts.schema());
         }
     }
 

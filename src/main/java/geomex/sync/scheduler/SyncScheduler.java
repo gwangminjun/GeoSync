@@ -9,6 +9,7 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 @Component
@@ -73,7 +74,7 @@ public class SyncScheduler {
     }
 
     public void runKrasLoad() {
-        runKrasLoad(null, null, null);
+        runKrasLoad(null, (String) null, null);
     }
 
     public void runKrasLoad(List<Integer> targetIndices, String schemaOverride) {
@@ -88,6 +89,19 @@ public class SyncScheduler {
         }
         try {
             krasWorker.runLoad(targetIndices, schemaOverride, tableFilter);
+        } finally {
+            krasLoadRunning.set(false);
+        }
+    }
+
+    public void runKrasLoad(List<Integer> targetIndices, Map<Integer, String> schemaMap, java.util.Set<String> fileFilter) {
+        if (!syncEnabled) return;
+        if (!krasLoadRunning.compareAndSet(false, true)) {
+            log.warn("[KRAS] 적재 이미 진행 중 — 스킵");
+            return;
+        }
+        try {
+            krasWorker.runLoad(targetIndices, schemaMap, fileFilter);
         } finally {
             krasLoadRunning.set(false);
         }
@@ -111,7 +125,7 @@ public class SyncScheduler {
 
     @Async
     public void triggerKrasLoadAsync() {
-        runKrasLoad(null, null, null);
+        runKrasLoad(null, (String) null, null);
     }
 
     @Async
@@ -122,5 +136,10 @@ public class SyncScheduler {
     @Async
     public void triggerKrasLoadAsync(List<Integer> targetIndices, String schemaOverride, java.util.Set<String> tableFilter) {
         runKrasLoad(targetIndices, schemaOverride, tableFilter);
+    }
+
+    @Async
+    public void triggerKrasLoadAsync(List<Integer> targetIndices, Map<Integer, String> schemaMap, java.util.Set<String> fileFilter) {
+        runKrasLoad(targetIndices, schemaMap, fileFilter);
     }
 }

@@ -130,7 +130,7 @@ public class SyncController {
     @PostMapping("/kras-load")
     public String triggerKrasLoad(
             @RequestParam(required = false) List<Integer> targetIdx,
-            @RequestParam(required = false, defaultValue = "") String schema,
+            @RequestParam Map<String, String> allParams,
             @RequestParam(required = false) List<String> files,
             RedirectAttributes ra) {
 
@@ -139,16 +139,25 @@ public class SyncController {
             return "redirect:/";
         }
 
-        String schemaOverride = schema.isBlank() ? null : schema.trim();
+        // 각 DB별 스키마 파싱: schema_0=ods, schema_1=public, ...
+        Map<Integer, String> schemaMap = new java.util.HashMap<>();
+        if (targetIdx != null) {
+            for (Integer idx : targetIdx) {
+                String schema = allParams.get("schema_" + idx);
+                if (schema != null && !schema.isBlank()) {
+                    schemaMap.put(idx, schema.trim());
+                }
+            }
+        }
+
         Set<String> fileFilter = (files == null || files.isEmpty()) ? null : new HashSet<>(files);
         statusService.recordStart("KRAS_LOAD");
-        scheduler.triggerKrasLoadAsync(targetIdx, schemaOverride, fileFilter);
+        scheduler.triggerKrasLoadAsync(targetIdx, schemaMap.isEmpty() ? null : schemaMap, fileFilter);
 
         String targetDesc = (targetIdx == null || targetIdx.isEmpty()) ? "전체 DB" : targetIdx.size() + "개 DB";
-        String schemaDesc = schemaOverride != null ? schemaOverride : tableNameService.getOdsSchema();
         String fileDesc = (fileFilter == null) ? "전체 파일" : fileFilter.size() + "개 파일";
         ra.addFlashAttribute("message",
-            "KRAS 적재를 시작했습니다 (" + targetDesc + ", 스키마: " + schemaDesc + ", " + fileDesc + ").");
+            "KRAS 적재를 시작했습니다 (" + targetDesc + ", " + fileDesc + ").");
         return "redirect:/";
     }
 
