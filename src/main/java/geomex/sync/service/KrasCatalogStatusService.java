@@ -63,16 +63,16 @@ public class KrasCatalogStatusService {
         List<CatalogFileStatus> statuses = new ArrayList<>();
         statuses.add(usezoneSummaryStatus(groups, lastSuccess));
         statuses.addAll(usezoneLayerStatuses(groups, lastSuccess));
-        statuses.add(exactStatus(groups, "엔진 중간 산출물", "연속지적도", "ods.lp_pa_cbnd",
+        statuses.add(exactStatus(groups, "엔진 중간 산출물", "연속지적도", "lp_pa_cbnd",
                         "ods.lp_pa_cbnd.*", Set.of(".shp", ".dbf", ".gmx"), 1, lastSuccess,
                         "카탈로그의 ods.lp_pa_cbnd 처리 대상"));
-        statuses.add(exactStatus(groups, "엔진 중간 산출물", "토지기본정보", "ods.land_frst_ledg",
+        statuses.add(exactStatus(groups, "엔진 중간 산출물", "토지기본정보", "land_frst_ledg",
                         "ods.land_frst_ledg.*", Set.of(".txt", ".gmx"), 1, lastSuccess,
                         "카탈로그의 ods.land_frst_ledg 처리 대상"));
-        statuses.add(legacyStatus(groups, "엔진 중간 산출물", "용도지역지구 통합 GMX", "ods.lt_c_uzone",
+        statuses.add(legacyStatus(groups, "엔진 중간 산출물", "용도지역지구 통합 GMX", "lt_c_uzone",
                         "ods.lt_c_uzone.gmx", Set.of(".gmx"), lastSuccess,
                         "현재 앱은 GMX를 만들지 않고 DB에 직접 적재"));
-        statuses.add(legacyStatus(groups, "비활성 산출물", "건물통합", "ods.f_fac_building",
+        statuses.add(legacyStatus(groups, "비활성 산출물", "건물통합", "f_fac_building",
                         "ods.f_fac_building.*", Set.of(".shp", ".dbf", ".gmx"), lastSuccess,
                         "base-tables.xml에서 비활성화된 항목"));
         return statuses;
@@ -91,13 +91,12 @@ public class KrasCatalogStatusService {
             latest = max(latest, group.latestModified);
         }
 
-        String targetTableName = tableNameService.resolve("ods.lt_c_uzone");
-        DbStatus db = dbStatus(targetTableName);
+        DbStatus db = dbStatus("lt_c_uzone");
         boolean fileLoaded = complete >= 47;
         return new CatalogFileStatus(
                 "KRAS 수신 원본 요약",
                 "KRAS 수신 원본",
-                targetTableName,
+                "lt_c_uzone",
                 "lsmd_cont_u*.{shp,dbf,shx}",
                 "레이어별 shp/dbf/shx",
                 47,
@@ -115,8 +114,7 @@ public class KrasCatalogStatusService {
     }
 
     private List<CatalogFileStatus> usezoneLayerStatuses(Map<String, FileGroup> groups, LocalDateTime lastSuccess) {
-        String targetTableName = tableNameService.resolve("ods.lt_c_uzone");
-        DbStatus db = dbStatus(targetTableName);
+        DbStatus db = dbStatus("lt_c_uzone");
         List<CatalogLayer> layers = readCatalogLayers();
         List<CatalogFileStatus> statuses = new ArrayList<>();
         for (CatalogLayer layer : layers) {
@@ -128,7 +126,7 @@ public class KrasCatalogStatusService {
             statuses.add(new CatalogFileStatus(
                     layer.category,
                     layer.code + " " + layer.description,
-                    targetTableName,
+                    "lt_c_uzone",
                     layer.fileName + ".{shp,dbf,shx}",
                     "shp, dbf, shx",
                     1,
@@ -156,10 +154,9 @@ public class KrasCatalogStatusService {
         int files = group != null ? group.fileCount : 0;
         LocalDateTime latest = group != null ? group.latestModified : null;
 
-        String targetTableName = tableNameService.resolve(target);
-        DbStatus db = dbStatus(targetTableName);
+        DbStatus db = dbStatus(target);
         boolean fileLoaded = complete >= expectedCount;
-        return new CatalogFileStatus(category, name, targetTableName, pattern,
+        return new CatalogFileStatus(category, name, target, pattern,
                 String.join(", ", requiredExtensions), expectedCount, complete, files,
                 latest, fileLoaded, isSynced(latest, lastSuccess), db.loaded, db.rowCount, db.message,
                 db.targetLabels, note);
@@ -174,10 +171,9 @@ public class KrasCatalogStatusService {
         int files = group != null ? group.fileCount : 0;
         LocalDateTime latest = group != null ? group.latestModified : null;
 
-        String targetTableName = tableNameService.resolve(target);
-        DbStatus db = dbStatus(targetTableName);
+        DbStatus db = dbStatus(target);
         boolean fileLoaded = complete > 0;
-        return new CatalogFileStatus(category, name, targetTableName, pattern,
+        return new CatalogFileStatus(category, name, target, pattern,
                 String.join(", ", requiredExtensions), 1, complete, files,
                 latest, fileLoaded, isSynced(latest, lastSuccess), db.loaded, db.rowCount, db.message,
                 db.targetLabels, note);

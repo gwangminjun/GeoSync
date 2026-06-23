@@ -39,6 +39,7 @@ public class SyncController {
         if (statusService.isRunning("KRAS")) {
             ra.addFlashAttribute("message", "KRAS 동기화가 이미 실행 중입니다.");
         } else {
+            statusService.recordStart("KRAS");
             scheduler.triggerKrasAsync();
             ra.addFlashAttribute("message", "KRAS 동기화를 시작했습니다.");
         }
@@ -50,6 +51,7 @@ public class SyncController {
         if (statusService.isRunning("KAIS")) {
             ra.addFlashAttribute("message", "KAIS 동기화가 이미 실행 중입니다.");
         } else {
+            statusService.recordStart("KAIS");
             scheduler.triggerKaisAsync();
             ra.addFlashAttribute("message", "KAIS 동기화를 시작했습니다.");
         }
@@ -61,6 +63,7 @@ public class SyncController {
         if (statusService.isRunning("KRAS_COLLECT")) {
             ra.addFlashAttribute("message", "KRAS 수집이 이미 실행 중입니다.");
         } else {
+            statusService.recordStart("KRAS_COLLECT");
             scheduler.triggerKrasCollectAsync();
             ra.addFlashAttribute("message", "KRAS 수집을 시작했습니다 (API → 파일).");
         }
@@ -114,6 +117,7 @@ public class SyncController {
         }
 
         String schemaOverride = schema.isBlank() ? null : schema.trim();
+        statusService.recordStart("KRAS_LOAD");
         scheduler.triggerKrasLoadAsync(targetIdx, schemaOverride);
 
         String targetDesc = (targetIdx == null || targetIdx.isEmpty()) ? "전체 DB" : targetIdx.size() + "개 DB";
