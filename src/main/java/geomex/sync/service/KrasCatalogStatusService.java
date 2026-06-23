@@ -62,19 +62,18 @@ public class KrasCatalogStatusService {
 
         List<CatalogFileStatus> statuses = new ArrayList<>();
         statuses.add(usezoneSummaryStatus(groups, lastSuccess));
-        statuses.addAll(usezoneLayerStatuses(groups, lastSuccess));
-        statuses.add(exactStatus(groups, "엔진 중간 산출물", "연속지적도", "lp_pa_cbnd",
-                        "ods.lp_pa_cbnd.*", Set.of(".shp", ".dbf", ".gmx"), 1, lastSuccess,
-                        "카탈로그의 ods.lp_pa_cbnd 처리 대상"));
-        statuses.add(exactStatus(groups, "엔진 중간 산출물", "토지기본정보", "land_frst_ledg",
-                        "ods.land_frst_ledg.*", Set.of(".txt", ".gmx"), 1, lastSuccess,
-                        "카탈로그의 ods.land_frst_ledg 처리 대상"));
-        statuses.add(legacyStatus(groups, "엔진 중간 산출물", "용도지역지구 통합 GMX", "lt_c_uzone",
-                        "ods.lt_c_uzone.gmx", Set.of(".gmx"), lastSuccess,
-                        "현재 앱은 GMX를 만들지 않고 DB에 직접 적재"));
-        statuses.add(legacyStatus(groups, "비활성 산출물", "건물통합", "f_fac_building",
-                        "ods.f_fac_building.*", Set.of(".shp", ".dbf", ".gmx"), lastSuccess,
-                        "base-tables.xml에서 비활성화된 항목"));
+        statuses.add(exactStatus(groups, "KRAS 수신 원본", "연속지적도", "lp_pa_cbnd",
+                        "lp_pa_cbnd.*", Set.of(".shp", ".dbf", ".gmx"), 1, lastSuccess,
+                        "lp_pa_cbnd"));
+        statuses.add(exactStatus(groups, "KRAS 수신 원본", "토지기본정보", "land_frst_ledg",
+                        "land_frst_ledg.*", Set.of(".txt", ".gmx"), 1, lastSuccess,
+                        "land_frst_ledg"));
+        statuses.add(legacyStatus(groups, "KRAS 수신 원본", "용도지역지구 통합", "lt_c_uzone",
+                        "lt_c_uzone.gmx", Set.of(".gmx"), lastSuccess,
+                        "lt_c_uzone"));
+        statuses.add(legacyStatus(groups, "참조", "건물통합", "f_fac_building",
+                        "f_fac_building.*", Set.of(".shp", ".dbf", ".gmx"), lastSuccess,
+                        "f_fac_building"));
         return statuses;
     }
 
@@ -257,6 +256,7 @@ public class KrasCatalogStatusService {
         int loadedTargets = 0;
         int totalRows = 0;
         int checkedTargets = 0;
+        String errorMsg = null;
         List<String> labels = new ArrayList<>();
         for (ActiveTarget target : targets) {
             checkedTargets++;
@@ -270,17 +270,29 @@ public class KrasCatalogStatusService {
                 totalRows += rows;
                 if (rows > 0) loadedTargets++;
             } catch (Exception e) {
-                return new DbStatus(false, totalRows,
-                        target.name() + " 조회 실패: " + shortMessage(e),
-                        String.join(", ", labels));
+                String msg = shortMessage(e);
+                if (isTableMissing(msg)) {
+                    // 테이블 미존재 = 아직 적재 안 됨 (정상 상태), 계속 진행
+                } else {
+                    errorMsg = target.name() + " 조회 실패: " + msg;
+                }
             }
         }
 
+        if (errorMsg != null && loadedTargets == 0) {
+            return new DbStatus(false, totalRows, errorMsg, String.join(", ", labels));
+        }
         boolean loaded = checkedTargets > 0 && loadedTargets == checkedTargets;
         String message = loaded
                 ? "적재 완료"
-                : loadedTargets + "/" + checkedTargets + "개 대상 적재";
+                : (loadedTargets == 0 ? "미적재" : loadedTargets + "/" + checkedTargets + "개 대상 적재");
         return new DbStatus(loaded, totalRows, message, String.join(", ", labels));
+    }
+
+    private boolean isTableMissing(String message) {
+        if (message == null) return false;
+        String lower = message.toLowerCase();
+        return lower.contains("does not exist") || lower.contains("존재하지") || lower.contains("no such table");
     }
 
     private String shortMessage(Exception e) {
