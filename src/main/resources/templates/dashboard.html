@@ -259,6 +259,23 @@
           </div>
         </div>
 
+        <!-- 적재 파일 선택 -->
+        <div style="margin-bottom:20px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+            <div style="font-size:12px;font-weight:600;color:#8a919c;letter-spacing:0.04em;">적재 파일</div>
+            <div style="display:flex;gap:8px;">
+              <button type="button" onclick="selectAllFiles(true)"
+                      style="padding:3px 10px;border-radius:6px;border:1px solid #2e3640;background:#1e242c;color:#9aa2ad;font-size:11.5px;font-weight:600;font-family:inherit;cursor:pointer;">전체 선택</button>
+              <button type="button" onclick="selectAllFiles(false)"
+                      style="padding:3px 10px;border-radius:6px;border:1px solid #2e3640;background:#1e242c;color:#9aa2ad;font-size:11.5px;font-weight:600;font-family:inherit;cursor:pointer;">전체 해제</button>
+            </div>
+          </div>
+          <div id="fileList" style="display:flex;flex-direction:column;gap:4px;max-height:220px;overflow-y:auto;padding-right:4px;">
+            <div style="color:#69707b;font-size:13px;">불러오는 중...</div>
+          </div>
+          <div id="fileSelectionSummary" style="margin-top:8px;font-size:11.5px;color:#69707b;"></div>
+        </div>
+
         <!-- 스키마 -->
         <div style="margin-bottom:24px;">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
@@ -302,7 +319,7 @@
     </div>
   </div>
 
-  <script>
+  <script th:inline="javascript">
     function scanWorkspace() {
       var modal = document.getElementById('scanModal');
       var result = document.getElementById('scanResult');
@@ -344,6 +361,8 @@
       var modal = document.getElementById('loadModal');
       modal.style.display = 'flex';
       setSchemaSelect([], '불러오는 중...', null);
+      document.getElementById('fileList').innerHTML = '<div style="color:#69707b;font-size:13px;">불러오는 중...</div>';
+      document.getElementById('fileSelectionSummary').textContent = '';
 
       fetch('/sync/kras-load-options')
         .then(function(r) { return r.json(); })
@@ -355,29 +374,98 @@
           if (targets.length === 0) {
             list.innerHTML = '<div style="color:#e88a82;font-size:13px;">설정된 DB가 없습니다.</div>';
             setSchemaSelect([], '선택 가능한 DB 없음', null);
-            return;
+          } else {
+            targets.forEach(function(t) {
+              var row = document.createElement('label');
+              row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;border:1px solid #2e3640;background:#141820;cursor:pointer;';
+              row.innerHTML =
+                '<input type="checkbox" name="targetIdx" value="' + t.idx + '" checked ' +
+                  'style="width:15px;height:15px;accent-color:#0e9b94;cursor:pointer;" ' +
+                  'onchange="onTargetChange()">' +
+                '<div>' +
+                  '<div style="font-size:13px;font-weight:600;color:#e7eaee;">' + escapeHtml(t.name) + '</div>' +
+                  '<div style="font-size:11.5px;color:#69707b;font-family:monospace;margin-top:2px;">' + escapeHtml(t.url) + '</div>' +
+                '</div>';
+              list.appendChild(row);
+            });
+            onTargetChange();
           }
-          targets.forEach(function(t) {
-            var row = document.createElement('label');
-            row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;border:1px solid #2e3640;background:#141820;cursor:pointer;';
-            row.innerHTML =
-              '<input type="checkbox" name="targetIdx" value="' + t.idx + '" checked ' +
-                'style="width:15px;height:15px;accent-color:#0e9b94;cursor:pointer;" ' +
-                'onchange="onTargetChange()">' +
-              '<div>' +
-                '<div style="font-size:13px;font-weight:600;color:#e7eaee;">' + escapeHtml(t.name) + '</div>' +
-                '<div style="font-size:11.5px;color:#69707b;font-family:monospace;margin-top:2px;">' + escapeHtml(t.url) + '</div>' +
-              '</div>';
-            list.appendChild(row);
-          });
-          // 첫 번째 DB 선택 상태로 스키마 로드
-          onTargetChange();
+
+          // 파일 목록 렌더링 (테이블별 그룹)
+          var fileListEl = document.getElementById('fileList');
+          fileListEl.innerHTML = '';
+          var files = data.files || [];
+          if (files.length === 0) {
+            fileListEl.innerHTML =
+              '<div style="color:#d9b066;font-size:13px;">수집된 파일이 없습니다. 수집을 먼저 실행하거나 파일에서 적재 준비를 실행하세요.</div>';
+            document.getElementById('fileSelectionSummary').textContent = '';
+          } else {
+            // 테이블별 그룹핑
+            var groups = {};
+            files.forEach(function(f) {
+              if (!groups[f.table]) groups[f.table] = [];
+              groups[f.table].push(f.file);
+            });
+            Object.keys(groups).forEach(function(table) {
+              var groupFiles = groups[table];
+              // 테이블 헤더 (파일이 여러 개일 때만 표시)
+              if (groupFiles.length > 1) {
+                var header = document.createElement('div');
+                header.style.cssText = 'font-size:11px;font-weight:600;color:#5b626d;letter-spacing:0.04em;padding:6px 4px 2px;';
+                header.textContent = table;
+                fileListEl.appendChild(header);
+              }
+              groupFiles.forEach(function(fileName) {
+                var row = document.createElement('label');
+                var indent = groupFiles.length > 1 ? 'margin-left:8px;' : '';
+                row.style.cssText = indent + 'display:flex;align-items:center;gap:10px;padding:7px 12px;border-radius:7px;border:1px solid #2e3640;background:#141820;cursor:pointer;';
+                row.innerHTML =
+                  '<input type="checkbox" name="files" value="' + escapeHtml(fileName) + '" checked ' +
+                    'style="width:14px;height:14px;accent-color:#0e9b94;cursor:pointer;" ' +
+                    'onchange="updateFileSummary()">' +
+                  '<div>' +
+                    '<div style="font-size:12.5px;color:#cdd3db;font-family:monospace;">' + escapeHtml(fileName) + '</div>' +
+                    (groupFiles.length === 1 ? '<div style="font-size:11px;color:#5b626d;margin-top:1px;">' + escapeHtml(table) + '</div>' : '') +
+                  '</div>';
+                fileListEl.appendChild(row);
+              });
+            });
+            updateFileSummary();
+          }
         })
         .catch(function() {
           document.getElementById('targetList').innerHTML =
             '<div style="color:#e88a82;font-size:13px;">DB 목록을 불러오지 못했습니다.</div>';
           setSchemaSelect([], '불러오기 실패', null);
+          document.getElementById('fileList').innerHTML =
+            '<div style="color:#e88a82;font-size:13px;">파일 목록을 불러오지 못했습니다.</div>';
         });
+    }
+
+    function updateFileSummary() {
+      var checkboxes = document.querySelectorAll('#fileList input[type="checkbox"]');
+      var total = checkboxes.length;
+      var checked = 0;
+      checkboxes.forEach(function(cb) { if (cb.checked) checked++; });
+      var el = document.getElementById('fileSelectionSummary');
+      if (total === 0) { el.textContent = ''; return; }
+      if (checked === total) {
+        el.textContent = '전체 ' + total + '개 파일 선택됨';
+        el.style.color = '#5fc98a';
+      } else if (checked === 0) {
+        el.textContent = '선택된 파일 없음 — 적재가 실행되지 않습니다';
+        el.style.color = '#e88a82';
+      } else {
+        el.textContent = total + '개 중 ' + checked + '개 선택됨';
+        el.style.color = '#d9b066';
+      }
+    }
+
+    function selectAllFiles(checked) {
+      document.querySelectorAll('#fileList input[type="checkbox"]').forEach(function(cb) {
+        cb.checked = checked;
+      });
+      updateFileSummary();
     }
 
     function onTargetChange() {
@@ -500,6 +588,7 @@
                 _startTimes[type] = info.startedAt ? new Date(info.startedAt) : new Date();
                 showBar(type);
               }
+              updateProgressBar(type, info);
             } else {
               if (wasRunning) {
                 anyFinished = true;
@@ -539,12 +628,42 @@
           '<span id="elapsed_' + type + '" ' +
             'style="font-size:12px;color:#69707b;font-variant-numeric:tabular-nums;font-family:monospace;">00:00</span>' +
         '</div>' +
-        '<div style="height:3px;background:#1e242c;border-radius:99px;overflow:hidden;position:relative;">' +
-          '<div style="position:absolute;top:0;height:100%;width:45%;' +
-            'background:linear-gradient(90deg,transparent 0%,' + color + ' 50%,transparent 100%);' +
-            'animation:krasBarSlide 1.5s ease-in-out infinite;"></div>' +
+        '<div style="display:flex;justify-content:space-between;gap:12px;margin-bottom:8px;font-size:12px;color:#9aa2ad;line-height:1.35;">' +
+          '<span id="progress_label_' + type + '" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">waiting</span>' +
+          '<span id="progress_count_' + type + '" style="font-family:monospace;font-variant-numeric:tabular-nums;white-space:nowrap;">0/0</span>' +
+        '</div>' +
+        '<div style="height:6px;background:#1e242c;border-radius:99px;overflow:hidden;position:relative;">' +
+          '<div id="progress_fill_' + type + '" style="height:100%;width:0%;background:' + color + ';transition:width .25s ease;"></div>' +
         '</div>';
       container.appendChild(card);
+    }
+
+    function updateProgressBar(type, info) {
+      var fill = document.getElementById('progress_fill_' + type);
+      var label = document.getElementById('progress_label_' + type);
+      var count = document.getElementById('progress_count_' + type);
+      if (!fill || !label || !count) return;
+
+      var rowTotal = Number(info.rowTotal || 0);
+      var rowCompleted = Number(info.rowCompleted || 0);
+      var rowPercent = Number(info.rowPercent || 0);
+      var tableTotal = Number(info.total || 0);
+      var tableCompleted = Number(info.completed || 0);
+      var tablePercent = Number(info.percent || 0);
+
+      if (rowTotal > 0) {
+        fill.style.width = Math.max(0, Math.min(100, rowPercent)) + '%';
+        label.textContent = info.rowCurrent || info.current || '';
+        count.textContent = rowCompleted.toLocaleString() + '/' + rowTotal.toLocaleString() + ' (' + rowPercent + '%)';
+      } else if (tableTotal > 0) {
+        fill.style.width = Math.max(0, Math.min(100, tablePercent)) + '%';
+        label.textContent = info.current || '';
+        count.textContent = tableCompleted.toLocaleString() + '/' + tableTotal.toLocaleString() + ' tables (' + tablePercent + '%)';
+      } else {
+        fill.style.width = '0%';
+        label.textContent = 'waiting';
+        count.textContent = '0/0';
+      }
     }
 
     function removeBar(type) {

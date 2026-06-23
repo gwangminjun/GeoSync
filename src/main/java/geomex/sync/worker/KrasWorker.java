@@ -9,9 +9,9 @@ import geomex.sync.model.ColumnDef;
 import geomex.sync.model.SyncTableDef;
 import geomex.sync.repository.OdsRepository;
 import geomex.sync.service.KrasGpkiService;
+import geomex.sync.service.RuntimeSettingsService;
 import geomex.sync.service.SyncStatusService;
 import geomex.sync.service.TargetDbService;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.apache.hc.client5.http.classic.methods.HttpPost;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
 import org.apache.hc.client5.http.impl.classic.HttpClients;
@@ -20,7 +20,6 @@ import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.apache.hc.core5.http.io.entity.StringEntity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
@@ -44,27 +43,14 @@ public class KrasWorker {
     private final KrasFileWriter fileWriter;
     private final KrasFileReader fileReader;
     private final KrasGpkiService gpkiService;
+    private final RuntimeSettingsService settings;
     private final ObjectMapper objectMapper = new ObjectMapper();
-
-    @Value("${kras.url}")
-    private String gatewayUrl;
-
-    @Value("${kras.conn-sys-id}")
-    private String connSysId;
-
-    @Value("${kras.chk-pnu}")
-    private String chkPnu;
-
-    @Value("${kras.config:conf/kras/base-tables.xml}")
-    private String configPath;
-
-    @Value("${sync.org-code:46870}")
-    private String orgCode;
 
     public KrasWorker(TableMapper tableMapper, OdsRepository odsRepository,
                       CoordTransformer coordTransformer, SyncStatusService statusService,
                       TargetDbService targetDbService, KrasFileWriter fileWriter,
-                      KrasFileReader fileReader, KrasGpkiService gpkiService) {
+                      KrasFileReader fileReader, KrasGpkiService gpkiService,
+                      RuntimeSettingsService settings) {
         this.tableMapper = tableMapper;
         this.odsRepository = odsRepository;
         this.coordTransformer = coordTransformer;
@@ -73,10 +59,11 @@ public class KrasWorker {
         this.fileWriter = fileWriter;
         this.fileReader = fileReader;
         this.gpkiService = gpkiService;
+        this.settings = settings;
     }
 
     public void run() {
-        log.info("[KRAS] 동기화 시작 (url={})", gatewayUrl);
+        log.info("[KRAS] 동기화 시작 (url={})", settings.krasUrl());
         statusService.recordStart("KRAS");
         int totalSuccess = 0, totalError = 0;
         boolean failed = false;
@@ -86,12 +73,24 @@ public class KrasWorker {
                 failed = true;
                 return;
             }
-            List<SyncTableDef> tableDefs = tableMapper.load(configPath);
+            List<SyncTableDef> tableDefs = tableMapper.load(settings.krasConfig());
+            List<TargetDbService.ActiveTarget> targets = targetDbService.getConfiguredTargets();
+            if (targets.isEmpty()) {
+                log.warn("[KRAS] active target DB not found; sync stopped");
+                failed = true;
+                return;
+            }
+            recreateSchemaTables(targets, null);
+            statusService.startProgress("KRAS", tableDefs.size(), "");
             Map<String, List<String>> manifest = new LinkedHashMap<>();
+            int completed = 0;
             for (SyncTableDef def : tableDefs) {
-                int saved = processTable(def, manifest);
+                statusService.updateProgress("KRAS", completed, tableDefs.size(), def.tgtTableName);
+                int saved = processTable(def, manifest, targets);
                 if (saved >= 0) totalSuccess += saved;
                 else totalError++;
+                completed++;
+                statusService.updateProgress("KRAS", completed, tableDefs.size(), def.tgtTableName);
             }
             fileWriter.writeManifest(manifest);
             log.info("[KRAS] 동기화 완료 (success={}, error={})", totalSuccess, totalError);
@@ -104,7 +103,7 @@ public class KrasWorker {
     }
 
     public void runCollect() {
-        log.info("[KRAS] 수집 시작 (API → 파일, url={})", gatewayUrl);
+        log.info("[KRAS] 수집 시작 (API → 파일, url={})", settings.krasUrl());
         statusService.recordStart("KRAS_COLLECT");
         int totalSuccess = 0, totalError = 0;
         boolean failed = false;
@@ -115,8 +114,11 @@ public class KrasWorker {
                 failed = true;
                 return;
             }
-            List<SyncTableDef> tableDefs = tableMapper.load(configPath);
+            List<SyncTableDef> tableDefs = tableMapper.load(settings.krasConfig());
+            statusService.startProgress("KRAS_COLLECT", tableDefs.size(), "");
+            int completed = 0;
             for (SyncTableDef def : tableDefs) {
+                statusService.updateProgress("KRAS_COLLECT", completed, tableDefs.size(), def.srcTableName);
                 try {
                     List<String> fileBaseNames = collectTable(def);
                     manifest.put(def.srcTableName, fileBaseNames);
@@ -125,6 +127,8 @@ public class KrasWorker {
                     log.error("[KRAS] {} 수집 실패: {}", def.srcTableName, e.getMessage());
                     totalError++;
                 }
+                completed++;
+                statusService.updateProgress("KRAS_COLLECT", completed, tableDefs.size(), def.srcTableName);
             }
             fileWriter.writeManifest(manifest);
             log.info("[KRAS] 수집 완료 (success={}, error={})", totalSuccess, totalError);
@@ -137,41 +141,71 @@ public class KrasWorker {
     }
 
     public void runLoad() {
-        runLoad(null, null);
+        runLoad(null, null, null);
     }
 
     public void runLoad(List<Integer> targetIndices, String schemaOverride) {
-        log.info("[KRAS] 적재 시작 (파일 → DB, schema={}, targets={})",
+        runLoad(targetIndices, schemaOverride, null);
+    }
+
+    public void runLoad(List<Integer> targetIndices, String schemaOverride, java.util.Set<String> fileFilter) {
+        log.info("[KRAS] 적재 시작 (파일 → DB, schema={}, targets={}, files={})",
                 schemaOverride != null ? schemaOverride : "기본",
-                targetIndices != null ? targetIndices : "전체");
+                targetIndices != null ? targetIndices : "전체",
+                fileFilter != null ? fileFilter : "전체");
         statusService.recordStart("KRAS_LOAD");
         int totalSuccess = 0, totalError = 0;
         boolean failed = false;
         try {
             List<TargetDbService.ActiveTarget> allTargets = targetDbService.getConfiguredTargets();
-            List<JdbcTemplate> selectedJdbcs = selectTargets(allTargets, targetIndices);
-            if (selectedJdbcs.isEmpty()) {
+            List<TargetDbService.ActiveTarget> selectedTargets = selectTargets(allTargets, targetIndices);
+            if (selectedTargets.isEmpty()) {
                 log.warn("[KRAS] 선택된 대상 DB 없음 — 적재 중단");
                 failed = true;
                 return;
             }
 
             Map<String, List<String>> manifest = fileReader.readManifest();
-            List<SyncTableDef> tableDefs = tableMapper.load(configPath);
+            List<SyncTableDef> tableDefs = tableMapper.load(settings.krasConfig());
+            if (fileFilter == null || fileFilter.isEmpty()) {
+                // 전체 적재: 모든 테이블 DROP + 재생성
+                recreateSchemaTables(selectedTargets, schemaOverride);
+            } else {
+                // 선택 적재: 적재할 테이블만 DROP → replaceAllTo의 ensureTableExists가 새 SRID로 재생성
+                for (SyncTableDef def : tableDefs) {
+                    boolean willLoad = manifest.getOrDefault(def.srcTableName, List.of())
+                            .stream().anyMatch(fileFilter::contains);
+                    if (willLoad) {
+                        for (TargetDbService.ActiveTarget target : selectedTargets) {
+                            odsRepository.dropTable(target.jdbc(), def.tgtTableName, schemaOverride);
+                        }
+                    }
+                }
+            }
+
+            // 전체 파일 수를 진행률 기준으로 사용
+            long totalFiles = manifest.values().stream().mapToLong(List::size).sum();
+            statusService.startProgress("KRAS_LOAD", (int) totalFiles, "");
+            int completedFiles = 0;
             for (SyncTableDef def : tableDefs) {
                 List<String> fileBaseNames = manifest.getOrDefault(def.srcTableName, List.of());
+                if (fileFilter != null && !fileFilter.isEmpty()) {
+                    fileBaseNames = fileBaseNames.stream().filter(fileFilter::contains).toList();
+                }
                 if (fileBaseNames.isEmpty()) {
-                    log.warn("[KRAS] {} 에 대한 수집 파일 없음 — 건너뜀", def.srcTableName);
                     continue;
                 }
+                statusService.updateProgress("KRAS_LOAD", completedFiles, (int) totalFiles, def.tgtTableName);
                 try {
-                    int saved = loadTable(def, fileBaseNames, selectedJdbcs, schemaOverride);
+                    int saved = loadTable(def, fileBaseNames, selectedTargets, schemaOverride);
                     if (saved >= 0) totalSuccess += saved;
                     else totalError++;
                 } catch (Exception e) {
                     log.error("[KRAS] {} 적재 실패: {}", def.srcTableName, e.getMessage());
                     totalError++;
                 }
+                completedFiles += fileBaseNames.size();
+                statusService.updateProgress("KRAS_LOAD", completedFiles, (int) totalFiles, def.tgtTableName);
             }
             log.info("[KRAS] 적재 완료 (success={}, error={})", totalSuccess, totalError);
         } catch (IOException e) {
@@ -185,13 +219,13 @@ public class KrasWorker {
         }
     }
 
-    private List<JdbcTemplate> selectTargets(List<TargetDbService.ActiveTarget> all, List<Integer> indices) {
+    private List<TargetDbService.ActiveTarget> selectTargets(List<TargetDbService.ActiveTarget> all, List<Integer> indices) {
         if (indices == null || indices.isEmpty()) {
-            return all.stream().map(TargetDbService.ActiveTarget::jdbc).toList();
+            return all;
         }
         return indices.stream()
                 .filter(i -> i >= 0 && i < all.size())
-                .map(i -> all.get(i).jdbc())
+                .map(all::get)
                 .toList();
     }
 
@@ -215,7 +249,7 @@ public class KrasWorker {
     }
 
     private int loadTable(SyncTableDef def, List<String> fileBaseNames,
-                          List<JdbcTemplate> targets, String schemaOverride) throws IOException {
+                          List<TargetDbService.ActiveTarget> targets, String schemaOverride) throws IOException {
         List<Map<String, Object>> rows = new ArrayList<>();
         for (String baseName : fileBaseNames) {
             rows.addAll(fileReader.readJson(baseName));
@@ -225,8 +259,10 @@ public class KrasWorker {
             return 0;
         }
         int saved = 0;
-        for (JdbcTemplate jdbc : targets) {
-            saved = odsRepository.replaceAllTo(jdbc, def, orgCode, coordTransformer.getTargetEpsg(), rows, schemaOverride);
+        for (TargetDbService.ActiveTarget target : targets) {
+            log.info("[KRAS] loading {} into target {}", def.tgtTableName, target.label());
+            saved = odsRepository.replaceAllTo(target.jdbc(), def, settings.orgCode(),
+                    coordTransformer.getTargetEpsg(), rows, schemaOverride, "KRAS_LOAD");
         }
         return saved;
     }
@@ -244,9 +280,9 @@ public class KrasWorker {
             }
             ObjectNode req = objectMapper.createObjectNode();
             req.put("service", "CHECK");
-            req.put("connSysId", connSysId);
-            req.put("orgCode", orgCode);
-            req.put("chkPnu", chkPnu);
+            req.put("connSysId", settings.krasConnSysId());
+            req.put("orgCode", settings.orgCode());
+            req.put("chkPnu", settings.krasChkPnu());
 
             JsonNode res = post(req);
             String code = res.path("resultCode").asText("");
@@ -259,7 +295,8 @@ public class KrasWorker {
         }
     }
 
-    private int processTable(SyncTableDef def, Map<String, List<String>> manifest) {
+    private int processTable(SyncTableDef def, Map<String, List<String>> manifest,
+                             List<TargetDbService.ActiveTarget> targets) {
         List<String> written = new ArrayList<>();
         List<Map<String, Object>> rows;
         if (def.srcTableName.startsWith("USEZONE:")) {
@@ -279,28 +316,38 @@ public class KrasWorker {
             written.add(toFileBaseName(def.srcTableName));
         }
         manifest.put(def.srcTableName, written);
-        return saveToAllTargets(def, rows);
+        return saveToTargets(def, rows, targets);
     }
 
-    private int saveToAllTargets(SyncTableDef def, List<Map<String, Object>> rows) {
-        List<JdbcTemplate> targets = targetDbService.getActiveTemplates();
+    private int saveToTargets(SyncTableDef def, List<Map<String, Object>> rows,
+                              List<TargetDbService.ActiveTarget> targets) {
         if (targets.isEmpty()) {
             log.warn("[KRAS] 활성 대상 DB 없음 — {} 저장 건너뜀", def.tgtTableName);
             return 0;
         }
         int saved = 0;
-        for (JdbcTemplate jdbc : targets) {
-            saved = odsRepository.replaceAllTo(jdbc, def, orgCode, coordTransformer.getTargetEpsg(), rows);
+        for (TargetDbService.ActiveTarget target : targets) {
+            log.info("[KRAS] loading {} into target {}", def.tgtTableName, target.label());
+            saved = odsRepository.replaceAllTo(target.jdbc(), def, settings.orgCode(),
+                    coordTransformer.getTargetEpsg(), rows, null, "KRAS");
         }
         return saved;
+    }
+
+    private void recreateSchemaTables(List<TargetDbService.ActiveTarget> targets, String schemaOverride) {
+        for (TargetDbService.ActiveTarget target : targets) {
+            log.info("[KRAS] recreating sync tables on target {} (schema={})",
+                    target.label(), schemaOverride != null ? schemaOverride : "default");
+            odsRepository.recreateSchemaTables(target.jdbc(), schemaOverride);
+        }
     }
 
     private List<String> fetchAvailableUsezoneLayers() {
         try {
             ObjectNode req = objectMapper.createObjectNode();
             req.put("service", "GetLayerList");
-            req.put("connSysId", connSysId);
-            req.put("orgCode", orgCode);
+            req.put("connSysId", settings.krasConnSysId());
+            req.put("orgCode", settings.orgCode());
 
             JsonNode res = post(req);
             List<String> names = new ArrayList<>();
@@ -319,8 +366,8 @@ public class KrasWorker {
         try {
             ObjectNode req = objectMapper.createObjectNode();
             req.put("service", "GetFeature");
-            req.put("connSysId", connSysId);
-            req.put("orgCode", orgCode);
+            req.put("connSysId", settings.krasConnSysId());
+            req.put("orgCode", settings.orgCode());
             req.put("layerName", layerName);
             req.put("srsName", "EPSG:" + KRAS_EPSG);
 
@@ -363,7 +410,7 @@ public class KrasWorker {
     private JsonNode post(ObjectNode body) throws Exception {
         gpkiService.addAuthentication(body);
         try (CloseableHttpClient client = HttpClients.createDefault()) {
-            HttpPost request = new HttpPost(gatewayUrl);
+            HttpPost request = new HttpPost(settings.krasUrl());
             request.setEntity(new StringEntity(objectMapper.writeValueAsString(body),
                     ContentType.APPLICATION_JSON));
 

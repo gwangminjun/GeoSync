@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import geomex.sync.mapper.TableMapper;
 import geomex.sync.model.ColumnDef;
 import geomex.sync.model.SyncTableDef;
+import geomex.sync.service.RuntimeSettingsService;
 import org.geotools.api.data.SimpleFeatureSource;
 import org.geotools.api.feature.simple.SimpleFeature;
 import org.geotools.data.shapefile.ShapefileDataStore;
@@ -13,7 +14,6 @@ import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.io.WKTWriter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.io.*;
@@ -32,28 +32,22 @@ public class KrasWorkspaceScanner {
 
     private static final Logger log = LoggerFactory.getLogger(KrasWorkspaceScanner.class);
 
-    @Value("${kras.work-dir:./workspace/kras}")
-    private String workDir;
-
-    @Value("${kras.config:conf/kras/base-tables.xml}")
-    private String configPath;
-
-    @Value("${sync.org-code:46870}")
-    private String orgCode;
-
     private final TableMapper tableMapper;
     private final KrasFileWriter fileWriter;
+    private final RuntimeSettingsService settings;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    public KrasWorkspaceScanner(TableMapper tableMapper, KrasFileWriter fileWriter) {
+    public KrasWorkspaceScanner(TableMapper tableMapper, KrasFileWriter fileWriter,
+                                RuntimeSettingsService settings) {
         this.tableMapper = tableMapper;
         this.fileWriter = fileWriter;
+        this.settings = settings;
     }
 
     public record ScanResult(int fileCount, int rowCount, List<String> messages) {}
 
     public ScanResult buildManifest() {
-        Path dir = Path.of(workDir, orgCode);
+        Path dir = Path.of(settings.krasWorkDir(), settings.orgCode());
         List<String> messages = new ArrayList<>();
 
         if (!Files.exists(dir)) {
@@ -66,7 +60,7 @@ public class KrasWorkspaceScanner {
         Set<String> claimed = new LinkedHashSet<>();
 
         try {
-            List<SyncTableDef> defs = tableMapper.load(configPath);
+            List<SyncTableDef> defs = tableMapper.load(settings.krasConfig());
 
             // 1단계: USEZONE이 아닌 테이블 처리
             for (SyncTableDef def : defs) {

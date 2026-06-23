@@ -4,6 +4,7 @@ import geomex.sync.scheduler.SyncScheduler;
 import geomex.sync.service.SyncStatusService;
 import geomex.sync.service.TargetDbService;
 import geomex.sync.service.TargetTableNameService;
+import geomex.sync.worker.KrasFileReader;
 import geomex.sync.worker.KrasWorkspaceScanner;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
@@ -11,8 +12,10 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Controller
 @RequestMapping("/sync")
@@ -23,15 +26,17 @@ public class SyncController {
     private final TargetDbService targetDbService;
     private final TargetTableNameService tableNameService;
     private final KrasWorkspaceScanner workspaceScanner;
+    private final KrasFileReader fileReader;
 
     public SyncController(SyncScheduler scheduler, SyncStatusService statusService,
                           TargetDbService targetDbService, TargetTableNameService tableNameService,
-                          KrasWorkspaceScanner workspaceScanner) {
+                          KrasWorkspaceScanner workspaceScanner, KrasFileReader fileReader) {
         this.scheduler = scheduler;
         this.statusService = statusService;
         this.targetDbService = targetDbService;
         this.tableNameService = tableNameService;
         this.workspaceScanner = workspaceScanner;
+        this.fileReader = fileReader;
     }
 
     @PostMapping("/kras")
@@ -83,6 +88,15 @@ public class SyncController {
             if (isRunning) {
                 var t = statusService.getRunningStartTime(type);
                 if (t != null) info.put("startedAt", t.toString());
+                var progress = statusService.getProgress(type);
+                info.put("total", progress.total());
+                info.put("completed", progress.completed());
+                info.put("percent", progress.percent());
+                info.put("current", progress.current());
+                info.put("rowTotal", progress.rowTotal());
+                info.put("rowCompleted", progress.rowCompleted());
+                info.put("rowPercent", progress.rowPercent());
+                info.put("rowCurrent", progress.rowCurrent());
             }
             result.put(type, info);
         }
@@ -99,9 +113,17 @@ public class SyncController {
             TargetDbService.ActiveTarget t = targets.get(i);
             targetList.add(Map.of("idx", i, "name", t.name(), "url", sanitizeUrl(t.url())));
         }
+        // manifest에서 파일 단위 목록 조회 (table → [file, ...] 구조를 flat하게)
+        List<Map<String, String>> files = new ArrayList<>();
+        try {
+            fileReader.readManifest().forEach((table, fileNames) ->
+                fileNames.forEach(f -> files.add(Map.of("table", table, "file", f)))
+            );
+        } catch (Exception ignored) {}
         return ResponseEntity.ok(Map.of(
             "targets", targetList,
-            "schema", tableNameService.getOdsSchema()
+            "schema", tableNameService.getOdsSchema(),
+            "files", files
         ));
     }
 
@@ -109,6 +131,7 @@ public class SyncController {
     public String triggerKrasLoad(
             @RequestParam(required = false) List<Integer> targetIdx,
             @RequestParam(required = false, defaultValue = "") String schema,
+            @RequestParam(required = false) List<String> files,
             RedirectAttributes ra) {
 
         if (statusService.isRunning("KRAS_LOAD")) {
@@ -117,13 +140,15 @@ public class SyncController {
         }
 
         String schemaOverride = schema.isBlank() ? null : schema.trim();
+        Set<String> fileFilter = (files == null || files.isEmpty()) ? null : new HashSet<>(files);
         statusService.recordStart("KRAS_LOAD");
-        scheduler.triggerKrasLoadAsync(targetIdx, schemaOverride);
+        scheduler.triggerKrasLoadAsync(targetIdx, schemaOverride, fileFilter);
 
         String targetDesc = (targetIdx == null || targetIdx.isEmpty()) ? "전체 DB" : targetIdx.size() + "개 DB";
         String schemaDesc = schemaOverride != null ? schemaOverride : tableNameService.getOdsSchema();
+        String fileDesc = (fileFilter == null) ? "전체 파일" : fileFilter.size() + "개 파일";
         ra.addFlashAttribute("message",
-            "KRAS 적재를 시작했습니다 (" + targetDesc + ", 스키마: " + schemaDesc + ").");
+            "KRAS 적재를 시작했습니다 (" + targetDesc + ", 스키마: " + schemaDesc + ", " + fileDesc + ").");
         return "redirect:/";
     }
 

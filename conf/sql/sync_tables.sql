@@ -1,4 +1,4 @@
-CREATE TABLE ods.anvm_jiga
+CREATE TABLE anvm_jiga
 (
   land_cd character varying(19),
   base_year character varying(4),
@@ -8,7 +8,7 @@ CREATE TABLE ods.anvm_jiga
   org_cd character varying(10)
 );
 
-CREATE TABLE ods.land_frst_ledg
+CREATE TABLE land_frst_ledg
 (
   adm_sec_cd character varying(5),
   land_loc_cd character varying(5),
@@ -20,7 +20,7 @@ CREATE TABLE ods.land_frst_ledg
   owngbn character varying(2),
   org_cd character varying(5)
 );
-CREATE TABLE ods.lp_pa_cbnd
+CREATE TABLE lp_pa_cbnd
 (
   pnu character varying(19),
   jibun character varying(15),
@@ -29,11 +29,11 @@ CREATE TABLE ods.lp_pa_cbnd
   _gid serial NOT NULL,
   _annox numeric(20,4),
   _annoy numeric(20,4),
-  _geometry geometry(MultiPolygon,5176),
+  _geometry geometry(MultiPolygon,5186),
   CONSTRAINT lp_pa_cbnd_pkey PRIMARY KEY (_gid)
 );
 
-CREATE TABLE ods.lt_c_uzone
+CREATE TABLE lt_c_uzone
 (
   mnum character varying(33),
   remark character varying(100),
@@ -45,11 +45,11 @@ CREATE TABLE ods.lt_c_uzone
   _gid serial NOT NULL,
   _annox numeric(20,4),
   _annoy numeric(20,4),
-  _geometry geometry(MultiPolygon,5176),
+  _geometry geometry(MultiPolygon,5186),
   CONSTRAINT lt_c_uzone_pkey PRIMARY KEY (_gid)
 );
 
-CREATE TABLE ods.mt_clct_log
+CREATE TABLE mt_clct_log
 (
   org_cd character varying(10),
   sys_cd character varying(10),
@@ -64,7 +64,7 @@ CREATE TABLE ods.mt_clct_log
   log_note text
 );
 
-CREATE TABLE ods.mt_link_log
+CREATE TABLE mt_link_log
 (
   usr_id character varying(30),
   org_cd character varying(10),
@@ -79,7 +79,7 @@ CREATE TABLE ods.mt_link_log
   log_note text
 );
 
-CREATE TABLE ods.mt_ods_log
+CREATE TABLE mt_ods_log
 (
   _seq serial NOT NULL,
   tbl_nm character varying(50),
@@ -90,7 +90,7 @@ CREATE TABLE ods.mt_ods_log
   CONSTRAINT mt_clouddata_log_pk PRIMARY KEY (_seq)
 );
 
-CREATE TABLE ods.mt_usezone_cd
+CREATE TABLE mt_usezone_cd
 (
   use_zone_zone_cd character varying(255),
   law_cls_cd character varying(255),
@@ -107,7 +107,7 @@ CREATE TABLE ods.mt_usezone_cd
   rpt_cls character varying(255),
   edt_tmap_layer_no character varying(255)
 );
-CREATE TABLE ods.tl_spbd_buld
+CREATE TABLE tl_spbd_buld
 (
   sig_cd character varying(5), 
   bul_man_no numeric(7,0), 
@@ -151,10 +151,10 @@ CREATE TABLE ods.tl_spbd_buld
   _gid serial NOT NULL,
   _annox numeric(20,4),
   _annoy numeric(20,4),
-  _geometry geometry(MultiPolygon,5176),
+  _geometry geometry(MultiPolygon,5186),
   CONSTRAINT tl_spbd_buld_pkey PRIMARY KEY (_gid)
 );
-CREATE TABLE ods.tl_spbd_entrc
+CREATE TABLE tl_spbd_entrc
 (
   sig_cd character varying(5),
   ent_man_no numeric(10,0),
@@ -167,10 +167,10 @@ CREATE TABLE ods.tl_spbd_entrc
   _gid serial NOT NULL,
   _annox numeric(20,4),
   _annoy numeric(20,4),
-  _geometry geometry(Point,5176),
+  _geometry geometry(Point,5186),
   CONSTRAINT tl_spbd_entrc_pkey PRIMARY KEY (_gid)
 );
-CREATE TABLE ods.tl_spbd_eqb
+CREATE TABLE tl_spbd_eqb
 (
   sig_cd character varying(5),
   eqb_man_sn numeric(10,0),
@@ -185,10 +185,10 @@ CREATE TABLE ods.tl_spbd_eqb
   _gid serial NOT NULL,
   _annox numeric(20,4),
   _annoy numeric(20,4),
-  _geometry geometry(MultiPolygon,5176),
+  _geometry geometry(MultiPolygon,5186),
   CONSTRAINT tl_spbd_eqb_pkey PRIMARY KEY (_gid)
 );
-CREATE TABLE ods.tl_spot_cntc
+CREATE TABLE tl_spot_cntc
 (
   sig_cd character varying(5),
   ent_man_no numeric(10,0),
@@ -201,10 +201,10 @@ CREATE TABLE ods.tl_spot_cntc
   _gid serial NOT NULL,
   _annox numeric(20,4),
   _annoy numeric(20,4),
-  _geometry geometry(MultiLineString,5176),
+  _geometry geometry(MultiLineString,5186),
   CONSTRAINT tl_spot_cntc_pkey PRIMARY KEY (_gid)
 );
-CREATE TABLE ods.tl_spot_fcltylc
+CREATE TABLE tl_spot_fcltylc
 (
   sig_cd character varying(5),
   fclty_sn numeric(12,0),
@@ -222,11 +222,11 @@ CREATE TABLE ods.tl_spot_fcltylc
   _gid serial NOT NULL,
   _annox numeric(20,4),
   _annoy numeric(20,4),
-  _geometry geometry(Point,5176),
+  _geometry geometry(Point,5186),
   CONSTRAINT tl_spot_fcltylc_pkey PRIMARY KEY (_gid)
 );
 
-CREATE TABLE ods.tl_sprd_crsrd
+CREATE TABLE tl_sprd_crsrd
 (
   sig_cd character varying(5),
   crsrd_sn numeric(12,0),
@@ -239,11 +239,11 @@ CREATE TABLE ods.tl_sprd_crsrd
   _gid serial NOT NULL,
   _annox numeric(20,4),
   _annoy numeric(20,4),
-  _geometry geometry(Point,5176),
+  _geometry geometry(Point,5186),
   CONSTRAINT tl_sprd_crsrd_pkey PRIMARY KEY (_gid)
 );
 
-CREATE TABLE ods.tl_sprd_intrvl
+CREATE TABLE tl_sprd_intrvl
 (
   sig_cd character varying(5),
   rds_man_no numeric(12,0),
@@ -260,11 +260,11 @@ CREATE TABLE ods.tl_sprd_intrvl
   _gid serial NOT NULL,
   _annox numeric(20,4),
   _annoy numeric(20,4),
-  _geometry geometry(MultiLineString,5176),
+  _geometry geometry(MultiLineString,5186),
   CONSTRAINT tl_sprd_intrvl_pkey PRIMARY KEY (_gid)
 );
 
-CREATE TABLE ods.tl_sprd_manage
+CREATE TABLE tl_sprd_manage
 (
   sig_cd character varying(5),
   rds_man_no numeric(12,0),
@@ -298,11 +298,11 @@ CREATE TABLE ods.tl_sprd_manage
   _gid serial NOT NULL,
   _annox numeric(20,4),
   _annoy numeric(20,4),
-  _geometry geometry(MultiLineString,5176),
+  _geometry geometry(MultiLineString,5186),
   CONSTRAINT tl_sprd_manage_pkey PRIMARY KEY (_gid)
 );
 
-CREATE TABLE ods.tl_sprd_rw
+CREATE TABLE tl_sprd_rw
 (
   sig_cd character varying(5),
   rw_sn numeric(12,0),
@@ -313,11 +313,11 @@ CREATE TABLE ods.tl_sprd_rw
   _gid serial NOT NULL,
   _annox numeric(20,4),
   _annoy numeric(20,4),
-  _geometry geometry(MultiPolygon,5176),
+  _geometry geometry(MultiPolygon,5186),
   CONSTRAINT tl_sprd_rw_pkey PRIMARY KEY (_gid)
 );
 
-CREATE TABLE ods.f_fac_building
+CREATE TABLE f_fac_building
 (
   ufid character varying(28),
   bld_nm character varying(150),
@@ -346,6 +346,6 @@ CREATE TABLE ods.f_fac_building
   _gid serial NOT NULL,
   _annox numeric(20,4),
   _annoy numeric(20,4),
-  _geometry geometry(MultiPolygon,5176),
+  _geometry geometry(MultiPolygon,5186),
   CONSTRAINT f_fac_building_pkey PRIMARY KEY (_gid)
 );

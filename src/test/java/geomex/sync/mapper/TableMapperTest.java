@@ -21,7 +21,7 @@ class TableMapperTest {
                 .findFirst().orElseThrow();
 
         assertThat(cbnd.hasGeometry()).isTrue();
-        assertThat(cbnd.keyColumns()).isNotEmpty();
+        assertThat(cbnd.columns).isNotEmpty();
     }
 
     @Test

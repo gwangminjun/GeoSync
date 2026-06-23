@@ -3,6 +3,7 @@ package geomex.sync.web;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import geomex.sync.service.RuntimeSettingsService;
 import org.apache.hc.client5.http.classic.methods.HttpPost;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
 import org.apache.hc.client5.http.impl.classic.HttpClients;
@@ -45,6 +46,11 @@ public class SettingsController {
 
     private static final Logger log = LoggerFactory.getLogger(SettingsController.class);
     private final ObjectMapper objectMapper = new ObjectMapper();
+    private final RuntimeSettingsService settings;
+
+    public SettingsController(RuntimeSettingsService settings) {
+        this.settings = settings;
+    }
 
     @Value("${spring.config.location:conf/application.yml}")
     private String configLocation;
@@ -184,7 +190,7 @@ public class SettingsController {
             ObjectNode req = objectMapper.createObjectNode();
             req.put("service",   "CHECK");
             req.put("connSysId", connId);
-            req.put("orgCode",   orgCode);
+            req.put("orgCode",   settings.orgCode());
             req.put("chkPnu",    chkPnu);
 
             try (CloseableHttpClient client = HttpClients.createDefault()) {
@@ -220,8 +226,9 @@ public class SettingsController {
         try {
             Files.createDirectories(configFile.getParent());
             Files.writeString(configFile, buildYaml(params), StandardCharsets.UTF_8);
+            settings.reload();
             log.info("설정 저장: {}", configFile.toAbsolutePath());
-            ra.addFlashAttribute("success", "설정을 저장했습니다. 변경 사항은 서비스 재시작 후 적용됩니다.");
+            ra.addFlashAttribute("success", "설정을 저장했습니다. 변경 사항은 재시작 없이 바로 적용됩니다.");
         } catch (IOException e) {
             log.error("설정 저장 실패: {}", e.getMessage());
             ra.addFlashAttribute("error", "설정 저장 실패: " + e.getMessage());
@@ -322,7 +329,7 @@ public class SettingsController {
 
     private long countRows(Connection conn, String schema, String table, boolean onlyOrg) throws Exception {
         String sql = "SELECT COUNT(*) FROM " + quoteIdent(schema) + "." + quoteIdent(table)
-                + (onlyOrg ? " WHERE org_cd = '" + orgCode.replace("'", "''") + "'" : "");
+                + (onlyOrg ? " WHERE org_cd = '" + settings.orgCode().replace("'", "''") + "'" : "");
         try (Statement st = conn.createStatement();
              ResultSet rs = st.executeQuery(sql)) {
             return rs.next() ? rs.getLong(1) : 0;
@@ -361,36 +368,36 @@ public class SettingsController {
             String host = safe(p.get("tgt_host_" + i));
             if (host.isEmpty()) continue;
             sb.append("spring:\n  datasource:\n")
-              .append("    url: jdbc:postgresql://").append(host).append(":")
-              .append(safe(p.get("tgt_port_" + i))).append("/")
-              .append(safe(p.get("tgt_dbname_" + i))).append("\n")
-              .append("    username: ").append(safe(p.get("tgt_user_" + i))).append("\n")
-              .append("    password: ").append(safe(p.get("tgt_pass_" + i))).append("\n\n");
+              .append("    url: ").append(yaml("jdbc:postgresql://" + host + ":"
+                      + safe(p.get("tgt_port_" + i)) + "/"
+                      + safe(p.get("tgt_dbname_" + i)))).append("\n")
+              .append("    username: ").append(yaml(p.get("tgt_user_" + i))).append("\n")
+              .append("    password: ").append(yaml(p.get("tgt_pass_" + i))).append("\n\n");
             break;
         }
 
         sb.append("kras:\n")
-          .append("  url: ").append(safe(p.get("kras_url"))).append("\n")
-          .append("  conn-sys-id: ").append(safe(p.get("kras_conn_sys_id"))).append("\n")
-          .append("  chk-pnu: \"").append(safe(p.get("kras_chk_pnu"))).append("\"\n")
-          .append("  schedule: '").append(safe(p.get("kras_schedule"))).append("'\n\n")
+          .append("  url: ").append(yaml(p.get("kras_url"))).append("\n")
+          .append("  conn-sys-id: ").append(yaml(p.get("kras_conn_sys_id"))).append("\n")
+          .append("  chk-pnu: ").append(yaml(p.get("kras_chk_pnu"))).append("\n")
+          .append("  schedule: ").append(yaml(p.get("kras_schedule"))).append("\n\n")
           .append("kais:\n")
-          .append("  work-dir: ").append(safe(p.get("kais_work_dir"))).append("\n")
-          .append("  schedule: '").append(safe(p.get("kais_schedule"))).append("'\n\n")
+          .append("  work-dir: ").append(yaml(p.get("kais_work_dir"))).append("\n")
+          .append("  schedule: ").append(yaml(p.get("kais_schedule"))).append("\n\n")
           .append("ods:\n")
-          .append("  schema: ").append(safe(p.get("ods_schema")).isEmpty() ? "ods" : safe(p.get("ods_schema"))).append("\n\n")
+          .append("  schema: ").append(yaml(safe(p.get("ods_schema")).isEmpty() ? "ods" : p.get("ods_schema"))).append("\n\n")
           .append("targets:\n");
 
         for (int i = 0; i < count; i++) {
             String host = safe(p.get("tgt_host_" + i));
             if (host.isEmpty()) continue;
             String enabled = p.get("tgt_enabled_" + i);
-            sb.append("  - name: ").append(safe(p.get("tgt_name_" + i))).append("\n")
-              .append("    host: ").append(host).append("\n")
+            sb.append("  - name: ").append(yaml(p.get("tgt_name_" + i))).append("\n")
+              .append("    host: ").append(yaml(host)).append("\n")
               .append("    port: ").append(safe(p.get("tgt_port_" + i))).append("\n")
-              .append("    dbname: ").append(safe(p.get("tgt_dbname_" + i))).append("\n")
-              .append("    username: ").append(safe(p.get("tgt_user_" + i))).append("\n")
-              .append("    password: ").append(safe(p.get("tgt_pass_" + i))).append("\n")
+              .append("    dbname: ").append(yaml(p.get("tgt_dbname_" + i))).append("\n")
+              .append("    username: ").append(yaml(p.get("tgt_user_" + i))).append("\n")
+              .append("    password: ").append(yaml(p.get("tgt_pass_" + i))).append("\n")
               .append("    enabled: ").append(enabled != null ? "true" : "false").append("\n");
         }
 
@@ -399,6 +406,10 @@ public class SettingsController {
 
     private String safe(String v) {
         return v != null ? v.trim() : "";
+    }
+
+    private String yaml(String v) {
+        return "\"" + safe(v).replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
     }
 
     private String mapValue(Map<String, Object> map, String key) {

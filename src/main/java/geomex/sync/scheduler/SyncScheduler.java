@@ -78,17 +78,21 @@ public class SyncScheduler {
     }
 
     public void runKrasLoad() {
-        runKrasLoad(null, null);
+        runKrasLoad(null, null, null);
     }
 
     public void runKrasLoad(List<Integer> targetIndices, String schemaOverride) {
+        runKrasLoad(targetIndices, schemaOverride, null);
+    }
+
+    public void runKrasLoad(List<Integer> targetIndices, String schemaOverride, java.util.Set<String> tableFilter) {
         if (!syncEnabled) return;
         if (!krasLoadRunning.compareAndSet(false, true)) {
             log.warn("[KRAS] 적재 이미 진행 중 — 스킵");
             return;
         }
         try {
-            krasWorker.runLoad(targetIndices, schemaOverride);
+            krasWorker.runLoad(targetIndices, schemaOverride, tableFilter);
         } finally {
             krasLoadRunning.set(false);
         }
@@ -112,11 +116,16 @@ public class SyncScheduler {
 
     @Async
     public void triggerKrasLoadAsync() {
-        runKrasLoad(null, null);
+        runKrasLoad(null, null, null);
     }
 
     @Async
     public void triggerKrasLoadAsync(List<Integer> targetIndices, String schemaOverride) {
-        runKrasLoad(targetIndices, schemaOverride);
+        runKrasLoad(targetIndices, schemaOverride, null);
+    }
+
+    @Async
+    public void triggerKrasLoadAsync(List<Integer> targetIndices, String schemaOverride, java.util.Set<String> tableFilter) {
+        runKrasLoad(targetIndices, schemaOverride, tableFilter);
     }
 }

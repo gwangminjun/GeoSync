@@ -2,164 +2,306 @@ package geomex.sync.repository;
 
 import geomex.sync.model.ColumnDef;
 import geomex.sync.model.SyncTableDef;
+import geomex.sync.service.SyncStatusService;
 import geomex.sync.service.TargetTableNameService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 @Repository
 public class OdsRepository {
 
     private static final Logger log = LoggerFactory.getLogger(OdsRepository.class);
+    private static final Pattern SAFE_IDENTIFIER = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
+    private static final int BATCH_SIZE = 500;
 
     private final JdbcTemplate jdbc;
     private final TargetTableNameService tableNameService;
+    private final SyncStatusService statusService;
 
-    public OdsRepository(JdbcTemplate jdbc, TargetTableNameService tableNameService) {
+    @Value("${ods.ddl:conf/sql/sync_tables.sql}")
+    private String ddlPath;
+
+    public OdsRepository(JdbcTemplate jdbc, TargetTableNameService tableNameService,
+                         SyncStatusService statusService) {
         this.jdbc = jdbc;
         this.tableNameService = tableNameService;
+        this.statusService = statusService;
     }
 
-    /**
-     * 대상 테이블에서 기관코드 전체 삭제 후 배치 INSERT (Spring primary DataSource 사용)
-     */
     @Transactional
     public int replaceAll(SyncTableDef def, String orgCode, int targetEpsg,
                           List<Map<String, Object>> rows) {
         return replaceAllTo(jdbc, def, orgCode, targetEpsg, rows);
     }
 
-    /**
-     * 지정된 JdbcTemplate에 기관코드 전체 삭제 후 배치 INSERT (다중 DB 대상용)
-     */
     public int replaceAllTo(JdbcTemplate targetJdbc, SyncTableDef def, String orgCode,
                             int targetEpsg, List<Map<String, Object>> rows) {
-        return replaceAllTo(targetJdbc, def, orgCode, targetEpsg, rows, null);
+        return replaceAllTo(targetJdbc, def, orgCode, targetEpsg, rows, null, null);
+    }
+
+    public void dropTable(JdbcTemplate targetJdbc, String tgtTableName, String schemaOverride) {
+        String targetTableName = tableNameService.resolve(tgtTableName, schemaOverride);
+        String sqlTableName = qualifiedTableName(targetTableName);
+        try {
+            targetJdbc.execute("DROP TABLE IF EXISTS " + sqlTableName + " CASCADE");
+            log.info("[{}] dropped", targetTableName);
+        } catch (Exception e) {
+            log.warn("[{}] drop failed: {}", targetTableName, e.getMessage());
+        }
+    }
+
+    public void recreateSchemaTables(JdbcTemplate targetJdbc, String schemaOverride) {
+        String schema = resolveSchema(schemaOverride);
+        String sqlSchema = quoteIdent(schema);
+        String databaseName = currentDatabase(targetJdbc);
+
+        try {
+            String ddlScript = Files.readString(Path.of(ddlPath), StandardCharsets.UTF_8);
+            List<OdsTableDdl.CreateTable> tables = OdsTableDdl.createTables(ddlScript);
+            if (tables.isEmpty()) {
+                throw new IllegalStateException("No CREATE TABLE statements found in " + ddlPath);
+            }
+
+            targetJdbc.execute("CREATE SCHEMA IF NOT EXISTS " + sqlSchema);
+
+            List<OdsTableDdl.CreateTable> dropOrder = new ArrayList<>(tables);
+            Collections.reverse(dropOrder);
+            for (OdsTableDdl.CreateTable table : dropOrder) {
+                String tableName = sqlSchema + "." + quoteIdent(table.baseName());
+                targetJdbc.execute("DROP TABLE IF EXISTS " + tableName + " CASCADE");
+            }
+
+            for (OdsTableDdl.CreateTable table : tables) {
+                String tableName = sqlSchema + "." + quoteIdent(table.baseName());
+                targetJdbc.execute(table.createSql(tableName));
+                verifyTableExists(targetJdbc, schema, table.baseName());
+            }
+
+            log.info("[{}] database={} recreated {} tables from {}",
+                    schema, databaseName, tables.size(), ddlPath);
+        } catch (Exception e) {
+            throw new IllegalStateException("Failed to recreate schema tables for "
+                    + databaseName + "." + schema + ": " + e.getMessage(), e);
+        }
     }
 
     public int replaceAllTo(JdbcTemplate targetJdbc, SyncTableDef def, String orgCode,
                             int targetEpsg, List<Map<String, Object>> rows, String schemaOverride) {
+        return replaceAllTo(targetJdbc, def, orgCode, targetEpsg, rows, schemaOverride, null);
+    }
+
+    public int replaceAllTo(JdbcTemplate targetJdbc, SyncTableDef def, String orgCode,
+                            int targetEpsg, List<Map<String, Object>> rows, String schemaOverride,
+                            String progressType) {
         String targetTableName = tableNameService.resolve(def.tgtTableName, schemaOverride);
+        String sqlTableName = qualifiedTableName(targetTableName);
+        String databaseName = currentDatabase(targetJdbc);
+        log.info("[{}] database={} org_cd={} save start (rows={})",
+                targetTableName, databaseName, orgCode, rows.size());
 
-        if (!targetTableName.equals(def.tgtTableName)) {
-            ensureTableExists(targetJdbc, targetTableName, def, targetEpsg);
-        }
+        ensureTableExists(targetJdbc, targetTableName, sqlTableName, def, targetEpsg);
+        log.info("[{}] database={} table verified", targetTableName, databaseName);
 
-        String deleteSql = "DELETE FROM " + targetTableName + " WHERE org_cd = ?";
+        String deleteSql = "DELETE FROM " + sqlTableName + " WHERE " + quoteIdent("org_cd") + " = ?";
         try {
             targetJdbc.update(deleteSql, orgCode);
+            log.info("[{}] org_cd={} old rows deleted", targetTableName, orgCode);
         } catch (Exception e) {
-            log.warn("[{}] DELETE 건너뜀: {}", targetTableName, e.getMessage());
+            log.warn("[{}] DELETE skipped: {}", targetTableName, e.getMessage());
         }
 
         if (rows.isEmpty()) return 0;
 
-        String insertSql = buildInsertSql(def, targetTableName, targetEpsg);
-        int count = 0;
+        String insertSql = buildInsertSql(def, sqlTableName, targetEpsg);
+        boolean hasOrgCd = def.columns.stream().anyMatch(c -> "org_cd".equals(c.tgtName));
 
+        List<Object[]> allParams = new ArrayList<>(rows.size());
         for (Map<String, Object> row : rows) {
-            Object[] params = buildParams(def, row, orgCode);
-            try {
-                targetJdbc.update(insertSql, params);
-                count++;
-            } catch (Exception e) {
-                log.warn("[{}] INSERT 실패 (row={}): {}", targetTableName, row, e.getMessage());
-            }
+            allParams.add(buildParams(def, row, orgCode, hasOrgCd));
         }
-        log.info("[{}] org_cd={} → {}건 저장", targetTableName, orgCode, count);
+
+        int count = 0;
+        int failCount = 0;
+        Exception firstFailure = null;
+        updateInsertProgress(progressType, targetTableName, databaseName, 0, rows.size());
+
+        for (int start = 0; start < allParams.size(); start += BATCH_SIZE) {
+            int end = Math.min(start + BATCH_SIZE, allParams.size());
+            List<Object[]> batch = allParams.subList(start, end);
+            try {
+                targetJdbc.batchUpdate(insertSql, batch);
+                count += batch.size();
+                log.info("[{}] org_cd={} INSERT progress {}/{}", targetTableName, orgCode, count, rows.size());
+            } catch (Exception e) {
+                failCount += batch.size();
+                if (firstFailure == null) firstFailure = e;
+                log.warn("[{}] batch INSERT failed (rows {}-{}): {}", targetTableName, start, end, e.getMessage());
+            }
+            updateInsertProgress(progressType, targetTableName, databaseName, count + failCount, rows.size());
+        }
+
+        updateInsertProgress(progressType, targetTableName, databaseName, count, rows.size());
+        if (failCount > 0) {
+            throw new IllegalStateException("INSERT failed for " + targetTableName
+                    + " on database " + databaseName + " (success=" + count
+                    + ", failed=" + failCount + "): " + firstFailure.getMessage(), firstFailure);
+        }
+        log.info("[{}] org_cd={} saved {} rows", targetTableName, orgCode, count);
         return count;
     }
 
+    private void updateInsertProgress(String progressType, String targetTableName,
+                                      String databaseName, int completed, int total) {
+        if (progressType == null || progressType.isBlank()) return;
+        statusService.updateRowProgress(progressType, completed, total,
+                databaseName + "." + targetTableName);
+    }
 
     private static final Map<String, String> GEOM_TYPE_MAP = Map.of(
-        "MULTIPOLYGON",   "MultiPolygon",
-        "POLYGON",        "Polygon",
-        "POINT",          "Point",
-        "MULTIPOINT",     "MultiPoint",
-        "LINESTRING",     "LineString",
-        "MULTILINESTRING","MultiLineString"
+            "MULTIPOLYGON", "MULTIPOLYGON",
+            "POLYGON", "POLYGON",
+            "POINT", "POINT",
+            "MULTIPOINT", "MULTIPOINT",
+            "LINESTRING", "LINESTRING",
+            "MULTILINESTRING", "MULTILINESTRING"
     );
 
-    private void ensureTableExists(JdbcTemplate targetJdbc, String targetTableName,
+    private void ensureTableExists(JdbcTemplate targetJdbc, String targetTableName, String sqlTableName,
                                    SyncTableDef def, int epsg) {
         String schema = targetTableName.contains(".")
                 ? targetTableName.substring(0, targetTableName.indexOf('.'))
                 : "public";
+        String baseName = targetTableName.contains(".")
+                ? targetTableName.substring(targetTableName.indexOf('.') + 1)
+                : targetTableName;
+        String sqlSchema = quoteIdent(schema);
+
         try {
-            targetJdbc.execute("CREATE SCHEMA IF NOT EXISTS " + schema);
+            targetJdbc.execute("CREATE SCHEMA IF NOT EXISTS " + sqlSchema);
+            String ddlScript = Files.readString(Path.of(ddlPath), StandardCharsets.UTF_8);
+            String ddl = OdsTableDdl.rewriteCreateTable(ddlScript, targetTableName, sqlTableName)
+                    .orElseThrow(() -> new IllegalStateException("DDL not found: " + baseName));
+            targetJdbc.execute(ddl);
+            verifyTableExists(targetJdbc, schema, baseName);
+            return;
+        } catch (Exception e) {
+            log.warn("[{}] SQL DDL table create failed; falling back to XML mapping: {}",
+                    targetTableName, e.getMessage());
+        }
 
-            StringBuilder ddl = new StringBuilder("CREATE TABLE IF NOT EXISTS ")
-                    .append(targetTableName).append(" (");
+        try {
+            targetJdbc.execute("CREATE SCHEMA IF NOT EXISTS " + sqlSchema);
 
-            if (def.hasGeometry()) {
-                ddl.append("_gid SERIAL NOT NULL, ");
-            }
-
+            StringBuilder colDdl = new StringBuilder();
+            ColumnDef geomCol = null;
             for (ColumnDef col : def.columns) {
-                ddl.append(col.tgtName).append(" ").append(toSqlType(col, epsg)).append(", ");
+                if (col.isGeometry) {
+                    geomCol = col;
+                    continue;
+                }
+                colDdl.append(quoteIdent(col.tgtName)).append(" ").append(toSqlType(col)).append(", ");
             }
 
             boolean hasOrgCd = def.columns.stream().anyMatch(c -> "org_cd".equals(c.tgtName));
-            if (!hasOrgCd) {
-                ddl.append("org_cd VARCHAR(10), ");
-            }
+            if (!hasOrgCd) colDdl.append(quoteIdent("org_cd")).append(" VARCHAR(10), ");
 
-            if (def.hasGeometry()) {
-                ddl.append("PRIMARY KEY (_gid)");
+            if (geomCol != null) {
+                String pgGeomType = GEOM_TYPE_MAP.getOrDefault(geomCol.type.toUpperCase(), "GEOMETRY");
+                String ddl = "CREATE TABLE IF NOT EXISTS " + sqlTableName + " ("
+                        + colDdl
+                        + quoteIdent("_gid") + " SERIAL, "
+                        + quoteIdent("_annox") + " NUMERIC(20,4), "
+                        + quoteIdent("_annoy") + " NUMERIC(20,4), "
+                        + quoteIdent(geomCol.tgtName) + " geometry(" + pgGeomType + "," + epsg + "), "
+                        + "PRIMARY KEY (" + quoteIdent("_gid") + ")"
+                        + ")";
+                targetJdbc.execute(ddl);
             } else {
-                ddl.setLength(ddl.length() - 2); // trailing ", " 제거
+                if (colDdl.length() > 0) colDdl.setLength(colDdl.length() - 2);
+                targetJdbc.execute("CREATE TABLE IF NOT EXISTS " + sqlTableName + " (" + colDdl + ")");
             }
 
-            ddl.append(")");
-            targetJdbc.execute(ddl.toString());
+            verifyTableExists(targetJdbc, schema, baseName);
         } catch (Exception e) {
-            log.warn("[{}] 테이블 자동 생성 실패: {}", targetTableName, e.getMessage());
+            throw new IllegalStateException("Table create failed for " + targetTableName + ": " + e.getMessage(), e);
         }
     }
 
-    private String toSqlType(ColumnDef col, int epsg) {
-        if (col.isGeometry) {
-            String pgType = GEOM_TYPE_MAP.getOrDefault(col.type.toUpperCase(), "Geometry");
-            return "geometry(" + pgType + ", " + epsg + ")";
+    private void verifyTableExists(JdbcTemplate targetJdbc, String schema, String tableName) {
+        Boolean exists = targetJdbc.queryForObject(
+                "SELECT EXISTS (SELECT 1 FROM information_schema.tables "
+                        + "WHERE table_schema = ? AND table_name = ? AND table_type = 'BASE TABLE')",
+                Boolean.class,
+                schema,
+                tableName);
+        if (!Boolean.TRUE.equals(exists)) {
+            throw new IllegalStateException("table was not created: " + schema + "." + tableName);
         }
+    }
+
+    private String currentDatabase(JdbcTemplate targetJdbc) {
+        try {
+            return targetJdbc.queryForObject("SELECT current_database()", String.class);
+        } catch (Exception e) {
+            return "unknown";
+        }
+    }
+
+    private String resolveSchema(String schemaOverride) {
+        if (schemaOverride != null && !schemaOverride.isBlank()) {
+            return schemaOverride.trim();
+        }
+        String odsSchema = tableNameService.getOdsSchema();
+        return odsSchema != null && !odsSchema.isBlank() ? odsSchema.trim() : "ods";
+    }
+
+    private String toSqlType(ColumnDef col) {
         return switch (col.type.toUpperCase()) {
             case "LONG", "INT", "INTEGER" -> "NUMERIC(20,0)";
-            case "DOUBLE", "FLOAT"        -> "NUMERIC(20,4)";
-            default                       -> "TEXT";
+            case "DOUBLE", "FLOAT" -> "NUMERIC(20,4)";
+            default -> "TEXT";
         };
     }
 
-    private String buildInsertSql(SyncTableDef def, String targetTableName, int epsg) {
+    private String buildInsertSql(SyncTableDef def, String sqlTableName, int epsg) {
         List<ColumnDef> cols = def.columns;
 
         StringBuilder colList = new StringBuilder();
         StringBuilder valList = new StringBuilder();
 
         for (ColumnDef col : cols) {
-            if (!colList.isEmpty()) { colList.append(", "); valList.append(", "); }
-            colList.append(col.tgtName);
+            if (!colList.isEmpty()) {
+                colList.append(", ");
+                valList.append(", ");
+            }
+            colList.append(quoteIdent(col.tgtName));
             valList.append(col.isGeometry ? "ST_GeomFromText(?, " + epsg + ")" : "?");
         }
 
-        // org_cd가 매핑에 없으면 추가
         boolean hasOrgCd = cols.stream().anyMatch(c -> "org_cd".equals(c.tgtName));
         if (!hasOrgCd) {
-            colList.append(", org_cd");
+            colList.append(", ").append(quoteIdent("org_cd"));
             valList.append(", ?");
         }
 
-        return "INSERT INTO " + targetTableName + " (" + colList + ") VALUES (" + valList + ")";
+        return "INSERT INTO " + sqlTableName + " (" + colList + ") VALUES (" + valList + ")";
     }
 
-    private Object[] buildParams(SyncTableDef def, Map<String, Object> row, String orgCode) {
+    private Object[] buildParams(SyncTableDef def, Map<String, Object> row, String orgCode, boolean hasOrgCd) {
         List<ColumnDef> cols = def.columns;
-        boolean hasOrgCd = cols.stream().anyMatch(c -> "org_cd".equals(c.tgtName));
-
         Object[] params = new Object[cols.size() + (hasOrgCd ? 0 : 1)];
         int i = 0;
         for (ColumnDef col : cols) {
@@ -169,5 +311,20 @@ public class OdsRepository {
             params[i] = orgCode;
         }
         return params;
+    }
+
+    private static String qualifiedTableName(String tableName) {
+        String trimmed = tableName.trim();
+        int dot = trimmed.lastIndexOf('.');
+        if (dot < 0) return quoteIdent(trimmed);
+        return quoteIdent(trimmed.substring(0, dot)) + "." + quoteIdent(trimmed.substring(dot + 1));
+    }
+
+    private static String quoteIdent(String identifier) {
+        String trimmed = identifier.trim();
+        if (!SAFE_IDENTIFIER.matcher(trimmed).matches()) {
+            throw new IllegalArgumentException("Unsafe SQL identifier: " + identifier);
+        }
+        return "\"" + trimmed + "\"";
     }
 }

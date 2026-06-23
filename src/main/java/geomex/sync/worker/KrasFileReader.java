@@ -1,9 +1,9 @@
 package geomex.sync.worker;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import geomex.sync.service.RuntimeSettingsService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
@@ -18,15 +18,14 @@ public class KrasFileReader {
 
     private static final Logger log = LoggerFactory.getLogger(KrasFileReader.class);
     private final ObjectMapper objectMapper = new ObjectMapper();
+    private final RuntimeSettingsService settings;
 
-    @Value("${kras.work-dir:./workspace/kras}")
-    private String workDir;
-
-    @Value("${sync.org-code:46870}")
-    private String orgCode;
+    public KrasFileReader(RuntimeSettingsService settings) {
+        this.settings = settings;
+    }
 
     public Map<String, List<String>> readManifest() throws IOException {
-        Path manifestPath = Path.of(workDir, orgCode, "_manifest.json");
+        Path manifestPath = Path.of(settings.krasWorkDir(), settings.orgCode(), "_manifest.json");
         if (!Files.exists(manifestPath)) {
             throw new IOException("매니페스트 파일 없음 (수집을 먼저 실행하세요): " + manifestPath);
         }
@@ -46,7 +45,7 @@ public class KrasFileReader {
 
     @SuppressWarnings("unchecked")
     public List<Map<String, Object>> readJson(String fileBaseName) throws IOException {
-        Path jsonPath = Path.of(workDir, orgCode, fileBaseName + ".json");
+        Path jsonPath = Path.of(settings.krasWorkDir(), settings.orgCode(), fileBaseName + ".json");
         if (!Files.exists(jsonPath)) {
             log.warn("[KRAS] JSON 캐시 파일 없음: {}", jsonPath);
             return List.of();

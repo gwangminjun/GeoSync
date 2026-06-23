@@ -14,9 +14,9 @@ import org.geotools.referencing.CRS;
 import org.locationtech.jts.geom.*;
 import org.locationtech.jts.io.WKTReader;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import geomex.sync.service.RuntimeSettingsService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.io.*;
@@ -32,17 +32,16 @@ public class KrasFileWriter {
 
     private static final Logger log = LoggerFactory.getLogger(KrasFileWriter.class);
     private final ObjectMapper objectMapper = new ObjectMapper();
+    private final RuntimeSettingsService settings;
 
-    @Value("${kras.work-dir:./workspace/kras}")
-    private String workDir;
-
-    @Value("${sync.org-code:46870}")
-    private String orgCode;
+    public KrasFileWriter(RuntimeSettingsService settings) {
+        this.settings = settings;
+    }
 
     public void write(String layerName, SyncTableDef def, List<Map<String, Object>> rows) {
         if (rows.isEmpty()) return;
         try {
-            Path dir = Path.of(workDir, orgCode);
+            Path dir = Path.of(settings.krasWorkDir(), settings.orgCode());
             Files.createDirectories(dir);
             String fileName = toFileName(layerName);
             if (def.hasGeometry()) {
@@ -50,7 +49,7 @@ public class KrasFileWriter {
             } else {
                 writeTxt(dir, fileName, def, rows);
             }
-            log.debug("[KRAS] 파일 저장: {}/{}", orgCode, fileName);
+            log.debug("[KRAS] 파일 저장: {}/{}", settings.orgCode(), fileName);
         } catch (Exception e) {
             log.warn("[KRAS] 파일 저장 실패 ({}): {}", layerName, e.getMessage());
         }
@@ -59,11 +58,11 @@ public class KrasFileWriter {
     public void writeJson(String layerName, List<Map<String, Object>> rows) {
         if (rows.isEmpty()) return;
         try {
-            Path dir = Path.of(workDir, orgCode);
+            Path dir = Path.of(settings.krasWorkDir(), settings.orgCode());
             Files.createDirectories(dir);
             String fileName = toFileName(layerName);
             objectMapper.writeValue(dir.resolve(fileName + ".json").toFile(), rows);
-            log.debug("[KRAS] JSON 캐시 저장: {}/{}.json", orgCode, fileName);
+            log.debug("[KRAS] JSON 캐시 저장: {}/{}.json", settings.orgCode(), fileName);
         } catch (Exception e) {
             log.warn("[KRAS] JSON 캐시 저장 실패 ({}): {}", layerName, e.getMessage());
         }
@@ -71,7 +70,7 @@ public class KrasFileWriter {
 
     public void writeManifest(Map<String, List<String>> tableToFiles) {
         try {
-            Path dir = Path.of(workDir, orgCode);
+            Path dir = Path.of(settings.krasWorkDir(), settings.orgCode());
             Files.createDirectories(dir);
             Map<String, Object> manifest = new LinkedHashMap<>();
             manifest.put("collectedAt", LocalDateTime.now().toString());

@@ -23,8 +23,8 @@ public class CoordTransformer {
 
     private static final Logger log = LoggerFactory.getLogger(CoordTransformer.class);
 
-    // 저장 좌표계: EPSG:5176 (WGS84 중부원점)
-    private static final int TARGET_EPSG = 5176;
+    // 저장 좌표계: EPSG:5186 (GRS80 중부원점)
+    private static final int TARGET_EPSG = 5186;
 
     // transform 캐시 (소스 EPSG → MathTransform)
     private final Map<Integer, MathTransform> transformCache = new ConcurrentHashMap<>();
@@ -41,7 +41,7 @@ public class CoordTransformer {
     }
 
     /**
-     * WKT 도형 문자열을 소스 EPSG에서 EPSG:5176으로 변환한 후 WKT로 반환
+     * WKT 도형 문자열을 소스 EPSG에서 EPSG:5186으로 변환한 후 WKT로 반환
      */
     public String transformWkt(String wkt, int sourceEpsg) {
         if (wkt == null || wkt.isBlank()) return null;
@@ -58,7 +58,7 @@ public class CoordTransformer {
     }
 
     /**
-     * JTS Geometry를 소스 EPSG에서 EPSG:5176으로 변환
+     * JTS Geometry를 소스 EPSG에서 EPSG:5186으로 변환
      */
     public Geometry transform(Geometry geom, int sourceEpsg) {
         if (sourceEpsg == TARGET_EPSG) return geom;
