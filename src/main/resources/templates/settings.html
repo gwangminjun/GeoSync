@@ -114,6 +114,30 @@
 
     <!-- ── KRAS ── -->
     <div style="display:flex;flex-direction:column;gap:14px;">
+      <div class="gs-section">ODS</div>
+      <div style="display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap;">
+        <div style="max-width:260px;flex:1;">
+          <label class="gs-label">ODS Schema</label>
+          <input class="gs-input mono" type="text" name="ods_schema" id="ods_schema"
+                 th:value="${values['ods_schema']}" placeholder="ods">
+        </div>
+        <div style="flex:3;min-width:280px;">
+          <label class="gs-label">대상 DB 확인</label>
+          <div id="ods-target-tabs" style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button th:each="t,i : ${targets}" type="button" class="btn-ghost"
+                    th:onclick="'checkOdsSchema(' + ${i.index} + ')'"
+                    th:text="${t.name != null && !#strings.isEmpty(t.name) ? t.name : 'DB ' + (i.index + 1)}">DB</button>
+          </div>
+        </div>
+      </div>
+      <div id="ods-check-result"
+           style="display:none;border:1px solid #262c35;border-radius:8px;background:#171b21;padding:12px;overflow-x:auto;"></div>
+      <div th:if="${#lists.isEmpty(targets)}" style="font-size:12.5px;color:#d9b066;">
+        대상 DB를 먼저 추가하고 저장한 뒤 확인할 수 있습니다.
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:14px;">
       <div class="gs-section">KRAS</div>
 
       <!-- URL + 연결ID + 연결테스트 -->
@@ -450,6 +474,55 @@
         res.textContent = 'FAIL';
         res.style.color = '#e88a82';
       });
+  }
+
+  function checkOdsSchema(targetIndex) {
+    const schema = document.getElementById('ods_schema').value.trim() || 'ods';
+    const box = document.getElementById('ods-check-result');
+    box.style.display = 'block';
+    box.innerHTML = '<div style="font-size:12.5px;color:#69707b;">checking...</div>';
+
+    const body = new FormData();
+    body.append('target_index', targetIndex);
+    body.append('ods_schema', schema);
+
+    fetch('/settings/check-ods', { method:'POST', body })
+      .then(r => r.json())
+      .then(d => {
+        if (!d.success) {
+          box.innerHTML = `<div style="font-size:12.5px;color:#e88a82;">${escapeHtml(d.message || 'check failed')}</div>`;
+          return;
+        }
+        const rows = (d.tables || []).map(t => `
+          <tr>
+            <td style="padding:7px 8px;color:#cdd3db;font-family:'JetBrains Mono',monospace;">${escapeHtml(t.name)}</td>
+            <td style="padding:7px 8px;text-align:right;color:#e7eaee;font-family:'JetBrains Mono',monospace;">${Number(t.totalRows || 0).toLocaleString()}</td>
+            <td style="padding:7px 8px;text-align:right;color:#e7eaee;font-family:'JetBrains Mono',monospace;">${t.orgRows === null || t.orgRows === undefined ? '-' : Number(t.orgRows).toLocaleString()}</td>
+          </tr>`).join('');
+        box.innerHTML = `
+          <div style="display:flex;gap:12px;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;">
+            <div style="font-size:13px;color:#cdd3db;font-weight:600;">${escapeHtml(d.target)} / ${escapeHtml(d.schema)}</div>
+            <div style="font-size:12px;color:${d.schemaExists ? '#5fc98a' : '#e88a82'};">${d.schemaExists ? 'schema exists' : 'schema missing'}</div>
+          </div>
+          ${d.schemaExists ? `
+          <table class="tgt-table">
+            <thead><tr><th>Table</th><th style="text-align:right;">Total rows</th><th style="text-align:right;">org_cd rows</th></tr></thead>
+            <tbody>${rows || '<tr><td colspan="3" style="padding:10px;color:#69707b;">No tables</td></tr>'}</tbody>
+          </table>` : ''}
+        `;
+      })
+      .catch(() => {
+        box.innerHTML = '<div style="font-size:12.5px;color:#e88a82;">request failed</div>';
+      });
+  }
+
+  function escapeHtml(value) {
+    return String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
   }
 
   document.addEventListener('DOMContentLoaded', function() {

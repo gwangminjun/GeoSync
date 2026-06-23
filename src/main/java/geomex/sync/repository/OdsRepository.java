@@ -2,6 +2,7 @@ package geomex.sync.repository;
 
 import geomex.sync.model.ColumnDef;
 import geomex.sync.model.SyncTableDef;
+import geomex.sync.service.TargetTableNameService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -17,9 +18,11 @@ public class OdsRepository {
     private static final Logger log = LoggerFactory.getLogger(OdsRepository.class);
 
     private final JdbcTemplate jdbc;
+    private final TargetTableNameService tableNameService;
 
-    public OdsRepository(JdbcTemplate jdbc) {
+    public OdsRepository(JdbcTemplate jdbc, TargetTableNameService tableNameService) {
         this.jdbc = jdbc;
+        this.tableNameService = tableNameService;
     }
 
     /**
@@ -36,12 +39,13 @@ public class OdsRepository {
      */
     public int replaceAllTo(JdbcTemplate targetJdbc, SyncTableDef def, String orgCode,
                             int targetEpsg, List<Map<String, Object>> rows) {
-        String deleteSql = "DELETE FROM " + def.tgtTableName + " WHERE org_cd = ?";
+        String targetTableName = tableNameService.resolve(def.tgtTableName);
+        String deleteSql = "DELETE FROM " + targetTableName + " WHERE org_cd = ?";
         targetJdbc.update(deleteSql, orgCode);
 
         if (rows.isEmpty()) return 0;
 
-        String insertSql = buildInsertSql(def, targetEpsg);
+        String insertSql = buildInsertSql(def, targetTableName, targetEpsg);
         int count = 0;
 
         for (Map<String, Object> row : rows) {
@@ -57,7 +61,7 @@ public class OdsRepository {
         return count;
     }
 
-    private String buildInsertSql(SyncTableDef def, int epsg) {
+    private String buildInsertSql(SyncTableDef def, String targetTableName, int epsg) {
         List<ColumnDef> cols = def.columns;
 
         StringBuilder colList = new StringBuilder();
@@ -76,7 +80,7 @@ public class OdsRepository {
             valList.append(", ?");
         }
 
-        return "INSERT INTO " + def.tgtTableName + " (" + colList + ") VALUES (" + valList + ")";
+        return "INSERT INTO " + targetTableName + " (" + colList + ") VALUES (" + valList + ")";
     }
 
     private Object[] buildParams(SyncTableDef def, Map<String, Object> row, String orgCode) {

@@ -28,6 +28,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -66,6 +69,7 @@ public class SettingsController {
                 Map<String, Object> root = readYamlRoot(content);
                 Map<String, Object> kras = childMap(root, "kras");
                 Map<String, Object> gpki = childMap(kras, "gpki");
+                Map<String, Object> ods = childMap(root, "ods");
                 values.put("kras_url",         extractYamlValue(content, "url",        "kras"));
                 values.put("kras_conn_sys_id", extractYamlValue(content, "conn-sys-id","kras"));
                 values.put("kras_chk_pnu",     extractYamlValue(content, "chk-pnu",   "kras"));
@@ -75,6 +79,7 @@ public class SettingsController {
                 values.put("gpki_home_dir",    yamlValue(gpki, "home-dir", "./gpki"));
                 values.put("gpki_password_file", yamlValue(gpki, "password-file", "password.txt"));
                 values.put("gpki_decrypt_response", yamlValue(gpki, "decrypt-response", "true"));
+                values.put("ods_schema",       yamlValue(ods, "schema", "ods"));
                 values.put("kais_work_dir",    extractYamlValue(content, "work-dir",   "kais"));
                 values.put("kais_schedule",    extractYamlValue(content, "schedule",   "kais"));
 
@@ -93,6 +98,7 @@ public class SettingsController {
         values.putIfAbsent("gpki_home_dir", "./gpki");
         values.putIfAbsent("gpki_password_file", "password.txt");
         values.putIfAbsent("gpki_decrypt_response", "true");
+        values.putIfAbsent("ods_schema", "ods");
 
         model.addAttribute("currentPage", "settings");
         model.addAttribute("configPath", configFile.toAbsolutePath().toString());
@@ -122,6 +128,53 @@ public class SettingsController {
             }
         } catch (ClassNotFoundException e) {
             return Map.of("success", false, "message", "PostgreSQL 드라이버를 찾을 수 없습니다");
+        } catch (Exception e) {
+            return Map.of("success", false, "message", e.getMessage());
+        }
+    }
+
+    @PostMapping("/check-ods")
+    @ResponseBody
+    public Map<String, Object> checkOdsSchema(
+            @RequestParam int target_index,
+            @RequestParam(required = false, defaultValue = "ods") String ods_schema) {
+        Path configFile = resolveConfigPath();
+        if (!Files.exists(configFile)) {
+            return Map.of("success", false, "message", "Config file not found");
+        }
+
+        try {
+            String content = Files.readString(configFile, StandardCharsets.UTF_8);
+            List<Map<String, Object>> targets = readTargets(content);
+            if (target_index < 0 || target_index >= targets.size()) {
+                return Map.of("success", false, "message", "Target DB not found");
+            }
+
+            Map<String, Object> target = targets.get(target_index);
+            String schema = safe(ods_schema).isEmpty() ? "ods" : safe(ods_schema);
+            String host = mapValue(target, "host");
+            String port = mapValue(target, "port");
+            String dbname = mapValue(target, "dbname");
+            String user = mapValue(target, "username");
+            String password = mapValue(target, "password");
+            String name = mapValue(target, "name");
+            String url = "jdbc:postgresql://" + host + ":" + port + "/" + dbname;
+
+            Class.forName("org.postgresql.Driver");
+            try (Connection conn = DriverManager.getConnection(url, user, password)) {
+                boolean schemaExists = schemaExists(conn, schema);
+                List<Map<String, Object>> tables = schemaExists
+                        ? inspectSchemaTables(conn, schema)
+                        : List.of();
+                return Map.of(
+                        "success", true,
+                        "target", name.isEmpty() ? url : name,
+                        "url", url,
+                        "schema", schema,
+                        "schemaExists", schemaExists,
+                        "tables", tables
+                );
+            }
         } catch (Exception e) {
             return Map.of("success", false, "message", e.getMessage());
         }
@@ -228,6 +281,70 @@ public class SettingsController {
         return value != null ? String.valueOf(value) : fallback;
     }
 
+    private boolean schemaExists(Connection conn, String schema) throws Exception {
+        try (PreparedStatement ps = conn.prepareStatement(
+                "SELECT EXISTS (SELECT 1 FROM information_schema.schemata WHERE schema_name = ?)")) {
+            ps.setString(1, schema);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() && rs.getBoolean(1);
+            }
+        }
+    }
+
+    private List<Map<String, Object>> inspectSchemaTables(Connection conn, String schema) throws Exception {
+        List<String> tableNames = new ArrayList<>();
+        try (PreparedStatement ps = conn.prepareStatement(
+                "SELECT table_name FROM information_schema.tables " +
+                "WHERE table_schema = ? AND table_type = 'BASE TABLE' ORDER BY table_name LIMIT 100")) {
+            ps.setString(1, schema);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    tableNames.add(rs.getString(1));
+                }
+            }
+        }
+
+        List<Map<String, Object>> tables = new ArrayList<>();
+        for (String tableName : tableNames) {
+            boolean hasOrgCd = columnExists(conn, schema, tableName, "org_cd");
+            long totalRows = countRows(conn, schema, tableName, false);
+            Long orgRows = hasOrgCd ? countRows(conn, schema, tableName, true) : null;
+            Map<String, Object> table = new LinkedHashMap<>();
+            table.put("name", tableName);
+            table.put("totalRows", totalRows);
+            table.put("orgRows", orgRows);
+            table.put("hasOrgCd", hasOrgCd);
+            tables.add(table);
+        }
+        return tables;
+    }
+
+    private boolean columnExists(Connection conn, String schema, String table, String column) throws Exception {
+        try (PreparedStatement ps = conn.prepareStatement(
+                "SELECT EXISTS (SELECT 1 FROM information_schema.columns " +
+                "WHERE table_schema = ? AND table_name = ? AND column_name = ?)")) {
+            ps.setString(1, schema);
+            ps.setString(2, table);
+            ps.setString(3, column);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() && rs.getBoolean(1);
+            }
+        }
+    }
+
+    private long countRows(Connection conn, String schema, String table, boolean onlyOrg) throws Exception {
+        String sql = "SELECT COUNT(*) FROM " + quoteIdent(schema) + "." + quoteIdent(table)
+                + (onlyOrg ? " WHERE org_cd = '" + orgCode.replace("'", "''") + "'" : "");
+        try (Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery(sql)) {
+            return rs.next() ? rs.getLong(1) : 0;
+        }
+    }
+
+    private String quoteIdent(String value) {
+        return "\"" + value.replace("\"", "\"\"") + "\"";
+    }
+
     private String extractYamlValue(String content, String key, String section) {
         int sectionIdx = content.indexOf("\n" + section + ":");
         if (sectionIdx < 0) sectionIdx = content.indexOf(section + ":");
@@ -279,6 +396,8 @@ public class SettingsController {
           .append("kais:\n")
           .append("  work-dir: ").append(safe(p.get("kais_work_dir"))).append("\n")
           .append("  schedule: '").append(safe(p.get("kais_schedule"))).append("'\n\n")
+          .append("ods:\n")
+          .append("  schema: ").append(safe(p.get("ods_schema")).isEmpty() ? "ods" : safe(p.get("ods_schema"))).append("\n\n")
           .append("targets:\n");
 
         for (int i = 0; i < count; i++) {
@@ -299,5 +418,10 @@ public class SettingsController {
 
     private String safe(String v) {
         return v != null ? v.trim() : "";
+    }
+
+    private String mapValue(Map<String, Object> map, String key) {
+        Object value = map.get(key);
+        return value != null ? String.valueOf(value).trim() : "";
     }
 }

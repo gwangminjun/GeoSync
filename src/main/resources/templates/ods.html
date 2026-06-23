@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}" lang="ko">
+<head>
+  <title>ODS</title>
+  <th:block layout:fragment="head">
+  <style>
+    .tab-btn {
+      padding:7px 16px; border-radius:7px; font-size:13px; font-weight:500;
+      border:1px solid #2e3640; background:#1a1f26; color:#9aa2ad;
+      cursor:pointer; font-family:inherit; transition:all .15s;
+    }
+    .tab-btn.active { border-color:#0e9b94; color:#66c4be; background:rgba(14,155,148,.12); font-weight:600; }
+    .tab-btn:hover:not(.active) { border-color:#3e4650; color:#cdd3db; }
+
+    .tbl-card {
+      border:1px solid #232830; border-radius:10px; background:#171b21;
+      padding:16px 18px; cursor:pointer; transition:all .15s;
+      display:flex; flex-direction:column; gap:6px;
+    }
+    .tbl-card:hover { border-color:#2e3640; background:#1c212a; }
+    .tbl-card.active { border-color:#0e9b94; background:rgba(14,155,148,.08); }
+    .tbl-card.missing { border-color:#3d2a2a; background:#1a1414; cursor:default; }
+    .tbl-name { font-size:12.5px; font-family:'JetBrains Mono',monospace; color:#e7eaee; }
+    .tbl-desc { font-size:12px; color:#9aa2ad; }
+    .tbl-count { font-size:22px; font-weight:700; color:#f3f5f7; letter-spacing:-0.02em; font-family:'JetBrains Mono',monospace; }
+    .tbl-count.zero { color:#5b626d; }
+    .tbl-count.missing { color:#e88a82; font-size:14px; }
+    .src-badge {
+      font-size:10.5px; font-weight:700; letter-spacing:.04em;
+      padding:2px 7px; border-radius:4px; align-self:flex-start;
+    }
+    .src-kras { background:rgba(14,155,148,.18); color:#66c4be; }
+    .src-kais { background:rgba(100,130,220,.18); color:#8eaaee; }
+
+    .preview-wrap { border:1px solid #232830; border-radius:10px; background:#171b21; overflow:hidden; }
+    .preview-header { padding:12px 18px; border-bottom:1px solid #232830; display:flex; align-items:center; gap:12px; }
+    .preview-table-wrap { overflow-x:auto; max-height:420px; overflow-y:auto; }
+    .preview-table { width:100%; border-collapse:collapse; font-size:12.5px; }
+    .preview-table th { padding:8px 12px; background:#14171c; color:#69707b; font-weight:600;
+                        border-bottom:1px solid #232830; white-space:nowrap; position:sticky; top:0; z-index:1; }
+    .preview-table td { padding:6px 12px; border-bottom:1px solid #1e242c; color:#cdd3db;
+                        white-space:nowrap; max-width:260px; overflow:hidden; text-overflow:ellipsis; font-family:'JetBrains Mono',monospace; }
+    .preview-table tr:last-child td { border-bottom:none; }
+    .preview-table tr:hover td { background:#1c212a; }
+    .pager-btn { padding:5px 12px; border-radius:6px; border:1px solid #2e3640; background:#1a1f26;
+                 color:#9aa2ad; cursor:pointer; font-size:12.5px; font-family:inherit; }
+    .pager-btn:hover:not(:disabled) { border-color:#0e9b94; color:#66c4be; }
+    .pager-btn:disabled { opacity:.35; cursor:default; }
+    .spinner { width:18px; height:18px; border:2px solid #2e3640; border-top-color:#0e9b94;
+               border-radius:50%; animation:spin .7s linear infinite; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+  </style>
+  </th:block>
+</head>
+<body>
+<main layout:fragment="content">
+
+  <!-- 헤더 -->
+  <div style="margin-bottom:24px;display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+    <div>
+      <div style="font-size:19px;font-weight:700;color:#f3f5f7;letter-spacing:-0.01em;">ODS 데이터베이스</div>
+      <div style="font-size:12px;color:#69707b;margin-top:4px;">각 대상 DB의 ODS 스키마 테이블 현황 및 데이터 조회</div>
+    </div>
+    <div id="refresh-area" style="display:flex;align-items:center;gap:8px;">
+      <span id="last-updated" style="font-size:11.5px;color:#5b626d;font-family:'JetBrains Mono',monospace;"></span>
+      <button onclick="reload()" style="padding:6px 14px;border-radius:7px;border:1px solid #2e3640;background:#1a1f26;color:#9aa2ad;cursor:pointer;font-size:12.5px;font-family:inherit;">↻ 새로고침</button>
+    </div>
+  </div>
+
+  <!-- 대상 DB 없을 때 -->
+  <div th:if="${#lists.isEmpty(targets)}"
+       style="padding:32px;text-align:center;border:1px solid #262c35;border-radius:10px;background:#171b21;">
+    <div style="font-size:14px;color:#69707b;">활성화된 대상 DB가 없습니다.</div>
+    <a th:href="@{/settings}" style="display:inline-block;margin-top:12px;font-size:13px;color:#0e9b94;">설정에서 추가하기 →</a>
+  </div>
+
+  <div th:unless="${#lists.isEmpty(targets)}">
+
+    <!-- 대상 DB 탭 -->
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:22px;" id="target-tabs">
+      <button th:each="t,i : ${targets}"
+              class="tab-btn"
+              th:classappend="${i.first} ? ' active' : ''"
+              th:attr="data-idx=${i.index}"
+              th:text="${t.name()}"
+              onclick="selectTarget(this)">DB</button>
+    </div>
+
+    <!-- 테이블 카드 그리드 -->
+    <div style="margin-bottom:8px;display:flex;align-items:center;gap:10px;">
+      <div style="font-size:11.5px;font-weight:700;color:#69707b;letter-spacing:.06em;text-transform:uppercase;">테이블 현황</div>
+      <div id="table-spinner" style="display:none;" class="spinner"></div>
+    </div>
+    <div id="table-grid"
+         style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px;margin-bottom:26px;">
+      <!-- AJAX로 채워짐 -->
+    </div>
+
+    <!-- 데이터 미리보기 -->
+    <div id="preview-section" style="display:none;">
+      <div style="font-size:11.5px;font-weight:700;color:#69707b;letter-spacing:.06em;text-transform:uppercase;margin-bottom:10px;">데이터 미리보기</div>
+      <div class="preview-wrap">
+        <div class="preview-header">
+          <span id="preview-title" style="font-family:'JetBrains Mono',monospace;font-size:13px;color:#e7eaee;"></span>
+          <div id="preview-spinner" style="display:none;" class="spinner"></div>
+          <div style="margin-left:auto;display:flex;align-items:center;gap:8px;">
+            <span id="preview-page-info" style="font-size:12px;color:#69707b;"></span>
+            <button class="pager-btn" id="btn-prev" onclick="changePage(-1)" disabled>← 이전</button>
+            <button class="pager-btn" id="btn-next" onclick="changePage(1)" disabled>다음 →</button>
+          </div>
+        </div>
+        <div class="preview-table-wrap">
+          <div id="preview-content" style="padding:20px;font-size:13px;color:#69707b;">테이블 카드를 클릭하면 데이터를 조회합니다.</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</main>
+
+<th:block layout:fragment="scripts">
+<script>
+  let currentTargetIdx = 0;
+  let currentTable     = null;
+  let currentPage      = 0;
+  let currentHasMore   = false;
+
+  /* ── 초기 로드 ─────────────────────────────────────── */
+  document.addEventListener('DOMContentLoaded', () => {
+    loadTables(0);
+  });
+
+  /* ── 대상 탭 선택 ──────────────────────────────────── */
+  function selectTarget(btn) {
+    document.querySelectorAll('#target-tabs .tab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentTargetIdx = parseInt(btn.dataset.idx);
+    currentTable     = null;
+    currentPage      = 0;
+    document.getElementById('preview-section').style.display = 'none';
+    loadTables(currentTargetIdx);
+  }
+
+  /* ── 테이블 목록 로드 ──────────────────────────────── */
+  function loadTables(idx) {
+    const grid    = document.getElementById('table-grid');
+    const spinner = document.getElementById('table-spinner');
+    grid.innerHTML = '';
+    spinner.style.display = 'block';
+
+    fetch(`/ods/tables?idx=${idx}`)
+      .then(r => r.json())
+      .then(data => {
+        spinner.style.display = 'none';
+        if (data.error) { grid.innerHTML = `<div style="color:#e88a82;font-size:13px;">${data.error}</div>`; return; }
+        data.tables.forEach((t, i) => renderCard(t, i));
+        document.getElementById('last-updated').textContent = '조회: ' + new Date().toLocaleTimeString('ko-KR');
+      })
+      .catch(e => { spinner.style.display = 'none'; grid.innerHTML = `<div style="color:#e88a82;">${e}</div>`; });
+  }
+
+  function renderCard(t, i) {
+    const grid = document.getElementById('table-grid');
+    const shortName = t.name.split('.')[1];
+    const countTxt = t.exists
+      ? (t.count >= 0 ? Number(t.count).toLocaleString() + ' 건' : '0 건')
+      : '테이블 없음';
+    const countClass = !t.exists ? 'missing' : (t.count === 0 ? 'zero' : '');
+    const cardClass  = !t.exists ? 'missing' : '';
+    const badgeClass = t.src === 'KRAS' ? 'src-kras' : 'src-kais';
+    const card = document.createElement('div');
+    card.className = `tbl-card ${cardClass}`;
+    card.innerHTML = `
+      <span class="src-badge ${badgeClass}">${t.src}</span>
+      <div class="tbl-count ${countClass}">${countTxt}</div>
+      <div class="tbl-name">${shortName}</div>
+      <div class="tbl-desc">${t.desc}</div>`;
+    if (t.exists && t.count > 0) {
+      card.onclick = () => selectTable(t.name);
+    }
+    if (t.name === currentTable) card.classList.add('active');
+    grid.appendChild(card);
+  }
+
+  /* ── 테이블 선택 → 미리보기 ────────────────────────── */
+  function selectTable(tableName) {
+    currentTable = tableName;
+    currentPage  = 0;
+    // 카드 active 표시 갱신
+    document.querySelectorAll('.tbl-card').forEach(c => c.classList.remove('active'));
+    event.currentTarget.classList.add('active');
+    document.getElementById('preview-section').style.display = 'block';
+    document.getElementById('preview-title').textContent = tableName;
+    loadPreview();
+  }
+
+  function changePage(delta) {
+    currentPage += delta;
+    loadPreview();
+  }
+
+  /* ── 미리보기 로드 ─────────────────────────────────── */
+  function loadPreview() {
+    const spinner = document.getElementById('preview-spinner');
+    const content = document.getElementById('preview-content');
+    spinner.style.display = 'block';
+    content.innerHTML = '';
+
+    fetch(`/ods/preview?idx=${currentTargetIdx}&table=${encodeURIComponent(currentTable)}&page=${currentPage}`)
+      .then(r => r.json())
+      .then(data => {
+        spinner.style.display = 'none';
+        if (data.error) {
+          content.innerHTML = `<div style="padding:20px;color:#e88a82;">${data.error}</div>`;
+          return;
+        }
+        currentHasMore = data.hasMore;
+        renderPreview(data);
+      })
+      .catch(e => { spinner.style.display = 'none'; content.innerHTML = `<div style="padding:20px;color:#e88a82;">${e}</div>`; });
+  }
+
+  function renderPreview(data) {
+    const content = document.getElementById('preview-content');
+    const pageInfo = document.getElementById('preview-page-info');
+    const btnPrev  = document.getElementById('btn-prev');
+    const btnNext  = document.getElementById('btn-next');
+
+    if (!data.rows || data.rows.length === 0) {
+      content.innerHTML = '<div style="padding:20px;color:#69707b;">데이터가 없습니다.</div>';
+      pageInfo.textContent = '';
+      btnPrev.disabled = true;
+      btnNext.disabled = true;
+      return;
+    }
+
+    const start = currentPage * 20 + 1;
+    const end   = start + data.rows.length - 1;
+    pageInfo.textContent = `${start} – ${end}행`;
+    btnPrev.disabled = currentPage <= 0;
+    btnNext.disabled = !currentHasMore;
+
+    let html = '<table class="preview-table"><thead><tr>';
+    data.columns.forEach(c => { html += `<th>${c}</th>`; });
+    html += '</tr></thead><tbody>';
+    data.rows.forEach(row => {
+      html += '<tr>';
+      row.forEach(cell => {
+        const val = cell == null ? '' : String(cell);
+        html += `<td title="${escHtml(val)}">${escHtml(val.length > 60 ? val.substring(0,60) + '…' : val)}</td>`;
+      });
+      html += '</tr>';
+    });
+    html += '</tbody></table>';
+    content.innerHTML = html;
+  }
+
+  function reload() { loadTables(currentTargetIdx); }
+
+  function escHtml(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+</script>
+</th:block>
+</body>
+</html>

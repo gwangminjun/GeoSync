@@ -34,6 +34,7 @@ public class KrasCatalogStatusService {
 
     private final SyncStatusService statusService;
     private final TargetDbService targetDbService;
+    private final TargetTableNameService tableNameService;
     private final Map<String, CachedDbStatus> dbStatusCache = new ConcurrentHashMap<>();
 
     @Value("${kras.work-dir:./workspace/kras}")
@@ -45,9 +46,11 @@ public class KrasCatalogStatusService {
     @Value("${kras.catalog:./46870_DATA_CATALOG.md}")
     private String catalogPath;
 
-    public KrasCatalogStatusService(SyncStatusService statusService, TargetDbService targetDbService) {
+    public KrasCatalogStatusService(SyncStatusService statusService, TargetDbService targetDbService,
+                                    TargetTableNameService tableNameService) {
         this.statusService = statusService;
         this.targetDbService = targetDbService;
+        this.tableNameService = tableNameService;
     }
 
     public List<CatalogFileStatus> getStatuses() {
@@ -88,12 +91,13 @@ public class KrasCatalogStatusService {
             latest = max(latest, group.latestModified);
         }
 
-        DbStatus db = dbStatus("ods.lt_c_uzone");
+        String targetTableName = tableNameService.resolve("ods.lt_c_uzone");
+        DbStatus db = dbStatus(targetTableName);
         boolean fileLoaded = complete >= 47;
         return new CatalogFileStatus(
                 "KRAS 수신 원본 요약",
                 "KRAS 수신 원본",
-                "ods.lt_c_uzone",
+                targetTableName,
                 "lsmd_cont_u*.{shp,dbf,shx}",
                 "레이어별 shp/dbf/shx",
                 47,
@@ -111,7 +115,8 @@ public class KrasCatalogStatusService {
     }
 
     private List<CatalogFileStatus> usezoneLayerStatuses(Map<String, FileGroup> groups, LocalDateTime lastSuccess) {
-        DbStatus db = dbStatus("ods.lt_c_uzone");
+        String targetTableName = tableNameService.resolve("ods.lt_c_uzone");
+        DbStatus db = dbStatus(targetTableName);
         List<CatalogLayer> layers = readCatalogLayers();
         List<CatalogFileStatus> statuses = new ArrayList<>();
         for (CatalogLayer layer : layers) {
@@ -123,7 +128,7 @@ public class KrasCatalogStatusService {
             statuses.add(new CatalogFileStatus(
                     layer.category,
                     layer.code + " " + layer.description,
-                    "ods.lt_c_uzone",
+                    targetTableName,
                     layer.fileName + ".{shp,dbf,shx}",
                     "shp, dbf, shx",
                     1,
@@ -151,9 +156,10 @@ public class KrasCatalogStatusService {
         int files = group != null ? group.fileCount : 0;
         LocalDateTime latest = group != null ? group.latestModified : null;
 
-        DbStatus db = dbStatus(target);
+        String targetTableName = tableNameService.resolve(target);
+        DbStatus db = dbStatus(targetTableName);
         boolean fileLoaded = complete >= expectedCount;
-        return new CatalogFileStatus(category, name, target, pattern,
+        return new CatalogFileStatus(category, name, targetTableName, pattern,
                 String.join(", ", requiredExtensions), expectedCount, complete, files,
                 latest, fileLoaded, isSynced(latest, lastSuccess), db.loaded, db.rowCount, db.message,
                 db.targetLabels, note);
@@ -168,9 +174,10 @@ public class KrasCatalogStatusService {
         int files = group != null ? group.fileCount : 0;
         LocalDateTime latest = group != null ? group.latestModified : null;
 
-        DbStatus db = dbStatus(target);
+        String targetTableName = tableNameService.resolve(target);
+        DbStatus db = dbStatus(targetTableName);
         boolean fileLoaded = complete > 0;
-        return new CatalogFileStatus(category, name, target, pattern,
+        return new CatalogFileStatus(category, name, targetTableName, pattern,
                 String.join(", ", requiredExtensions), 1, complete, files,
                 latest, fileLoaded, isSynced(latest, lastSuccess), db.loaded, db.rowCount, db.message,
                 db.targetLabels, note);
@@ -217,24 +224,25 @@ public class KrasCatalogStatusService {
     }
 
     private DbStatus dbStatus(String tableName) {
-        CachedDbStatus cached = dbStatusCache.get(tableName);
+        String targetTableName = tableNameService.resolve(tableName);
+        CachedDbStatus cached = dbStatusCache.get(targetTableName);
         if (cached != null && !cached.isExpired()) {
             return cached.status;
         }
 
         CompletableFuture<DbStatus> future = CompletableFuture
-                .supplyAsync(() -> dbStatusBlocking(tableName));
-        future.thenAccept(status -> dbStatusCache.put(tableName, new CachedDbStatus(status)));
+                .supplyAsync(() -> dbStatusBlocking(targetTableName));
+        future.thenAccept(status -> dbStatusCache.put(targetTableName, new CachedDbStatus(status)));
 
         try {
             DbStatus status = future.get(DB_CHECK_TIMEOUT_MS, TimeUnit.MILLISECONDS);
-            dbStatusCache.put(tableName, new CachedDbStatus(status));
+            dbStatusCache.put(targetTableName, new CachedDbStatus(status));
             return status;
         } catch (Exception e) {
             DbStatus fallback = cached != null
                     ? cached.status
                     : new DbStatus(false, null, "DB 확인 지연", "확인 중");
-            dbStatusCache.put(tableName, new CachedDbStatus(fallback));
+            dbStatusCache.put(targetTableName, new CachedDbStatus(fallback));
             return fallback;
         }
     }
