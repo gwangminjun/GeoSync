@@ -343,7 +343,7 @@
     function openLoadModal() {
       var modal = document.getElementById('loadModal');
       modal.style.display = 'flex';
-      setSchemaSelect([], '불러오는 중...', null);
+      document.getElementById('targetList').innerHTML = '<div style="color:#69707b;font-size:13px;">불러오는 중...</div>';
       document.getElementById('fileList').innerHTML = '<div style="color:#69707b;font-size:13px;">불러오는 중...</div>';
       document.getElementById('fileSelectionSummary').textContent = '';
 
@@ -435,7 +435,6 @@
         .catch(function() {
           document.getElementById('targetList').innerHTML =
             '<div style="color:#e88a82;font-size:13px;">DB 목록을 불러오지 못했습니다.</div>';
-          setSchemaSelect([], '불러오기 실패', null);
           document.getElementById('fileList').innerHTML =
             '<div style="color:#e88a82;font-size:13px;">파일 목록을 불러오지 못했습니다.</div>';
         });
