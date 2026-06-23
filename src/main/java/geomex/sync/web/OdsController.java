@@ -38,14 +38,14 @@ public class OdsController {
         model.addAttribute("orgCode", orgCode);
         model.addAttribute("krasRunning", statusService.isRunning("KRAS"));
         model.addAttribute("kaisRunning", statusService.isRunning("KAIS"));
-        model.addAttribute("targets", targetDbService.getActiveTargets());
+        model.addAttribute("targets", targetDbService.getConfiguredTargets());
         return "ods";
     }
 
     @GetMapping("/schemas")
     @ResponseBody
     public Map<String, Object> getSchemas(@RequestParam(defaultValue = "0") int idx) {
-        List<TargetDbService.ActiveTarget> targets = targetDbService.getActiveTargets();
+        List<TargetDbService.ActiveTarget> targets = targetDbService.getConfiguredTargets();
         if (idx < 0 || idx >= targets.size()) {
             return Map.of("error", "대상 DB를 찾을 수 없습니다");
         }
@@ -72,7 +72,7 @@ public class OdsController {
         if (!SAFE_NAME.matcher(schema).matches() || SYSTEM_SCHEMAS.contains(schema)) {
             return Map.of("error", "유효하지 않은 스키마명");
         }
-        List<TargetDbService.ActiveTarget> targets = targetDbService.getActiveTargets();
+        List<TargetDbService.ActiveTarget> targets = targetDbService.getConfiguredTargets();
         if (idx < 0 || idx >= targets.size()) {
             return Map.of("error", "대상 DB를 찾을 수 없습니다");
         }
@@ -119,7 +119,7 @@ public class OdsController {
             return Map.of("error", "유효하지 않은 테이블명");
         }
 
-        List<TargetDbService.ActiveTarget> targets = targetDbService.getActiveTargets();
+        List<TargetDbService.ActiveTarget> targets = targetDbService.getConfiguredTargets();
         if (idx < 0 || idx >= targets.size()) {
             return Map.of("error", "대상 DB를 찾을 수 없습니다");
         }
