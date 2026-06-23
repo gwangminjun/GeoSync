@@ -63,10 +63,18 @@ public class SettingsController {
         if (Files.exists(configFile)) {
             try {
                 String content = Files.readString(configFile, StandardCharsets.UTF_8);
+                Map<String, Object> root = readYamlRoot(content);
+                Map<String, Object> kras = childMap(root, "kras");
+                Map<String, Object> gpki = childMap(kras, "gpki");
                 values.put("kras_url",         extractYamlValue(content, "url",        "kras"));
                 values.put("kras_conn_sys_id", extractYamlValue(content, "conn-sys-id","kras"));
                 values.put("kras_chk_pnu",     extractYamlValue(content, "chk-pnu",   "kras"));
                 values.put("kras_schedule",    extractYamlValue(content, "schedule",   "kras"));
+                values.put("gpki_enabled",     yamlValue(gpki, "enabled", "false"));
+                values.put("gpki_id",          yamlValue(gpki, "id", ""));
+                values.put("gpki_home_dir",    yamlValue(gpki, "home-dir", "./gpki"));
+                values.put("gpki_password_file", yamlValue(gpki, "password-file", "password.txt"));
+                values.put("gpki_decrypt_response", yamlValue(gpki, "decrypt-response", "true"));
                 values.put("kais_work_dir",    extractYamlValue(content, "work-dir",   "kais"));
                 values.put("kais_schedule",    extractYamlValue(content, "schedule",   "kais"));
 
@@ -80,6 +88,11 @@ public class SettingsController {
                 log.warn("설정 파일 읽기 실패: {}", e.getMessage());
             }
         }
+        values.putIfAbsent("gpki_enabled", "false");
+        values.putIfAbsent("gpki_id", "");
+        values.putIfAbsent("gpki_home_dir", "./gpki");
+        values.putIfAbsent("gpki_password_file", "password.txt");
+        values.putIfAbsent("gpki_decrypt_response", "true");
 
         model.addAttribute("currentPage", "settings");
         model.addAttribute("configPath", configFile.toAbsolutePath().toString());
@@ -186,10 +199,7 @@ public class SettingsController {
     @SuppressWarnings("unchecked")
     private List<Map<String, Object>> readTargets(String content) {
         try {
-            Yaml yaml = new Yaml();
-            Object loaded = yaml.load(content);
-            if (!(loaded instanceof Map)) return Collections.emptyList();
-            Map<String, Object> root = (Map<String, Object>) loaded;
+            Map<String, Object> root = readYamlRoot(content);
             Object t = root.get("targets");
             if (!(t instanceof List)) return Collections.emptyList();
             return (List<Map<String, Object>>) t;
@@ -197,6 +207,25 @@ public class SettingsController {
             log.warn("targets 파싱 실패: {}", e.getMessage());
             return Collections.emptyList();
         }
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> readYamlRoot(String content) {
+        Object loaded = new Yaml().load(content);
+        if (!(loaded instanceof Map)) return Collections.emptyMap();
+        return (Map<String, Object>) loaded;
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> childMap(Map<String, Object> parent, String key) {
+        Object child = parent.get(key);
+        if (!(child instanceof Map)) return Collections.emptyMap();
+        return (Map<String, Object>) child;
+    }
+
+    private String yamlValue(Map<String, Object> map, String key, String fallback) {
+        Object value = map.get(key);
+        return value != null ? String.valueOf(value) : fallback;
     }
 
     private String extractYamlValue(String content, String key, String section) {
@@ -239,7 +268,14 @@ public class SettingsController {
           .append("  url: ").append(safe(p.get("kras_url"))).append("\n")
           .append("  conn-sys-id: ").append(safe(p.get("kras_conn_sys_id"))).append("\n")
           .append("  chk-pnu: \"").append(safe(p.get("kras_chk_pnu"))).append("\"\n")
-          .append("  schedule: '").append(safe(p.get("kras_schedule"))).append("'\n\n")
+          .append("  schedule: '").append(safe(p.get("kras_schedule"))).append("'\n")
+          .append("  gpki:\n")
+          .append("    enabled: ").append(p.containsKey("gpki_enabled") ? "true" : "false").append("\n")
+          .append("    id: ").append(safe(p.get("gpki_id"))).append("\n")
+          .append("    home-dir: ").append(safe(p.get("gpki_home_dir"))).append("\n")
+          .append("    password-file: ").append(safe(p.get("gpki_password_file"))).append("\n")
+          .append("    password: ").append(safe(p.get("gpki_password"))).append("\n")
+          .append("    decrypt-response: ").append(p.containsKey("gpki_decrypt_response") ? "true" : "false").append("\n\n")
           .append("kais:\n")
           .append("  work-dir: ").append(safe(p.get("kais_work_dir"))).append("\n")
           .append("  schedule: '").append(safe(p.get("kais_schedule"))).append("'\n\n")

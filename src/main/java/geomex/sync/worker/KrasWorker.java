@@ -8,6 +8,7 @@ import geomex.sync.mapper.TableMapper;
 import geomex.sync.model.ColumnDef;
 import geomex.sync.model.SyncTableDef;
 import geomex.sync.repository.OdsRepository;
+import geomex.sync.service.KrasGpkiService;
 import geomex.sync.service.SyncStatusService;
 import geomex.sync.service.TargetDbService;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -15,13 +16,13 @@ import org.apache.hc.client5.http.classic.methods.HttpPost;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
 import org.apache.hc.client5.http.impl.classic.HttpClients;
 import org.apache.hc.core5.http.ContentType;
+import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.apache.hc.core5.http.io.entity.StringEntity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
-import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -39,6 +40,7 @@ public class KrasWorker {
     private final SyncStatusService statusService;
     private final TargetDbService targetDbService;
     private final KrasFileWriter fileWriter;
+    private final KrasGpkiService gpkiService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Value("${kras.url}")
@@ -58,13 +60,15 @@ public class KrasWorker {
 
     public KrasWorker(TableMapper tableMapper, OdsRepository odsRepository,
                       CoordTransformer coordTransformer, SyncStatusService statusService,
-                      TargetDbService targetDbService, KrasFileWriter fileWriter) {
+                      TargetDbService targetDbService, KrasFileWriter fileWriter,
+                      KrasGpkiService gpkiService) {
         this.tableMapper = tableMapper;
         this.odsRepository = odsRepository;
         this.coordTransformer = coordTransformer;
         this.statusService = statusService;
         this.targetDbService = targetDbService;
         this.fileWriter = fileWriter;
+        this.gpkiService = gpkiService;
     }
 
     public void run() {
@@ -95,6 +99,10 @@ public class KrasWorker {
 
     private boolean checkConnection() {
         try {
+            gpkiService.assertReady();
+            if (gpkiService.isEnabled()) {
+                log.info("[KRAS] GPKI authentication enabled (gpki_id={})", gpkiService.gpkiId());
+            }
             ObjectNode req = objectMapper.createObjectNode();
             req.put("service", "CHECK");
             req.put("connSysId", connSysId);
@@ -208,15 +216,15 @@ public class KrasWorker {
     }
 
     private JsonNode post(ObjectNode body) throws Exception {
+        gpkiService.addAuthentication(body);
         try (CloseableHttpClient client = HttpClients.createDefault()) {
             HttpPost request = new HttpPost(gatewayUrl);
             request.setEntity(new StringEntity(objectMapper.writeValueAsString(body),
                     ContentType.APPLICATION_JSON));
 
             return client.execute(request, response -> {
-                try (InputStream is = response.getEntity().getContent()) {
-                    return objectMapper.readTree(is);
-                }
+                String responseText = EntityUtils.toString(response.getEntity());
+                return objectMapper.readTree(gpkiService.decodeResponse(responseText));
             });
         }
     }
