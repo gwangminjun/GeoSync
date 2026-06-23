@@ -29,7 +29,7 @@ CREATE TABLE lp_pa_cbnd
   _gid serial NOT NULL,
   _annox numeric(20,4),
   _annoy numeric(20,4),
-  _geometry geometry(MultiPolygon,5186),
+  _geometry geometry(MultiPolygon,5174),
   CONSTRAINT lp_pa_cbnd_pkey PRIMARY KEY (_gid)
 );
 
@@ -45,7 +45,7 @@ CREATE TABLE lt_c_uzone
   _gid serial NOT NULL,
   _annox numeric(20,4),
   _annoy numeric(20,4),
-  _geometry geometry(MultiPolygon,5186),
+  _geometry geometry(MultiPolygon,5174),
   CONSTRAINT lt_c_uzone_pkey PRIMARY KEY (_gid)
 );
 
@@ -151,7 +151,7 @@ CREATE TABLE tl_spbd_buld
   _gid serial NOT NULL,
   _annox numeric(20,4),
   _annoy numeric(20,4),
-  _geometry geometry(MultiPolygon,5186),
+  _geometry geometry(MultiPolygon,5174),
   CONSTRAINT tl_spbd_buld_pkey PRIMARY KEY (_gid)
 );
 CREATE TABLE tl_spbd_entrc
@@ -167,7 +167,7 @@ CREATE TABLE tl_spbd_entrc
   _gid serial NOT NULL,
   _annox numeric(20,4),
   _annoy numeric(20,4),
-  _geometry geometry(Point,5186),
+  _geometry geometry(Point,5174),
   CONSTRAINT tl_spbd_entrc_pkey PRIMARY KEY (_gid)
 );
 CREATE TABLE tl_spbd_eqb
@@ -185,7 +185,7 @@ CREATE TABLE tl_spbd_eqb
   _gid serial NOT NULL,
   _annox numeric(20,4),
   _annoy numeric(20,4),
-  _geometry geometry(MultiPolygon,5186),
+  _geometry geometry(MultiPolygon,5174),
   CONSTRAINT tl_spbd_eqb_pkey PRIMARY KEY (_gid)
 );
 CREATE TABLE tl_spot_cntc
@@ -201,7 +201,7 @@ CREATE TABLE tl_spot_cntc
   _gid serial NOT NULL,
   _annox numeric(20,4),
   _annoy numeric(20,4),
-  _geometry geometry(MultiLineString,5186),
+  _geometry geometry(MultiLineString,5174),
   CONSTRAINT tl_spot_cntc_pkey PRIMARY KEY (_gid)
 );
 CREATE TABLE tl_spot_fcltylc
@@ -222,7 +222,7 @@ CREATE TABLE tl_spot_fcltylc
   _gid serial NOT NULL,
   _annox numeric(20,4),
   _annoy numeric(20,4),
-  _geometry geometry(Point,5186),
+  _geometry geometry(Point,5174),
   CONSTRAINT tl_spot_fcltylc_pkey PRIMARY KEY (_gid)
 );
 
@@ -239,7 +239,7 @@ CREATE TABLE tl_sprd_crsrd
   _gid serial NOT NULL,
   _annox numeric(20,4),
   _annoy numeric(20,4),
-  _geometry geometry(Point,5186),
+  _geometry geometry(Point,5174),
   CONSTRAINT tl_sprd_crsrd_pkey PRIMARY KEY (_gid)
 );
 
@@ -260,7 +260,7 @@ CREATE TABLE tl_sprd_intrvl
   _gid serial NOT NULL,
   _annox numeric(20,4),
   _annoy numeric(20,4),
-  _geometry geometry(MultiLineString,5186),
+  _geometry geometry(MultiLineString,5174),
   CONSTRAINT tl_sprd_intrvl_pkey PRIMARY KEY (_gid)
 );
 
@@ -298,7 +298,7 @@ CREATE TABLE tl_sprd_manage
   _gid serial NOT NULL,
   _annox numeric(20,4),
   _annoy numeric(20,4),
-  _geometry geometry(MultiLineString,5186),
+  _geometry geometry(MultiLineString,5174),
   CONSTRAINT tl_sprd_manage_pkey PRIMARY KEY (_gid)
 );
 
@@ -313,7 +313,7 @@ CREATE TABLE tl_sprd_rw
   _gid serial NOT NULL,
   _annox numeric(20,4),
   _annoy numeric(20,4),
-  _geometry geometry(MultiPolygon,5186),
+  _geometry geometry(MultiPolygon,5174),
   CONSTRAINT tl_sprd_rw_pkey PRIMARY KEY (_gid)
 );
 
@@ -346,6 +346,6 @@ CREATE TABLE f_fac_building
   _gid serial NOT NULL,
   _annox numeric(20,4),
   _annoy numeric(20,4),
-  _geometry geometry(MultiPolygon,5186),
+  _geometry geometry(MultiPolygon,5174),
   CONSTRAINT f_fac_building_pkey PRIMARY KEY (_gid)
 );

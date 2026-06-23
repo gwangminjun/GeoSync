@@ -252,7 +252,7 @@ public class KrasWorkspaceScanner {
                             try {
                                 geom = coordTransformer.transform(geom, SHP_EPSG);
                             } catch (Exception e) {
-                                log.warn("[Scanner] 좌표 변환 실패 (EPSG:{} → 5186): {}", SHP_EPSG, e.getMessage());
+                                log.warn("[Scanner] 좌표 변환 실패 (EPSG:{} → 5174): {}", SHP_EPSG, e.getMessage());
                             }
                         }
                         row.put(geomCol.srcName, geom != null ? wktWriter.write(geom) : null);
