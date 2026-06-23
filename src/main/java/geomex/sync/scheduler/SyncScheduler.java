@@ -6,7 +6,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -34,8 +33,6 @@ public class SyncScheduler {
         this.kaisWorker = kaisWorker;
     }
 
-    // 매일 04:30 — KRAS 동기화
-    @Scheduled(cron = "${kras.schedule:0 30 4 * * *}")
     public void runKras() {
         if (!syncEnabled) return;
         if (!krasRunning.compareAndSet(false, true)) {
@@ -49,8 +46,6 @@ public class SyncScheduler {
         }
     }
 
-    // 매일 03:30 — KAIS 동기화
-    @Scheduled(cron = "${kais.schedule:0 30 3 * * *}")
     public void runKais() {
         if (!syncEnabled) return;
         if (!kaisRunning.compareAndSet(false, true)) {

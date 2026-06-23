@@ -37,6 +37,9 @@ public class RuntimeSettingsService {
     @Value("${kras.schedule:0 30 4 * * *}")
     private String defaultKrasSchedule;
 
+    @Value("${kais.schedule:0 30 3 * * *}")
+    private String defaultKaisSchedule;
+
     @Value("${ods.schema:ods}")
     private String defaultOdsSchema;
 
@@ -74,6 +77,10 @@ public class RuntimeSettingsService {
 
     public String krasSchedule() {
         return str(child("kras").get("schedule"), defaultKrasSchedule);
+    }
+
+    public String kaisSchedule() {
+        return str(child("kais").get("schedule"), defaultKaisSchedule);
     }
 
     public String odsSchema() {

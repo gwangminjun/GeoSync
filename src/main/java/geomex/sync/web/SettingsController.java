@@ -3,6 +3,7 @@ package geomex.sync.web;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import geomex.sync.scheduler.DynamicScheduleManager;
 import geomex.sync.service.RuntimeSettingsService;
 import org.apache.hc.client5.http.classic.methods.HttpPost;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
@@ -47,9 +48,11 @@ public class SettingsController {
     private static final Logger log = LoggerFactory.getLogger(SettingsController.class);
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final RuntimeSettingsService settings;
+    private final DynamicScheduleManager scheduleManager;
 
-    public SettingsController(RuntimeSettingsService settings) {
+    public SettingsController(RuntimeSettingsService settings, DynamicScheduleManager scheduleManager) {
         this.settings = settings;
+        this.scheduleManager = scheduleManager;
     }
 
     @Value("${spring.config.location:conf/application.yml}")
@@ -227,6 +230,7 @@ public class SettingsController {
             Files.createDirectories(configFile.getParent());
             Files.writeString(configFile, buildYaml(params), StandardCharsets.UTF_8);
             settings.reload();
+            scheduleManager.reloadSchedules();
             log.info("설정 저장: {}", configFile.toAbsolutePath());
             ra.addFlashAttribute("success", "설정을 저장했습니다. 변경 사항은 재시작 없이 바로 적용됩니다.");
         } catch (IOException e) {
