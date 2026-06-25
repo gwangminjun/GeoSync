@@ -3,8 +3,8 @@ package geomex.sync.service;
 import geomex.sync.model.CatalogFileStatus;
 import geomex.sync.model.SyncHistory;
 import geomex.sync.service.TargetDbService.ActiveTarget;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -35,26 +35,22 @@ public class KrasCatalogStatusService {
     private final SyncStatusService statusService;
     private final TargetDbService targetDbService;
     private final TargetTableNameService tableNameService;
+    private final RuntimeSettingsService settings;
     private final Map<String, CachedDbStatus> dbStatusCache = new ConcurrentHashMap<>();
-
-    @Value("${kras.work-dir:./workspace/kras}")
-    private String workDir;
-
-    @Value("${sync.org-code:46870}")
-    private String orgCode;
 
     @Value("${kras.catalog:./46870_DATA_CATALOG.md}")
     private String catalogPath;
 
     public KrasCatalogStatusService(SyncStatusService statusService, TargetDbService targetDbService,
-                                    TargetTableNameService tableNameService) {
+                                    TargetTableNameService tableNameService, RuntimeSettingsService settings) {
         this.statusService = statusService;
         this.targetDbService = targetDbService;
         this.tableNameService = tableNameService;
+        this.settings = settings;
     }
 
     public List<CatalogFileStatus> getStatuses() {
-        Path dir = Path.of(workDir, orgCode).normalize();
+        Path dir = Path.of(settings.krasWorkDir(), settings.orgCode()).normalize();
         Map<String, FileGroup> groups = readGroups(dir);
         LocalDateTime lastSuccess = statusService.getLastSuccess("KRAS")
                 .map(SyncHistory::startTime)
@@ -64,46 +60,7 @@ public class KrasCatalogStatusService {
         statuses.add(usezoneSummaryStatus(groups, lastSuccess));
         statuses.add(exactStatus(groups, "KRAS 수신 원본", "연속지적도", "lp_pa_cbnd",
                         "lp_pa_cbnd.*", Set.of(".shp", ".dbf", ".gmx"), 1, lastSuccess,
-                        "lp_pa_cbnd"));
-        statuses.add(exactStatus(groups, "KRAS 수신 원본", "토지기본정보", "land_frst_ledg",
-                        "land_frst_ledg.*", Set.of(".txt", ".gmx"), 1, lastSuccess,
-                        "land_frst_ledg"));
-        statuses.add(legacyStatus(groups, "KRAS 수신 원본", "용도지역지구 통합", "lt_c_uzone",
-                        "lt_c_uzone.gmx", Set.of(".gmx"), lastSuccess,
-                        "lt_c_uzone"));
-        statuses.add(legacyStatus(groups, "참조", "건물통합", "f_fac_building",
-                        "f_fac_building.*", Set.of(".shp", ".dbf"), lastSuccess,
-                        "f_fac_building"));
-        statuses.add(legacyStatus(groups, "도로명주소", "건물", "tl_spbd_buld",
-                        "tl_spbd_buld.*", Set.of(".shp", ".dbf"), lastSuccess,
-                        "tl_spbd_buld"));
-        statuses.add(legacyStatus(groups, "도로명주소", "출입구", "tl_spbd_entrc",
-                        "tl_spbd_entrc.*", Set.of(".shp", ".dbf"), lastSuccess,
-                        "tl_spbd_entrc"));
-        statuses.add(legacyStatus(groups, "도로명주소", "장비구역", "tl_spbd_eqb",
-                        "tl_spbd_eqb.*", Set.of(".shp", ".dbf"), lastSuccess,
-                        "tl_spbd_eqb"));
-        statuses.add(legacyStatus(groups, "도로명주소", "접촉점", "tl_spot_cntc",
-                        "tl_spot_cntc.*", Set.of(".shp", ".dbf"), lastSuccess,
-                        "tl_spot_cntc"));
-        statuses.add(legacyStatus(groups, "도로명주소", "시설위치", "tl_spot_fcltylc",
-                        "tl_spot_fcltylc.*", Set.of(".shp", ".dbf"), lastSuccess,
-                        "tl_spot_fcltylc"));
-        statuses.add(legacyStatus(groups, "도로명주소", "교차로", "tl_sprd_crsrd",
-                        "tl_sprd_crsrd.*", Set.of(".shp", ".dbf"), lastSuccess,
-                        "tl_sprd_crsrd"));
-        statuses.add(legacyStatus(groups, "도로명주소", "구간", "tl_sprd_intrvl",
-                        "tl_sprd_intrvl.*", Set.of(".shp", ".dbf"), lastSuccess,
-                        "tl_sprd_intrvl"));
-        statuses.add(legacyStatus(groups, "도로명주소", "도로관리", "tl_sprd_manage",
-                        "tl_sprd_manage.*", Set.of(".shp", ".dbf"), lastSuccess,
-                        "tl_sprd_manage"));
-        statuses.add(legacyStatus(groups, "도로명주소", "도로구역", "tl_sprd_rw",
-                        "tl_sprd_rw.*", Set.of(".shp", ".dbf"), lastSuccess,
-                        "tl_sprd_rw"));
-        statuses.add(legacyStatus(groups, "KRAS 수신 원본", "공시지가", "anvm_jiga",
-                        "abpd_pann_jiga.*", Set.of(".txt"), lastSuccess,
-                        "abpd_pann_jiga"));
+                        "lp_pa_cbnd", false));
         return statuses;
     }
 
@@ -120,7 +77,7 @@ public class KrasCatalogStatusService {
             latest = max(latest, group.latestModified);
         }
 
-        DbStatus db = dbStatus("lt_c_uzone");
+        DbStatus db = dbStatus("lt_c_uzone", true);
         boolean fileLoaded = complete >= 47;
         return new CatalogFileStatus(
                 "KRAS 수신 원본 요약",
@@ -143,7 +100,7 @@ public class KrasCatalogStatusService {
     }
 
     private List<CatalogFileStatus> usezoneLayerStatuses(Map<String, FileGroup> groups, LocalDateTime lastSuccess) {
-        DbStatus db = dbStatus("lt_c_uzone");
+        DbStatus db = dbStatus("lt_c_uzone", true);
         List<CatalogLayer> layers = readCatalogLayers();
         List<CatalogFileStatus> statuses = new ArrayList<>();
         for (CatalogLayer layer : layers) {
@@ -176,14 +133,15 @@ public class KrasCatalogStatusService {
 
     private CatalogFileStatus exactStatus(Map<String, FileGroup> groups, String category, String name, String target,
                                           String pattern, Set<String> requiredExtensions,
-                                          int expectedCount, LocalDateTime lastSuccess, String note) {
+                                          int expectedCount, LocalDateTime lastSuccess, String note,
+                                          boolean filterByOrgCode) {
         String baseName = baseNameFromPattern(pattern);
         FileGroup group = groups.get(baseName);
         int complete = group != null && group.extensions.containsAll(requiredExtensions) ? 1 : 0;
         int files = group != null ? group.fileCount : 0;
         LocalDateTime latest = group != null ? group.latestModified : null;
 
-        DbStatus db = dbStatus(target);
+        DbStatus db = dbStatus(target, filterByOrgCode);
         boolean fileLoaded = complete >= expectedCount;
         return new CatalogFileStatus(category, name, target, pattern,
                 String.join(", ", requiredExtensions), expectedCount, complete, files,
@@ -193,14 +151,14 @@ public class KrasCatalogStatusService {
 
     private CatalogFileStatus legacyStatus(Map<String, FileGroup> groups, String category, String name, String target,
                                            String pattern, Set<String> requiredExtensions,
-                                           LocalDateTime lastSuccess, String note) {
+                                           LocalDateTime lastSuccess, String note, boolean filterByOrgCode) {
         String baseName = baseNameFromPattern(pattern);
         FileGroup group = groups.get(baseName);
         int complete = group != null && group.extensions.containsAll(requiredExtensions) ? 1 : 0;
         int files = group != null ? group.fileCount : 0;
         LocalDateTime latest = group != null ? group.latestModified : null;
 
-        DbStatus db = dbStatus(target);
+        DbStatus db = dbStatus(target, filterByOrgCode);
         boolean fileLoaded = complete > 0;
         return new CatalogFileStatus(category, name, target, pattern,
                 String.join(", ", requiredExtensions), 1, complete, files,
@@ -248,31 +206,35 @@ public class KrasCatalogStatusService {
         );
     }
 
-    private DbStatus dbStatus(String tableName) {
-        String targetTableName = tableNameService.resolve(tableName);
-        CachedDbStatus cached = dbStatusCache.get(targetTableName);
+    private DbStatus dbStatus(String tableName, boolean filterByOrgCode) {
+        String cacheKey = targetTableName(tableName);
+        CachedDbStatus cached = dbStatusCache.get(cacheKey);
         if (cached != null && !cached.isExpired()) {
             return cached.status;
         }
 
         CompletableFuture<DbStatus> future = CompletableFuture
-                .supplyAsync(() -> dbStatusBlocking(targetTableName));
-        future.thenAccept(status -> dbStatusCache.put(targetTableName, new CachedDbStatus(status)));
+                .supplyAsync(() -> dbStatusBlocking(targetTableName(tableName), filterByOrgCode));
+        future.thenAccept(status -> dbStatusCache.put(cacheKey, new CachedDbStatus(status)));
 
         try {
             DbStatus status = future.get(DB_CHECK_TIMEOUT_MS, TimeUnit.MILLISECONDS);
-            dbStatusCache.put(targetTableName, new CachedDbStatus(status));
+            dbStatusCache.put(cacheKey, new CachedDbStatus(status));
             return status;
         } catch (Exception e) {
             DbStatus fallback = cached != null
                     ? cached.status
                     : new DbStatus(false, null, "DB 확인 지연", "확인 중");
-            dbStatusCache.put(targetTableName, new CachedDbStatus(fallback));
+            dbStatusCache.put(cacheKey, new CachedDbStatus(fallback));
             return fallback;
         }
     }
 
-    private DbStatus dbStatusBlocking(String tableName) {
+    private String targetTableName(String tableName) {
+        return tableNameService.resolve(tableName);
+    }
+
+    private DbStatus dbStatusBlocking(String tableName, boolean filterByOrgCode) {
         List<ActiveTarget> targets;
         try {
             targets = targetDbService.getActiveTargets();
@@ -292,10 +254,16 @@ public class KrasCatalogStatusService {
             checkedTargets++;
             labels.add(target.label());
             try {
-                Integer count = target.jdbc().queryForObject(
-                        "SELECT COUNT(*) FROM " + tableName + " WHERE org_cd = ?",
-                        Integer.class,
-                        orgCode);
+                Integer count;
+                if (filterByOrgCode) {
+                    count = target.jdbc().queryForObject(
+                            "SELECT COUNT(*) FROM " + tableName + " WHERE org_cd = ?",
+                            Integer.class, settings.orgCode());
+                } else {
+                    count = target.jdbc().queryForObject(
+                            "SELECT COUNT(*) FROM " + tableName,
+                            Integer.class);
+                }
                 int rows = count != null ? count : 0;
                 totalRows += rows;
                 if (rows > 0) loadedTargets++;

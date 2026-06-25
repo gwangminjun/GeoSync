@@ -5,10 +5,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
+import org.springframework.scheduling.support.CronExpression;
 import org.springframework.scheduling.support.CronTrigger;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDateTime;
 import java.util.concurrent.ScheduledFuture;
 
 @Component
@@ -21,7 +23,6 @@ public class DynamicScheduleManager {
     private final RuntimeSettingsService settings;
 
     private ScheduledFuture<?> krasTask;
-    private ScheduledFuture<?> kaisTask;
 
     public DynamicScheduleManager(SyncScheduler syncScheduler, RuntimeSettingsService settings) {
         this.syncScheduler = syncScheduler;
@@ -39,25 +40,31 @@ public class DynamicScheduleManager {
 
     public synchronized void reloadSchedules() {
         cancelTask("KRAS", krasTask);
-        cancelTask("KAIS", kaisTask);
         krasTask = null;
-        kaisTask = null;
 
         String krasCron = settings.krasSchedule();
-        String kaisCron = settings.kaisSchedule();
-
         if (isValid(krasCron)) {
-            krasTask = taskScheduler.schedule(syncScheduler::runKras, new CronTrigger(krasCron));
-            log.info("[Scheduler] KRAS 스케줄 등록: {}", krasCron);
+            krasTask = taskScheduler.schedule(syncScheduler::runKrasScheduledLoad, new CronTrigger(krasCron));
+            log.info("[Scheduler] KRAS 스케줄 등록 (스캔+적재: lt_c_uzone, lp_pa_cbnd): {}", krasCron);
         } else {
             log.info("[Scheduler] KRAS 스케줄 비활성 (cron='{}')", krasCron);
         }
+    }
 
-        if (isValid(kaisCron)) {
-            kaisTask = taskScheduler.schedule(syncScheduler::runKais, new CronTrigger(kaisCron));
-            log.info("[Scheduler] KAIS 스케줄 등록: {}", kaisCron);
-        } else {
-            log.info("[Scheduler] KAIS 스케줄 비활성 (cron='{}')", kaisCron);
+    public String getKrasCron() {
+        return settings.krasSchedule();
+    }
+
+    public boolean isKrasActive() {
+        return krasTask != null && !krasTask.isDone();
+    }
+
+    public LocalDateTime getNextRunTime(String cron) {
+        if (!isValid(cron)) return null;
+        try {
+            return CronExpression.parse(cron).next(LocalDateTime.now());
+        } catch (Exception e) {
+            return null;
         }
     }
 

@@ -23,11 +23,6 @@ kras:
   timeout-seconds: 300
   work-dir: ${KRAS_WORK_DIR:./workspace/kras}
 
-kais:
-  work-dir: ${KAIS_WORK_DIR:./KAIS_WORK}
-  config: ${KAIS_CONFIG:conf/kais/base-tables.xml}
-  schedule: ${KAIS_SCHEDULE:0 30 3 * * *}
-
 ods:
   schema: ${ODS_SCHEMA:ods}
   schedule: ${ODS_SCHEDULE:0 30 5 * * *}

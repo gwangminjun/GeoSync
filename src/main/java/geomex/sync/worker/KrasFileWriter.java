@@ -112,7 +112,7 @@ public class KrasFileWriter {
         ShapefileDataStore store = (ShapefileDataStore) factory.createNewDataStore(
                 Map.of("url", shpFile.toURI().toURL()));
         store.createSchema(featureType);
-        store.setCharset(Charset.forName("EUC-KR"));
+        store.setCharset(Charset.forName("MS949"));
 
         WKTReader wktReader = new WKTReader();
         Transaction tx = new DefaultTransaction("kras-write");
@@ -150,7 +150,7 @@ public class KrasFileWriter {
                 .filter(c -> !c.isGeometry).collect(Collectors.toList());
 
         try (PrintWriter pw = new PrintWriter(
-                new OutputStreamWriter(new FileOutputStream(txtFile), Charset.forName("EUC-KR")))) {
+                new OutputStreamWriter(new FileOutputStream(txtFile), Charset.forName("MS949")))) {
             pw.println(cols.stream().map(c -> c.srcName).collect(Collectors.joining(",")));
             for (Map<String, Object> row : rows) {
                 pw.println(cols.stream()

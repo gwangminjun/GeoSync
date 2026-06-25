@@ -31,7 +31,7 @@
   </div>
 
   <!-- 스탯 카드 4개 -->
-  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px;">
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:24px;">
 
     <!-- KRAS 마지막 실행 -->
     <div style="background:#1a1f26;border:1px solid #262c35;border-radius:11px;padding:18px;">
@@ -49,24 +49,6 @@
         </div>
       </div>
       <div th:unless="${krasLast != null}" style="font-size:13px;color:#5b626d;margin-top:11px;">기록 없음</div>
-    </div>
-
-    <!-- KAIS 마지막 실행 -->
-    <div style="background:#1a1f26;border:1px solid #262c35;border-radius:11px;padding:18px;">
-      <div style="font-size:11.5px;color:#69707b;font-weight:600;">KAIS 마지막 실행</div>
-      <div th:if="${kaisLast != null}">
-        <div style="font-size:18px;font-weight:600;color:#e7eaee;margin-top:11px;font-variant-numeric:tabular-nums;"
-             th:text="${#temporals.format(kaisLast.startTime(), 'MM-dd HH:mm')}"></div>
-        <div style="margin-top:11px;">
-          <span th:if="${kaisLast.status() == 'SUCCESS'}"
-                style="padding:3px 9px;border-radius:6px;font-size:11px;font-weight:600;background:#15291f;color:#5fc98a;">완료</span>
-          <span th:if="${kaisLast.status() == 'RUNNING'}"
-                style="padding:3px 9px;border-radius:6px;font-size:11px;font-weight:600;background:#2a2517;color:#d9b066;">실행중</span>
-          <span th:if="${kaisLast.status() == 'FAILED'}"
-                style="padding:3px 9px;border-radius:6px;font-size:11px;font-weight:600;background:#2a1a1a;color:#e88a82;">실패</span>
-        </div>
-      </div>
-      <div th:unless="${kaisLast != null}" style="font-size:13px;color:#5b626d;margin-top:11px;">기록 없음</div>
     </div>
 
     <!-- 오늘 처리 건수 -->
@@ -90,48 +72,28 @@
   <!-- 수동 실행 버튼 -->
   <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:26px;align-items:center;">
 
-    <!-- KRAS 전체 (수집 + 적재) -->
-    <form method="post" th:action="@{/sync/kras}" style="margin:0;">
-      <button type="submit"
-              th:disabled="${krasRunning or krasCollectRunning or krasLoadRunning}"
-              th:style="${krasRunning} ? 'border:none;cursor:not-allowed;padding:10px 18px;border-radius:8px;font-size:13.5px;font-weight:600;font-family:inherit;background:#1e242c;color:#5b626d;' : 'border:none;cursor:pointer;padding:10px 18px;border-radius:8px;font-size:13.5px;font-weight:600;font-family:inherit;background:#0e9b94;color:#fff;'"
-              th:text="${krasRunning} ? 'KRAS 실행중...' : 'KRAS 전체'">KRAS 전체</button>
-    </form>
-
-    <div style="width:1px;height:28px;background:#2e3640;margin:0 4px;"></div>
-
-    <!-- KRAS 수집 (API → 파일) -->
-    <form method="post" th:action="@{/sync/kras-collect}" style="margin:0;">
-      <button type="submit"
-              th:disabled="${krasCollectRunning or krasRunning}"
-              th:style="${krasCollectRunning} ? 'cursor:not-allowed;padding:10px 18px;border-radius:8px;font-size:13.5px;font-weight:600;font-family:inherit;background:#1e242c;color:#5b626d;border:1px solid #2e3640;' : 'cursor:pointer;padding:10px 18px;border-radius:8px;font-size:13.5px;font-weight:600;font-family:inherit;background:#1e242c;color:#66c4be;border:1px solid #2e3640;'"
-              th:text="${krasCollectRunning} ? 'KRAS 수집중...' : 'KRAS 수집'">KRAS 수집</button>
-    </form>
-
-    <!-- KRAS 적재 (파일 → DB) - 모달 트리거 -->
+    <!-- KRAS 적재 -->
     <button type="button"
             id="krasLoadBtn"
-            th:disabled="${krasLoadRunning or krasRunning}"
-            th:style="${krasLoadRunning} ? 'cursor:not-allowed;padding:10px 18px;border-radius:8px;font-size:13.5px;font-weight:600;font-family:inherit;background:#1e242c;color:#5b626d;border:1px solid #2e3640;' : 'cursor:pointer;padding:10px 18px;border-radius:8px;font-size:13.5px;font-weight:600;font-family:inherit;background:#1e242c;color:#66c4be;border:1px solid #2e3640;'"
+            th:disabled="${krasLoadRunning}"
+            th:style="${krasLoadRunning} ? 'cursor:not-allowed;padding:10px 18px;border-radius:8px;font-size:13.5px;font-weight:600;font-family:inherit;background:#1e242c;color:#5b626d;border:1px solid #2e3640;' : 'cursor:pointer;padding:10px 18px;border-radius:8px;font-size:13.5px;font-weight:600;font-family:inherit;background:#0e9b94;color:#fff;border:none;'"
             th:text="${krasLoadRunning} ? 'KRAS 적재중...' : 'KRAS 적재'"
             onclick="openLoadModal()">KRAS 적재</button>
 
-    <div style="width:1px;height:28px;background:#2e3640;margin:0 4px;"></div>
-
-    <!-- KAIS -->
-    <form method="post" th:action="@{/sync/kais}" style="margin:0;">
-      <button type="submit"
-              th:disabled="${kaisRunning}"
-              th:style="${kaisRunning} ? 'cursor:not-allowed;padding:10px 18px;border-radius:8px;font-size:13.5px;font-weight:600;font-family:inherit;background:#1e242c;color:#5b626d;border:1px solid #2e3640;' : 'cursor:pointer;padding:10px 18px;border-radius:8px;font-size:13.5px;font-weight:600;font-family:inherit;background:#1e242c;color:#cdd3db;border:1px solid #2e3640;'"
-              th:text="${kaisRunning} ? 'KAIS 실행중...' : 'KAIS 수동 실행'">KAIS 수동 실행</button>
-    </form>
-
-    <div style="width:1px;height:28px;background:#2e3640;margin:0 4px;"></div>
-
-    <!-- 파일에서 적재 준비 -->
+    <!-- 데이터 미리보기 -->
     <button type="button"
-            style="cursor:pointer;padding:10px 18px;border-radius:8px;font-size:13.5px;font-weight:600;font-family:inherit;background:#1e242c;color:#8a919c;border:1px dashed #3a4250;"
-            onclick="scanWorkspace()">파일에서 적재 준비</button>
+            style="cursor:pointer;padding:10px 18px;border-radius:8px;font-size:13.5px;font-weight:600;font-family:inherit;background:#1e242c;color:#66c4be;border:1px solid #2e3640;"
+            onclick="openPreviewModal()">데이터 미리보기</button>
+
+    <!-- KRAS API 테스트 -->
+    <button type="button"
+            style="cursor:pointer;padding:10px 18px;border-radius:8px;font-size:13.5px;font-weight:600;font-family:inherit;background:#1e242c;color:#b68aff;border:1px solid #2e3640;"
+            onclick="openApiTestModal()">API 테스트</button>
+
+    <!-- Mock 테스트 -->
+    <button type="button"
+            style="cursor:pointer;padding:10px 18px;border-radius:8px;font-size:13.5px;font-weight:600;font-family:inherit;background:#1e242c;color:#d9b066;border:1px solid #2e3640;"
+            onclick="openMockModal()">Mock 테스트</button>
 
   </div>
 
@@ -141,55 +103,79 @@
   <!-- 데이터 저장 상태 -->
   <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:12px;">
     <div style="font-size:14px;font-weight:700;color:#f3f5f7;">데이터 저장 상태</div>
-    <div style="font-size:12px;color:#69707b;">workspace/kras/<span th:text="${orgCode}">46870</span> 기준</div>
+    <div style="font-size:12px;color:#69707b;">lt_c_uzone / lp_pa_cbnd 기준</div>
   </div>
-  <div style="background:#1a1f26;border:1px solid #262c35;border-radius:11px;overflow:hidden;margin-bottom:26px;">
-    <table style="width:100%;border-collapse:collapse;font-size:13px;">
-      <thead>
-        <tr style="background:#171b21;">
-          <th style="text-align:left;padding:11px 18px;font-size:11px;font-weight:600;color:#69707b;letter-spacing:0.03em;border-bottom:1px solid #262c35;">항목</th>
-          <th style="width:100px;text-align:center;padding:11px 14px;font-size:11px;font-weight:600;color:#69707b;letter-spacing:0.03em;border-bottom:1px solid #262c35;">완료</th>
-          <th style="width:140px;text-align:left;padding:11px 14px;font-size:11px;font-weight:600;color:#69707b;letter-spacing:0.03em;border-bottom:1px solid #262c35;">최근 저장</th>
-          <th style="width:150px;text-align:left;padding:11px 14px;font-size:11px;font-weight:600;color:#69707b;letter-spacing:0.03em;border-bottom:1px solid #262c35;">파일 적재</th>
-          <th style="width:320px;text-align:left;padding:11px 18px;font-size:11px;font-weight:600;color:#69707b;letter-spacing:0.03em;border-bottom:1px solid #262c35;">DB 적재</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr th:each="s : ${catalogStatuses}" style="border-bottom:1px solid #21262e;">
-          <td style="padding:12px 18px;vertical-align:top;">
-            <div style="font-weight:600;color:#e7eaee;line-height:1.35;" th:text="${s.name()}"></div>
-            <div style="font-size:11.5px;color:#5b626d;margin-top:3px;font-family:'JetBrains Mono',monospace;" th:text="${s.note()}"></div>
-          </td>
-          <td style="padding:12px 14px;text-align:center;color:#e7eaee;font-variant-numeric:tabular-nums;vertical-align:top;white-space:nowrap;">
-            <span th:text="${s.completeCount()}">0</span><span style="color:#5b626d;"> / </span><span th:text="${s.expectedCount()}">1</span>
-          </td>
-          <td style="padding:12px 14px;color:#9aa2ad;font-variant-numeric:tabular-nums;vertical-align:top;white-space:nowrap;font-size:12px;"
-              th:text="${s.latestModified() != null ? #temporals.format(s.latestModified(), 'MM-dd HH:mm') : '-'}"></td>
-          <td style="padding:12px 14px;vertical-align:top;">
-            <span th:if="${s.fileLoaded() && s.fileSynced()}"
-                  style="display:inline-flex;align-items:center;white-space:nowrap;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:600;background:#15291f;color:#5fc98a;">최근 동기화</span>
-            <span th:if="${s.fileLoaded() && !s.fileSynced()}"
-                  style="display:inline-flex;align-items:center;white-space:nowrap;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:600;background:#2a2517;color:#d9b066;">이전 저장본</span>
-            <span th:if="${!s.fileLoaded() && s.exists()}"
-                  style="display:inline-flex;align-items:center;white-space:nowrap;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:600;background:#2a2517;color:#d9b066;">일부 파일</span>
-            <span th:if="${!s.exists()}"
-                  style="display:inline-flex;align-items:center;white-space:nowrap;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:600;background:#2a1a1a;color:#e88a82;">파일 없음</span>
-          </td>
-          <td style="padding:12px 18px;vertical-align:top;">
-            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-              <span th:if="${s.dbLoaded()}"
-                    style="display:inline-flex;align-items:center;white-space:nowrap;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:600;background:#15291f;color:#5fc98a;">
-                <span th:text="${#numbers.formatInteger(s.dbRowCount(), 0, 'COMMA')}">0</span>건
-              </span>
-              <span th:if="${!s.dbLoaded()}"
-                    style="display:inline-flex;align-items:center;white-space:nowrap;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:600;background:#2a1a1a;color:#e88a82;"
-                    th:text="${s.dbMessage()}">미적재</span>
-              <span style="font-size:11px;color:#5b626d;" th:text="${s.dbTargets()}"></span>
-            </div>
-          </td>
-        </tr>
-      </tbody>
-    </table>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:26px;">
+
+    <div th:each="s : ${catalogStatuses}"
+         style="background:#1a1f26;border:1px solid #262c35;border-radius:11px;padding:18px;">
+
+      <!-- 헤더: 테이블명 + 유형 배지 -->
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:14px;">
+        <div>
+          <div style="font-size:13px;font-weight:700;color:#e7eaee;font-family:'JetBrains Mono',monospace;letter-spacing:-0.01em;"
+               th:text="${s.target()}"></div>
+          <div style="font-size:11.5px;color:#69707b;margin-top:3px;" th:text="${s.name()}"></div>
+        </div>
+        <span th:if="${s.target() == 'lt_c_uzone'}"
+              style="padding:3px 9px;border-radius:6px;font-size:11px;font-weight:600;background:#1a2a3a;color:#66c4be;white-space:nowrap;flex-shrink:0;">API</span>
+        <span th:unless="${s.target() == 'lt_c_uzone'}"
+              style="padding:3px 9px;border-radius:6px;font-size:11px;font-weight:600;background:#2a2517;color:#d9b066;white-space:nowrap;flex-shrink:0;">SHP</span>
+      </div>
+
+      <!-- DB 건수 -->
+      <div style="margin-bottom:10px;">
+        <div th:if="${s.dbRowCount() != null}"
+             style="display:flex;align-items:baseline;gap:5px;">
+          <span style="font-size:28px;font-weight:700;color:#0e9b94;font-variant-numeric:tabular-nums;letter-spacing:-0.02em;"
+                th:text="${#numbers.formatInteger(s.dbRowCount(), 0, 'COMMA')}">0</span>
+          <span style="font-size:12px;color:#69707b;">건</span>
+        </div>
+        <div th:unless="${s.dbRowCount() != null}"
+             style="font-size:24px;font-weight:700;color:#5b626d;">—</div>
+      </div>
+
+      <!-- DB 상태 배지 -->
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+        <span th:if="${s.dbLoaded()}"
+              style="padding:3px 9px;border-radius:999px;font-size:11px;font-weight:600;background:#15291f;color:#5fc98a;white-space:nowrap;">DB 적재 완료</span>
+        <span th:unless="${s.dbLoaded()}"
+              style="padding:3px 9px;border-radius:999px;font-size:11px;font-weight:600;background:#2a1a1a;color:#e88a82;white-space:nowrap;">미적재</span>
+        <span style="font-size:11.5px;color:#5b626d;" th:text="${s.dbMessage()}"></span>
+      </div>
+
+      <!-- 구분선 -->
+      <div style="border-top:1px solid #21262e;margin-bottom:10px;"></div>
+
+      <!-- 파일/소스 상태 -->
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+        <div style="font-size:11.5px;color:#69707b;">
+          파일
+          <span style="color:#e7eaee;margin-left:2px;" th:text="${s.completeCount()}">0</span>
+          <span> / </span>
+          <span th:text="${s.expectedCount()}">1</span>
+          <span th:if="${s.latestModified() != null}"
+                style="color:#45505a;margin-left:6px;"
+                th:text="${#temporals.format(s.latestModified(), 'MM-dd HH:mm')}"></span>
+        </div>
+        <div>
+          <span th:if="${s.fileLoaded() && s.fileSynced()}"
+                style="font-size:11px;font-weight:600;color:#5fc98a;">최근 동기화</span>
+          <span th:if="${s.fileLoaded() && !s.fileSynced()}"
+                style="font-size:11px;font-weight:600;color:#d9b066;">이전 저장본</span>
+          <span th:if="${!s.fileLoaded() && s.exists()}"
+                style="font-size:11px;font-weight:600;color:#d9b066;">일부 파일</span>
+          <span th:if="${!s.exists()}"
+                style="font-size:11px;font-weight:600;color:#e88a82;">파일 없음</span>
+        </div>
+      </div>
+
+      <!-- 대상 DB -->
+      <div th:if="${s.dbTargets() != null && !#strings.isEmpty(s.dbTargets())}"
+           style="font-size:11px;color:#45505a;margin-top:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"
+           th:text="${s.dbTargets()}"></div>
+
+    </div>
   </div>
 
   <!-- 실행 이력 -->
@@ -237,41 +223,26 @@
     </table>
   </div>
 
-  <!-- KRAS 적재 확인 모달 -->
+  <!-- KRAS 직접 적재 모달 (lt_c_uzone=API→DB, lp_pa_cbnd=SHP→DB) -->
   <div id="loadModal" style="display:none;position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,0.6);align-items:center;justify-content:center;">
     <div style="background:#1a1f26;border:1px solid #2e3640;border-radius:14px;padding:28px 32px;width:480px;max-width:90vw;max-height:80vh;overflow-y:auto;">
 
-      <div style="font-size:16px;font-weight:700;color:#f3f5f7;margin-bottom:6px;">KRAS 적재 확인</div>
-      <div style="font-size:12.5px;color:#69707b;margin-bottom:22px;">적재할 대상 DB와 스키마를 확인하고 수정 후 실행하세요.</div>
+      <div style="font-size:16px;font-weight:700;color:#f3f5f7;margin-bottom:4px;">KRAS 적재</div>
+      <div style="font-size:12px;color:#69707b;margin-bottom:6px;">
+        <span style="color:#66c4be;">lt_c_uzone</span> — KRAS API 직접 수신 후 DB 저장<br>
+        <span style="color:#66c4be;">lp_pa_cbnd</span> — 워크스페이스 SHP 파일 → DB 저장
+      </div>
+      <div style="font-size:11.5px;color:#5b626d;margin-bottom:20px;">대상 DB와 스키마를 확인하고 실행하세요.</div>
 
-      <form id="loadForm" method="post" action="/sync/kras-load">
+      <form id="loadForm" method="post" action="/sync/kras-direct-load">
 
-        <!-- 대상 DB (각 DB별 스키마 포함) -->
-        <div style="margin-bottom:20px;">
+        <div style="margin-bottom:22px;">
           <div style="font-size:12px;font-weight:600;color:#8a919c;letter-spacing:0.04em;margin-bottom:10px;">대상 DB</div>
           <div id="targetList" style="display:flex;flex-direction:column;gap:10px;">
             <div style="color:#69707b;font-size:13px;">불러오는 중...</div>
           </div>
         </div>
 
-        <!-- 적재 파일 선택 -->
-        <div style="margin-bottom:20px;">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-            <div style="font-size:12px;font-weight:600;color:#8a919c;letter-spacing:0.04em;">적재 파일</div>
-            <div style="display:flex;gap:8px;">
-              <button type="button" onclick="selectAllFiles(true)"
-                      style="padding:3px 10px;border-radius:6px;border:1px solid #2e3640;background:#1e242c;color:#9aa2ad;font-size:11.5px;font-weight:600;font-family:inherit;cursor:pointer;">전체 선택</button>
-              <button type="button" onclick="selectAllFiles(false)"
-                      style="padding:3px 10px;border-radius:6px;border:1px solid #2e3640;background:#1e242c;color:#9aa2ad;font-size:11.5px;font-weight:600;font-family:inherit;cursor:pointer;">전체 해제</button>
-            </div>
-          </div>
-          <div id="fileList" style="display:flex;flex-direction:column;gap:4px;max-height:220px;overflow-y:auto;padding-right:4px;">
-            <div style="color:#69707b;font-size:13px;">불러오는 중...</div>
-          </div>
-          <div id="fileSelectionSummary" style="margin-top:8px;font-size:11.5px;color:#69707b;"></div>
-        </div>
-
-        <!-- 버튼 -->
         <div style="display:flex;gap:10px;justify-content:flex-end;">
           <button type="button" onclick="closeLoadModal()"
                   style="padding:9px 20px;border-radius:8px;border:1px solid #2e3640;background:#1e242c;color:#cdd3db;font-size:13.5px;font-weight:600;font-family:inherit;cursor:pointer;">
@@ -287,67 +258,200 @@
     </div>
   </div>
 
-  <!-- 파일 스캔 결과 모달 -->
-  <div id="scanModal" style="display:none;position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,0.6);align-items:center;justify-content:center;">
-    <div style="background:#1a1f26;border:1px solid #2e3640;border-radius:14px;padding:28px 32px;width:520px;max-width:90vw;max-height:80vh;overflow-y:auto;">
-      <div style="font-size:16px;font-weight:700;color:#f3f5f7;margin-bottom:6px;">파일에서 적재 준비</div>
-      <div style="font-size:12.5px;color:#69707b;margin-bottom:18px;">workspace/kras 디렉토리의 SHP/TXT 파일을 읽어 JSON 캐시와 manifest를 생성합니다.</div>
-      <div id="scanResult" style="font-size:13px;line-height:1.8;color:#cdd3db;margin-bottom:20px;">스캔 중...</div>
-      <div style="display:flex;justify-content:flex-end;">
-        <button type="button" onclick="closeScanModal()"
-                style="padding:9px 20px;border-radius:8px;border:1px solid #2e3640;background:#1e242c;color:#cdd3db;font-size:13.5px;font-weight:600;font-family:inherit;cursor:pointer;">
-          닫기
+  <!-- 데이터 미리보기 모달 -->
+  <div id="previewModal" style="display:none;position:fixed;inset:0;z-index:1050;background:rgba(0,0,0,0.7);align-items:center;justify-content:center;">
+    <div style="background:#1a1f26;border:1px solid #2e3640;border-radius:14px;padding:24px 28px;width:92vw;max-width:1100px;max-height:88vh;display:flex;flex-direction:column;">
+
+      <!-- 헤더 -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-shrink:0;">
+        <div>
+          <div style="font-size:16px;font-weight:700;color:#f3f5f7;">데이터 미리보기</div>
+          <div style="font-size:12px;color:#69707b;margin-top:3px;">lt_c_uzone — KRAS API  |  lp_pa_cbnd — 워크스페이스 SHP 파일</div>
+        </div>
+        <button type="button" onclick="closePreviewModal()"
+                style="padding:5px 14px;border-radius:7px;border:1px solid #2e3640;background:#1e242c;color:#9aa2ad;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;">닫기</button>
+      </div>
+
+      <!-- 탭 -->
+      <div style="display:flex;gap:0;border-bottom:1px solid #262c35;margin-bottom:16px;flex-shrink:0;">
+        <button id="prevTabUzone" type="button" onclick="switchPreviewTab('uzone')"
+                style="padding:8px 20px;border:none;border-bottom:2px solid #66c4be;background:transparent;color:#66c4be;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;">
+          lt_c_uzone (API)
+        </button>
+        <button id="prevTabCbnd" type="button" onclick="switchPreviewTab('cbnd')"
+                style="padding:8px 20px;border:none;border-bottom:2px solid transparent;background:transparent;color:#69707b;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;">
+          lp_pa_cbnd (SHP)
         </button>
       </div>
+
+      <!-- lt_c_uzone 탭 패널 -->
+      <div id="prevPanelUzone" style="flex:1;display:flex;flex-direction:column;min-height:0;">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;flex-shrink:0;">
+          <select id="prevUzoneLayer"
+                  style="flex:1;min-width:220px;padding:6px 10px;border-radius:7px;border:1px solid #2e3640;background:#141820;color:#e7eaee;font-size:12.5px;font-family:inherit;outline:none;">
+            <option value="">레이어 목록 불러오는 중...</option>
+          </select>
+          <select id="prevUzoneLimit"
+                  style="padding:6px 8px;border-radius:7px;border:1px solid #2e3640;background:#141820;color:#e7eaee;font-size:12.5px;font-family:inherit;outline:none;">
+            <option value="10">10건</option>
+            <option value="20" selected>20건</option>
+            <option value="50">50건</option>
+          </select>
+          <button type="button" onclick="fetchPreviewUzone()"
+                  style="padding:6px 16px;border-radius:7px;border:none;background:#0e9b94;color:#fff;font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer;">조회</button>
+        </div>
+        <div id="prevUzoneResult" style="flex:1;overflow:auto;border-radius:8px;border:1px solid #262c35;">
+          <div style="padding:20px;color:#69707b;font-size:13px;">레이어를 선택하고 조회 버튼을 클릭하세요.</div>
+        </div>
+      </div>
+
+      <!-- lp_pa_cbnd 탭 패널 -->
+      <div id="prevPanelCbnd" style="flex:1;display:none;flex-direction:column;min-height:0;">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;flex-shrink:0;">
+          <div style="font-size:12.5px;color:#9aa2ad;">워크스페이스 SHP 파일에서 직접 읽어 표시합니다.</div>
+          <select id="prevCbndLimit"
+                  style="padding:6px 8px;border-radius:7px;border:1px solid #2e3640;background:#141820;color:#e7eaee;font-size:12.5px;font-family:inherit;outline:none;">
+            <option value="10">10건</option>
+            <option value="20" selected>20건</option>
+            <option value="50">50건</option>
+          </select>
+          <button type="button" onclick="fetchPreviewCbnd()"
+                  style="padding:6px 16px;border-radius:7px;border:none;background:#0e9b94;color:#fff;font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer;">조회</button>
+        </div>
+        <div id="prevCbndResult" style="flex:1;overflow:auto;border-radius:8px;border:1px solid #262c35;">
+          <div style="padding:20px;color:#69707b;font-size:13px;">조회 버튼을 클릭하세요.</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- KRAS API 테스트 모달 -->
+  <div id="apiTestModal" style="display:none;position:fixed;inset:0;z-index:1050;background:rgba(0,0,0,0.7);align-items:center;justify-content:center;">
+    <div style="background:#1a1f26;border:1px solid #2e3640;border-radius:14px;padding:24px 28px;width:92vw;max-width:860px;max-height:88vh;display:flex;flex-direction:column;gap:0;">
+
+      <!-- 헤더 -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-shrink:0;">
+        <div>
+          <div style="font-size:16px;font-weight:700;color:#f3f5f7;">KRAS API 테스트</div>
+          <div style="font-size:12px;color:#69707b;margin-top:3px;">연결 확인 → 레이어 목록 → 데이터 조회 순으로 테스트하세요.</div>
+        </div>
+        <button type="button" onclick="closeApiTestModal()"
+                style="padding:5px 14px;border-radius:7px;border:1px solid #2e3640;background:#1e242c;color:#9aa2ad;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;">닫기</button>
+      </div>
+
+      <!-- Step 1: 연결 확인 -->
+      <div style="background:#141820;border:1px solid #262c35;border-radius:10px;padding:16px 18px;margin-bottom:12px;flex-shrink:0;">
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+          <div style="font-size:13px;font-weight:700;color:#b68aff;min-width:80px;">① 연결 확인</div>
+          <button type="button" onclick="apiTestCheck()"
+                  id="checkBtn"
+                  style="padding:6px 16px;border-radius:7px;border:none;background:#b68aff;color:#fff;font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer;">
+            CHECK 요청
+          </button>
+          <div id="checkResult" style="font-size:12.5px;color:#69707b;">—</div>
+        </div>
+      </div>
+
+      <!-- Step 2: 레이어 목록 -->
+      <div style="background:#141820;border:1px solid #262c35;border-radius:10px;padding:16px 18px;margin-bottom:12px;flex-shrink:0;">
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px;">
+          <div style="font-size:13px;font-weight:700;color:#66c4be;min-width:80px;">② 레이어 목록</div>
+          <button type="button" onclick="apiTestLayers()"
+                  id="layersBtn"
+                  style="padding:6px 16px;border-radius:7px;border:none;background:#0e9b94;color:#fff;font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer;">
+            GetLayerList
+          </button>
+          <div id="layersStatus" style="font-size:12.5px;color:#69707b;">—</div>
+        </div>
+        <div id="layersList" style="display:none;max-height:140px;overflow-y:auto;border-radius:7px;border:1px solid #1e242c;"></div>
+      </div>
+
+      <!-- Step 3: 데이터 조회 -->
+      <div style="background:#141820;border:1px solid #262c35;border-radius:10px;padding:16px 18px;flex-shrink:0;">
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px;">
+          <div style="font-size:13px;font-weight:700;color:#d9b066;min-width:80px;">③ 데이터 조회</div>
+          <select id="apiLayerSelect"
+                  style="padding:5px 10px;border-radius:6px;border:1px solid #2e3640;background:#1a1f26;color:#e7eaee;font-size:12.5px;font-family:inherit;outline:none;min-width:240px;">
+            <option value="">레이어를 선택하세요</option>
+          </select>
+          <select id="apiFeatureLimit"
+                  style="padding:5px 8px;border-radius:6px;border:1px solid #2e3640;background:#1a1f26;color:#e7eaee;font-size:12.5px;font-family:inherit;outline:none;">
+            <option value="3">3건</option>
+            <option value="5" selected>5건</option>
+            <option value="10">10건</option>
+          </select>
+          <button type="button" onclick="apiTestFeatures()"
+                  id="featuresBtn"
+                  style="padding:6px 16px;border-radius:7px;border:none;background:#c08a2a;color:#fff;font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer;">
+            GetFeature
+          </button>
+        </div>
+        <div id="featuresResult" style="overflow:auto;max-height:260px;border-radius:7px;border:1px solid #1e242c;">
+          <div style="padding:14px;color:#69707b;font-size:12.5px;">레이어를 선택하고 GetFeature 버튼을 클릭하세요.</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Mock 테스트 모달 -->
+  <div id="mockModal" style="display:none;position:fixed;inset:0;z-index:1050;background:rgba(0,0,0,0.7);align-items:center;justify-content:center;">
+    <div style="background:#1a1f26;border:1px solid #2e3640;border-radius:14px;padding:24px 28px;width:520px;max-width:92vw;max-height:88vh;overflow-y:auto;">
+
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+        <div style="font-size:16px;font-weight:700;color:#f3f5f7;">Mock 데이터 적재 테스트</div>
+        <button type="button" onclick="closeMockModal()"
+                style="padding:5px 14px;border-radius:7px;border:1px solid #2e3640;background:#1e242c;color:#9aa2ad;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;">닫기</button>
+      </div>
+      <div style="font-size:12px;color:#69707b;margin-bottom:20px;">
+        <span style="color:#d9b066;">lt_c_uzone</span> — 간이 mock 3건 (EPSG:5186 좌표 고정)<br>
+        <span style="color:#d9b066;">lp_pa_cbnd</span> — 워크스페이스 SHP 파일 → DB 저장
+      </div>
+
+      <!-- 대상 DB -->
+      <div style="margin-bottom:16px;">
+        <div style="font-size:12px;font-weight:600;color:#8a919c;letter-spacing:0.04em;margin-bottom:8px;">대상 DB</div>
+        <div id="mockTargetList" style="display:flex;flex-direction:column;gap:8px;">
+          <div style="color:#69707b;font-size:13px;">불러오는 중...</div>
+        </div>
+      </div>
+
+      <!-- 스키마 -->
+      <div style="margin-bottom:20px;">
+        <div style="font-size:12px;font-weight:600;color:#8a919c;letter-spacing:0.04em;margin-bottom:8px;">저장 스키마</div>
+        <input type="text" id="mockSchema" value="test"
+               style="width:100%;box-sizing:border-box;padding:7px 10px;border-radius:7px;border:1px solid #2e3640;background:#141820;color:#e7eaee;font-size:13px;font-family:inherit;outline:none;">
+        <div style="font-size:11.5px;color:#5b626d;margin-top:5px;">운영 스키마(public, ods 등)를 입력하면 실제 데이터가 교체됩니다.</div>
+      </div>
+
+      <!-- 실행 버튼 -->
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-bottom:16px;">
+        <button type="button" onclick="closeMockModal()"
+                style="padding:9px 20px;border-radius:8px;border:1px solid #2e3640;background:#1e242c;color:#cdd3db;font-size:13.5px;font-weight:600;font-family:inherit;cursor:pointer;">
+          취소
+        </button>
+        <button type="button" id="mockRunBtn" onclick="runMockLoad()"
+                style="padding:9px 20px;border-radius:8px;border:none;background:#c08a2a;color:#fff;font-size:13.5px;font-weight:600;font-family:inherit;cursor:pointer;">
+          적재 실행
+        </button>
+      </div>
+
+      <!-- 결과 -->
+      <div id="mockResult" style="display:none;border-top:1px solid #262c35;padding-top:16px;"></div>
+
     </div>
   </div>
 
   <script th:inline="javascript">
-    function scanWorkspace() {
-      var modal = document.getElementById('scanModal');
-      var result = document.getElementById('scanResult');
-      modal.style.display = 'flex';
-      result.innerHTML = '스캔 중...';
-
-      fetch('/sync/kras-scan-workspace', { method: 'POST' })
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
-          if (data.error) {
-            result.innerHTML = '<span style="color:#e88a82;">오류: ' + escapeHtml(data.error) + '</span>';
-            return;
-          }
-          var msgs = (data.messages || []).map(function(m) {
-            var color = m.startsWith('✓') ? '#5fc98a' : m.startsWith('✗') ? '#e88a82' : '#9aa2ad';
-            return '<div style="color:' + color + ';">' + escapeHtml(m) + '</div>';
-          }).join('');
-          var summary = '<div style="margin-top:12px;padding:10px 12px;border-radius:8px;background:#141820;color:#66c4be;font-weight:600;">'
-            + '총 ' + data.fileCount + '개 파일, ' + (data.rowCount || 0).toLocaleString() + '건 준비 완료'
-            + '</div>';
-          result.innerHTML = msgs + summary;
-        })
-        .catch(function(e) {
-          result.innerHTML = '<span style="color:#e88a82;">요청 실패: ' + escapeHtml(String(e)) + '</span>';
-        });
-    }
-
-    function closeScanModal() {
-      document.getElementById('scanModal').style.display = 'none';
-    }
-
-    document.getElementById('scanModal').addEventListener('click', function(e) {
-      if (e.target === this) closeScanModal();
-    });
-
     var _defaultSchema = 'ods';
 
     function openLoadModal() {
-      var modal = document.getElementById('loadModal');
-      modal.style.display = 'flex';
-      document.getElementById('targetList').innerHTML = '<div style="color:#69707b;font-size:13px;">불러오는 중...</div>';
-      document.getElementById('fileList').innerHTML = '<div style="color:#69707b;font-size:13px;">불러오는 중...</div>';
-      document.getElementById('fileSelectionSummary').textContent = '';
+      document.getElementById('loadModal').style.display = 'flex';
+      document.getElementById('targetList').innerHTML =
+        '<div style="color:#69707b;font-size:13px;">불러오는 중...</div>';
 
-      fetch('/sync/kras-load-options')
+      fetch('/sync/kras-direct-load-options')
         .then(function(r) { return r.json(); })
         .then(function(data) {
           _defaultSchema = data.schema || 'ods';
@@ -356,122 +460,48 @@
           var targets = data.targets || [];
           if (targets.length === 0) {
             list.innerHTML = '<div style="color:#e88a82;font-size:13px;">설정된 DB가 없습니다.</div>';
-          } else {
-            targets.forEach(function(t) {
-              var wrapper = document.createElement('div');
-              wrapper.style.cssText = 'border:1px solid #2e3640;border-radius:8px;background:#141820;overflow:hidden;';
-
-              var labelRow = document.createElement('label');
-              labelRow.style.cssText = 'display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer;';
-              labelRow.innerHTML =
-                '<input type="checkbox" name="targetIdx" value="' + t.idx + '" checked ' +
-                  'style="width:15px;height:15px;accent-color:#0e9b94;cursor:pointer;flex-shrink:0;" ' +
-                  'onchange="onTargetCheck(this)">' +
-                '<div style="flex:1;min-width:0;">' +
-                  '<div style="font-size:13px;font-weight:600;color:#e7eaee;">' + escapeHtml(t.name) + '</div>' +
-                  '<div style="font-size:11.5px;color:#69707b;font-family:monospace;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml(t.url) + '</div>' +
-                '</div>';
-
-              var schemaRow = document.createElement('div');
-              schemaRow.id = 'schemaRow_' + t.idx;
-              schemaRow.style.cssText = 'display:flex;align-items:center;gap:8px;padding:8px 12px;border-top:1px solid #262c35;background:#111520;';
-              schemaRow.innerHTML =
-                '<span style="font-size:11.5px;color:#5b626d;white-space:nowrap;">스키마</span>' +
-                '<select name="schema_' + t.idx + '" id="schemaSelect_' + t.idx + '" ' +
-                  'style="flex:1;padding:5px 8px;border-radius:6px;border:1px solid #2e3640;background:#141820;color:#e7eaee;font-size:12.5px;font-family:inherit;outline:none;cursor:pointer;appearance:none;-webkit-appearance:none;">' +
-                  '<option value="">불러오는 중...</option>' +
-                '</select>';
-
-              wrapper.appendChild(labelRow);
-              wrapper.appendChild(schemaRow);
-              list.appendChild(wrapper);
-
-              fetchSchemas(t.idx, _defaultSchema);
-            });
+            return;
           }
+          targets.forEach(function(t) {
+            var wrapper = document.createElement('div');
+            wrapper.style.cssText = 'border:1px solid #2e3640;border-radius:8px;background:#141820;overflow:hidden;';
 
-          // 파일 목록 렌더링 (테이블별 그룹)
-          var fileListEl = document.getElementById('fileList');
-          fileListEl.innerHTML = '';
-          var files = data.files || [];
-          if (files.length === 0) {
-            fileListEl.innerHTML =
-              '<div style="color:#d9b066;font-size:13px;">수집된 파일이 없습니다. 수집을 먼저 실행하거나 파일에서 적재 준비를 실행하세요.</div>';
-            document.getElementById('fileSelectionSummary').textContent = '';
-          } else {
-            // 테이블별 그룹핑
-            var groups = {};
-            files.forEach(function(f) {
-              if (!groups[f.table]) groups[f.table] = [];
-              groups[f.table].push(f.file);
-            });
-            Object.keys(groups).forEach(function(table) {
-              var groupFiles = groups[table];
-              // 테이블 헤더 (파일이 여러 개일 때만 표시)
-              if (groupFiles.length > 1) {
-                var header = document.createElement('div');
-                header.style.cssText = 'font-size:11px;font-weight:600;color:#5b626d;letter-spacing:0.04em;padding:6px 4px 2px;';
-                header.textContent = table;
-                fileListEl.appendChild(header);
-              }
-              groupFiles.forEach(function(fileName) {
-                var row = document.createElement('label');
-                var indent = groupFiles.length > 1 ? 'margin-left:8px;' : '';
-                row.style.cssText = indent + 'display:flex;align-items:center;gap:10px;padding:7px 12px;border-radius:7px;border:1px solid #2e3640;background:#141820;cursor:pointer;';
-                row.innerHTML =
-                  '<input type="checkbox" name="files" value="' + escapeHtml(fileName) + '" checked ' +
-                    'style="width:14px;height:14px;accent-color:#0e9b94;cursor:pointer;" ' +
-                    'onchange="updateFileSummary()">' +
-                  '<div>' +
-                    '<div style="font-size:12.5px;color:#cdd3db;font-family:monospace;">' + escapeHtml(fileName) + '</div>' +
-                    (groupFiles.length === 1 ? '<div style="font-size:11px;color:#5b626d;margin-top:1px;">' + escapeHtml(table) + '</div>' : '') +
-                  '</div>';
-                fileListEl.appendChild(row);
-              });
-            });
-            updateFileSummary();
-          }
+            var labelRow = document.createElement('label');
+            labelRow.style.cssText = 'display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer;';
+            labelRow.innerHTML =
+              '<input type="checkbox" name="targetIdx" value="' + t.idx + '" checked ' +
+                'style="width:15px;height:15px;accent-color:#0e9b94;cursor:pointer;flex-shrink:0;" ' +
+                'onchange="onTargetCheck(this)">' +
+              '<div style="flex:1;min-width:0;">' +
+                '<div style="font-size:13px;font-weight:600;color:#e7eaee;">' + escapeHtml(t.name) + '</div>' +
+                '<div style="font-size:11.5px;color:#69707b;font-family:monospace;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml(t.url) + '</div>' +
+              '</div>';
+
+            var schemaRow = document.createElement('div');
+            schemaRow.id = 'schemaRow_' + t.idx;
+            schemaRow.style.cssText = 'display:flex;align-items:center;gap:8px;padding:8px 12px;border-top:1px solid #262c35;background:#111520;';
+            schemaRow.innerHTML =
+              '<span style="font-size:11.5px;color:#5b626d;white-space:nowrap;">스키마</span>' +
+              '<select name="schema_' + t.idx + '" id="schemaSelect_' + t.idx + '" ' +
+                'style="flex:1;padding:5px 8px;border-radius:6px;border:1px solid #2e3640;background:#141820;color:#e7eaee;font-size:12.5px;font-family:inherit;outline:none;cursor:pointer;">' +
+                '<option value="">불러오는 중...</option>' +
+              '</select>';
+
+            wrapper.appendChild(labelRow);
+            wrapper.appendChild(schemaRow);
+            list.appendChild(wrapper);
+            fetchSchemas(t.idx, _defaultSchema);
+          });
         })
         .catch(function() {
           document.getElementById('targetList').innerHTML =
             '<div style="color:#e88a82;font-size:13px;">DB 목록을 불러오지 못했습니다.</div>';
-          document.getElementById('fileList').innerHTML =
-            '<div style="color:#e88a82;font-size:13px;">파일 목록을 불러오지 못했습니다.</div>';
         });
     }
 
-    function updateFileSummary() {
-      var checkboxes = document.querySelectorAll('#fileList input[type="checkbox"]');
-      var total = checkboxes.length;
-      var checked = 0;
-      checkboxes.forEach(function(cb) { if (cb.checked) checked++; });
-      var el = document.getElementById('fileSelectionSummary');
-      if (total === 0) { el.textContent = ''; return; }
-      if (checked === total) {
-        el.textContent = '전체 ' + total + '개 파일 선택됨';
-        el.style.color = '#5fc98a';
-      } else if (checked === 0) {
-        el.textContent = '선택된 파일 없음 — 적재가 실행되지 않습니다';
-        el.style.color = '#e88a82';
-      } else {
-        el.textContent = total + '개 중 ' + checked + '개 선택됨';
-        el.style.color = '#d9b066';
-      }
-    }
-
-    function selectAllFiles(checked) {
-      document.querySelectorAll('#fileList input[type="checkbox"]').forEach(function(cb) {
-        cb.checked = checked;
-      });
-      updateFileSummary();
-    }
-
     function onTargetCheck(cb) {
-      var idx = cb.value;
-      var schemaRow = document.getElementById('schemaRow_' + idx);
-      if (schemaRow) {
-        schemaRow.style.display = cb.checked ? 'flex' : 'none';
-      }
+      var schemaRow = document.getElementById('schemaRow_' + cb.value);
+      if (schemaRow) schemaRow.style.display = cb.checked ? 'flex' : 'none';
     }
 
     function fetchSchemas(idx, defaultSchema) {
@@ -485,10 +515,7 @@
           sel.innerHTML = '';
           var schemas = data.schemas || [];
           if (schemas.length === 0) {
-            var opt = document.createElement('option');
-            opt.value = '';
-            opt.textContent = '스키마 없음';
-            sel.appendChild(opt);
+            sel.innerHTML = '<option value="">스키마 없음</option>';
             sel.disabled = true;
             return;
           }
@@ -516,6 +543,358 @@
       if (e.target === this) closeLoadModal();
     });
 
+    // ── 데이터 미리보기 ──────────────────────────────────────────────
+
+    document.getElementById('previewModal').addEventListener('click', function(e) {
+      if (e.target === this) closePreviewModal();
+    });
+
+    var _prevLayersLoaded = false;
+
+    function openPreviewModal() {
+      document.getElementById('previewModal').style.display = 'flex';
+      switchPreviewTab('uzone');
+      if (!_prevLayersLoaded) loadPreviewLayers();
+    }
+
+    function closePreviewModal() {
+      document.getElementById('previewModal').style.display = 'none';
+    }
+
+    function switchPreviewTab(tab) {
+      var isUzone = tab === 'uzone';
+      document.getElementById('prevPanelUzone').style.display = isUzone ? 'flex' : 'none';
+      document.getElementById('prevPanelCbnd').style.display  = isUzone ? 'none' : 'flex';
+      document.getElementById('prevTabUzone').style.color       = isUzone ? '#66c4be' : '#69707b';
+      document.getElementById('prevTabUzone').style.borderBottomColor = isUzone ? '#66c4be' : 'transparent';
+      document.getElementById('prevTabUzone').style.fontWeight  = isUzone ? '700' : '600';
+      document.getElementById('prevTabCbnd').style.color        = isUzone ? '#69707b' : '#66c4be';
+      document.getElementById('prevTabCbnd').style.borderBottomColor  = isUzone ? 'transparent' : '#66c4be';
+      document.getElementById('prevTabCbnd').style.fontWeight   = isUzone ? '600' : '700';
+    }
+
+    function loadPreviewLayers() {
+      var sel = document.getElementById('prevUzoneLayer');
+      sel.innerHTML = '<option value="">레이어 목록 불러오는 중...</option>';
+      fetch('/sync/kras-api-test?service=layers')
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          if (d.error) {
+            sel.innerHTML = '<option value="">레이어 조회 실패: ' + escapeHtml(d.error) + '</option>';
+            return;
+          }
+          _prevLayersLoaded = true;
+          var layers = d.layers || [];
+          sel.innerHTML = '<option value="">레이어를 선택하세요</option>';
+          layers.forEach(function(l) {
+            var opt = document.createElement('option');
+            opt.value = l.layerName;
+            opt.textContent = l.layerName + (l.layerAlias ? ' (' + l.layerAlias + ')' : '');
+            sel.appendChild(opt);
+          });
+        })
+        .catch(function(e) {
+          sel.innerHTML = '<option value="">오류: ' + escapeHtml(String(e)) + '</option>';
+        });
+    }
+
+    function fetchPreviewUzone() {
+      var layer = document.getElementById('prevUzoneLayer').value;
+      var limit = document.getElementById('prevUzoneLimit').value;
+      var out   = document.getElementById('prevUzoneResult');
+      if (!layer) {
+        out.innerHTML = '<div style="padding:16px;color:#e88a82;font-size:13px;">레이어를 먼저 선택하세요.</div>';
+        return;
+      }
+      out.innerHTML = '<div style="padding:16px;color:#69707b;font-size:13px;">조회 중...</div>';
+      fetch('/sync/preview?table=lt_c_uzone&layer=' + encodeURIComponent(layer) + '&limit=' + limit)
+        .then(function(r) { return r.json(); })
+        .then(function(d) { renderPreviewTable(out, d); })
+        .catch(function(e) {
+          out.innerHTML = '<div style="padding:16px;color:#e88a82;font-size:13px;">요청 오류: ' + escapeHtml(String(e)) + '</div>';
+        });
+    }
+
+    function fetchPreviewCbnd() {
+      var limit = document.getElementById('prevCbndLimit').value;
+      var out   = document.getElementById('prevCbndResult');
+      out.innerHTML = '<div style="padding:16px;color:#69707b;font-size:13px;">조회 중...</div>';
+      fetch('/sync/preview?table=lp_pa_cbnd&limit=' + limit)
+        .then(function(r) { return r.json(); })
+        .then(function(d) { renderPreviewTable(out, d); })
+        .catch(function(e) {
+          out.innerHTML = '<div style="padding:16px;color:#e88a82;font-size:13px;">요청 오류: ' + escapeHtml(String(e)) + '</div>';
+        });
+    }
+
+    function renderPreviewTable(container, data) {
+      if (data.error) {
+        container.innerHTML = '<div style="padding:16px;color:#e88a82;font-size:13px;">오류: ' + escapeHtml(data.error) + '</div>';
+        return;
+      }
+      var rows = data.rows || [];
+      var cols = data.columns || (rows.length > 0 ? Object.keys(rows[0]) : []);
+      if (cols.length === 0) {
+        container.innerHTML = '<div style="padding:16px;color:#69707b;font-size:13px;">데이터가 없습니다.</div>';
+        return;
+      }
+      var info = '<div style="padding:7px 12px;font-size:11.5px;color:#69707b;border-bottom:1px solid #262c35;flex-shrink:0;">'
+        + '전체 <strong style="color:#e7eaee;">' + (data.total || rows.length) + '</strong>건 중 '
+        + '<strong style="color:#e7eaee;">' + rows.length + '</strong>건 표시'
+        + (data.resultCode ? ' — resultCode: <strong style="color:#d9b066;">' + escapeHtml(data.resultCode) + '</strong>' : '')
+        + '</div>';
+      var thead = '<thead><tr>' + cols.map(function(c) {
+        return '<th style="padding:6px 10px;font-size:11.5px;font-weight:600;color:#9aa2ad;text-align:left;white-space:nowrap;border-bottom:1px solid #262c35;background:#0e1016;position:sticky;top:0;">' + escapeHtml(c) + '</th>';
+      }).join('') + '</tr></thead>';
+      var tbody = '<tbody>' + rows.map(function(row, ri) {
+        var bg = ri % 2 === 0 ? '#1a1f26' : '#141820';
+        return '<tr style="background:' + bg + ';">' + cols.map(function(c) {
+          var v = row[c];
+          var text = (v === null || v === undefined) ? '<span style="color:#3a4050;">null</span>' : escapeHtml(String(v));
+          return '<td style="padding:5px 10px;font-size:11.5px;color:#c8cdd5;border-bottom:1px solid #1e242c;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + escapeHtml(String(v != null ? v : '')) + '">' + text + '</td>';
+        }).join('') + '</tr>';
+      }).join('') + '</tbody>';
+      container.innerHTML = info + '<div style="overflow:auto;"><table style="border-collapse:collapse;width:100%;min-width:max-content;">' + thead + tbody + '</table></div>';
+    }
+
+    // ── KRAS API 테스트 ──────────────────────────────────────────────
+
+    document.getElementById('apiTestModal').addEventListener('click', function(e) {
+      if (e.target === this) closeApiTestModal();
+    });
+
+    function openApiTestModal() {
+      document.getElementById('apiTestModal').style.display = 'flex';
+      document.getElementById('checkResult').textContent = '—';
+      document.getElementById('layersStatus').textContent = '—';
+      document.getElementById('layersList').style.display = 'none';
+      document.getElementById('featuresResult').innerHTML =
+        '<div style="padding:14px;color:#69707b;font-size:12.5px;">레이어를 선택하고 GetFeature 버튼을 클릭하세요.</div>';
+    }
+
+    function closeApiTestModal() {
+      document.getElementById('apiTestModal').style.display = 'none';
+    }
+
+    function apiTestCheck() {
+      var btn = document.getElementById('checkBtn');
+      var out = document.getElementById('checkResult');
+      btn.disabled = true;
+      out.style.color = '#69707b';
+      out.textContent = '요청 중...';
+      fetch('/sync/kras-api-test?service=check')
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          if (d.success) {
+            out.style.color = '#5fc98a';
+            out.textContent = '연결 성공 (' + (d.resultCode || '') + ') — orgCode: ' + (d.orgCode || '') + '  url: ' + (d.url || '');
+          } else {
+            out.style.color = '#e88a82';
+            out.textContent = '실패: ' + (d.error || d.resultMsg || d.resultCode || '알 수 없음');
+          }
+        })
+        .catch(function(e) {
+          out.style.color = '#e88a82';
+          out.textContent = '요청 오류: ' + e;
+        })
+        .finally(function() { btn.disabled = false; });
+    }
+
+    function apiTestLayers() {
+      var btn = document.getElementById('layersBtn');
+      var status = document.getElementById('layersStatus');
+      var list = document.getElementById('layersList');
+      var sel = document.getElementById('apiLayerSelect');
+      btn.disabled = true;
+      status.style.color = '#69707b';
+      status.textContent = '요청 중...';
+      list.style.display = 'none';
+      fetch('/sync/kras-api-test?service=layers')
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          if (d.error) {
+            status.style.color = '#e88a82';
+            status.textContent = '실패: ' + d.error;
+            return;
+          }
+          var layers = d.layers || [];
+          status.style.color = '#66c4be';
+          status.textContent = '총 ' + layers.length + '개 레이어';
+          // 선택기 갱신
+          sel.innerHTML = '<option value="">레이어를 선택하세요</option>';
+          layers.forEach(function(l) {
+            var opt = document.createElement('option');
+            opt.value = l.layerName;
+            opt.textContent = l.layerName + (l.layerAlias ? ' (' + l.layerAlias + ')' : '');
+            sel.appendChild(opt);
+          });
+          // 목록 렌더
+          list.innerHTML = layers.map(function(l, i) {
+            var bg = i % 2 === 0 ? '#1a1f26' : '#141820';
+            return '<div style="display:flex;gap:12px;padding:7px 12px;background:' + bg + ';cursor:pointer;" onclick="document.getElementById(\'apiLayerSelect\').value=\'' + escapeHtml(l.layerName) + '\'">' +
+              '<span style="font-size:12px;color:#e7eaee;font-family:monospace;">' + escapeHtml(l.layerName) + '</span>' +
+              '<span style="font-size:12px;color:#69707b;">' + escapeHtml(l.layerAlias || '') + '</span>' +
+              '</div>';
+          }).join('');
+          list.style.display = 'block';
+        })
+        .catch(function(e) {
+          status.style.color = '#e88a82';
+          status.textContent = '요청 오류: ' + e;
+        })
+        .finally(function() { btn.disabled = false; });
+    }
+
+    function apiTestFeatures() {
+      var layer = document.getElementById('apiLayerSelect').value;
+      var limit = document.getElementById('apiFeatureLimit').value;
+      var btn = document.getElementById('featuresBtn');
+      var out = document.getElementById('featuresResult');
+      if (!layer) {
+        out.innerHTML = '<div style="padding:14px;color:#e88a82;font-size:12.5px;">레이어를 먼저 선택하세요.</div>';
+        return;
+      }
+      btn.disabled = true;
+      out.innerHTML = '<div style="padding:14px;color:#69707b;font-size:12.5px;">요청 중...</div>';
+      fetch('/sync/kras-api-test?service=features&layer=' + encodeURIComponent(layer) + '&limit=' + limit)
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          if (d.error) {
+            out.innerHTML = '<div style="padding:14px;color:#e88a82;font-size:12.5px;">오류: ' + escapeHtml(d.error) + '</div>';
+            return;
+          }
+          var rows = d.rows || [];
+          if (rows.length === 0) {
+            out.innerHTML = '<div style="padding:14px;color:#69707b;font-size:12.5px;">데이터 없음 (code=' + escapeHtml(d.resultCode || '') + ')</div>';
+            return;
+          }
+          var cols = Object.keys(rows[0]);
+          var info = '<div style="padding:7px 12px;font-size:11.5px;color:#69707b;border-bottom:1px solid #1e242c;">' +
+            '전체 <strong style="color:#e7eaee;">' + d.total + '</strong>건 중 <strong style="color:#e7eaee;">' + rows.length + '</strong>건 표시' +
+            ' — resultCode: <strong style="color:#d9b066;">' + escapeHtml(d.resultCode || '') + '</strong>' +
+            '</div>';
+          var thead = '<thead><tr>' + cols.map(function(c) {
+            return '<th style="padding:6px 10px;font-size:11.5px;font-weight:600;color:#9aa2ad;text-align:left;white-space:nowrap;border-bottom:1px solid #1e242c;background:#0e1016;position:sticky;top:0;">' + escapeHtml(c) + '</th>';
+          }).join('') + '</tr></thead>';
+          var tbody = '<tbody>' + rows.map(function(row, ri) {
+            var bg = ri % 2 === 0 ? '#1a1f26' : '#141820';
+            return '<tr style="background:' + bg + ';">' + cols.map(function(c) {
+              var v = row[c];
+              var text = (v === null || v === undefined) ? '<span style="color:#3a4050;">null</span>' : escapeHtml(String(v));
+              return '<td style="padding:5px 10px;font-size:11.5px;color:#c8cdd5;border-bottom:1px solid #1e242c;max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + escapeHtml(String(v != null ? v : '')) + '">' + text + '</td>';
+            }).join('') + '</tr>';
+          }).join('') + '</tbody>';
+          out.innerHTML = info + '<div style="overflow:auto;"><table style="border-collapse:collapse;width:100%;min-width:max-content;">' + thead + tbody + '</table></div>';
+        })
+        .catch(function(e) {
+          out.innerHTML = '<div style="padding:14px;color:#e88a82;font-size:12.5px;">요청 오류: ' + escapeHtml(String(e)) + '</div>';
+        })
+        .finally(function() { btn.disabled = false; });
+    }
+
+    // ── Mock 테스트 ──────────────────────────────────────────────────
+
+    document.getElementById('mockModal').addEventListener('click', function(e) {
+      if (e.target === this) closeMockModal();
+    });
+
+    function openMockModal() {
+      document.getElementById('mockModal').style.display = 'flex';
+      document.getElementById('mockResult').style.display = 'none';
+      document.getElementById('mockResult').innerHTML = '';
+      loadMockTargets();
+    }
+
+    function closeMockModal() {
+      document.getElementById('mockModal').style.display = 'none';
+    }
+
+    function loadMockTargets() {
+      var list = document.getElementById('mockTargetList');
+      list.innerHTML = '<div style="color:#69707b;font-size:13px;">불러오는 중...</div>';
+      fetch('/sync/kras-direct-load-options')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          list.innerHTML = '';
+          var targets = data.targets || [];
+          if (targets.length === 0) {
+            list.innerHTML = '<div style="color:#e88a82;font-size:13px;">설정된 DB가 없습니다.</div>';
+            return;
+          }
+          targets.forEach(function(t) {
+            var row = document.createElement('label');
+            row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid #2e3640;border-radius:8px;background:#141820;cursor:pointer;';
+            row.innerHTML =
+              '<input type="checkbox" name="mockTargetIdx" value="' + t.idx + '" checked ' +
+                'style="width:15px;height:15px;accent-color:#c08a2a;cursor:pointer;flex-shrink:0;">' +
+              '<div style="flex:1;min-width:0;">' +
+                '<div style="font-size:13px;font-weight:600;color:#e7eaee;">' + escapeHtml(t.name) + '</div>' +
+                '<div style="font-size:11.5px;color:#69707b;font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:2px;">' + escapeHtml(t.url) + '</div>' +
+              '</div>';
+            list.appendChild(row);
+          });
+        })
+        .catch(function() {
+          list.innerHTML = '<div style="color:#e88a82;font-size:13px;">DB 목록을 불러오지 못했습니다.</div>';
+        });
+    }
+
+    function runMockLoad() {
+      var schema = document.getElementById('mockSchema').value.trim() || 'test';
+      var btn = document.getElementById('mockRunBtn');
+      var resultEl = document.getElementById('mockResult');
+
+      var checkedBoxes = document.querySelectorAll('input[name="mockTargetIdx"]:checked');
+      var params = new URLSearchParams();
+      checkedBoxes.forEach(function(cb) { params.append('targetIdx', cb.value); });
+      params.append('schema', schema);
+
+      btn.disabled = true;
+      btn.textContent = '실행 중...';
+      resultEl.style.display = 'block';
+      resultEl.innerHTML = '<div style="color:#69707b;font-size:13px;">적재 중... (SHP 파일 크기에 따라 수 초 소요)</div>';
+
+      fetch('/sync/mock-load', { method: 'POST', body: params,
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'} })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (data.error) {
+            resultEl.innerHTML = '<div style="color:#e88a82;font-size:13px;">오류: ' + escapeHtml(data.error) + '</div>';
+            return;
+          }
+          var rows = data.results || [];
+          var schema = data.schema || '';
+          var html = '<div style="font-size:12px;color:#9aa2ad;margin-bottom:10px;">스키마: <strong style="color:#d9b066;">' + escapeHtml(schema) + '</strong></div>';
+          html += '<div style="display:flex;flex-direction:column;gap:8px;">';
+          rows.forEach(function(r) {
+            var hasError = !!r.error;
+            var color = hasError ? '#e88a82' : '#5fc98a';
+            var bg = hasError ? '#2a1a1a' : '#15291f';
+            html += '<div style="padding:10px 14px;border-radius:8px;background:' + bg + ';border:1px solid ' + (hasError ? '#3a2a28' : '#1e3a28') + ';">' +
+              '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">' +
+                '<span style="font-size:13px;font-weight:700;color:#e7eaee;font-family:monospace;">' + escapeHtml(r.table || '') + '</span>' +
+                '<span style="font-size:11.5px;color:#69707b;">' + escapeHtml(r.source || '') + '</span>' +
+              '</div>' +
+              '<div style="margin-top:5px;font-size:12px;color:' + color + ';">' +
+                (hasError
+                  ? '오류: ' + escapeHtml(r.error)
+                  : '입력 ' + (r.rows || 0) + '건 → 저장 <strong>' + (r.saved || 0) + '</strong>건') +
+              '</div>' +
+              '<div style="margin-top:3px;font-size:11px;color:#5b626d;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml(r.target || '') + '</div>' +
+            '</div>';
+          });
+          html += '</div>';
+          resultEl.innerHTML = html;
+        })
+        .catch(function(e) {
+          resultEl.innerHTML = '<div style="color:#e88a82;font-size:13px;">요청 오류: ' + escapeHtml(String(e)) + '</div>';
+        })
+        .finally(function() {
+          btn.disabled = false;
+          btn.textContent = '적재 실행';
+        });
+    }
+
     function escapeHtml(s) {
       return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     }
@@ -528,22 +907,19 @@
     var _barLabels = {
       'KRAS':         'KRAS 전체',
       'KRAS_COLLECT': 'KRAS 수집',
-      'KRAS_LOAD':    'KRAS 적재',
-      'KAIS':         'KAIS'
+      'KRAS_LOAD':    'KRAS 적재'
     };
     var _barColors = {
       'KRAS':         '#0e9b94',
       'KRAS_COLLECT': '#66c4be',
-      'KRAS_LOAD':    '#66c4be',
-      'KAIS':         '#8a919c'
+      'KRAS_LOAD':    '#66c4be'
     };
 
     // Thymeleaf로 주입된 초기 실행 상태
     var _initRunning = {
       'KRAS':         /*[[${krasRunning}]]*/        false,
       'KRAS_COLLECT': /*[[${krasCollectRunning}]]*/ false,
-      'KRAS_LOAD':    /*[[${krasLoadRunning}]]*/    false,
-      'KAIS':         /*[[${kaisRunning}]]*/        false
+      'KRAS_LOAD':    /*[[${krasLoadRunning}]]*/    false
     };
 
     function startPolling() {

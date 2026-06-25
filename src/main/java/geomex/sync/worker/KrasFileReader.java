@@ -24,6 +24,31 @@ public class KrasFileReader {
         this.settings = settings;
     }
 
+    public record ManifestInfo(String collectedAt, Map<String, List<String>> tables) {
+        public boolean isEmpty() { return tables == null || tables.isEmpty(); }
+    }
+
+    public ManifestInfo readManifestInfo() {
+        Path manifestPath = Path.of(settings.krasWorkDir(), settings.orgCode(), "_manifest.json");
+        if (!Files.exists(manifestPath)) return new ManifestInfo(null, Map.of());
+        try {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> raw = objectMapper.readValue(manifestPath.toFile(), Map.class);
+            String collectedAt = raw.get("collectedAt") instanceof String s ? s : null;
+            Map<String, List<String>> tables = new LinkedHashMap<>();
+            if (raw.get("tables") instanceof Map<?, ?> tMap) {
+                tMap.forEach((k, v) -> {
+                    if (v instanceof List<?> list)
+                        tables.put(k.toString(), list.stream().map(Object::toString).toList());
+                });
+            }
+            return new ManifestInfo(collectedAt, tables);
+        } catch (Exception e) {
+            log.warn("[KRAS] manifest 읽기 실패: {}", e.getMessage());
+            return new ManifestInfo(null, Map.of());
+        }
+    }
+
     public Map<String, List<String>> readManifest() throws IOException {
         Path manifestPath = Path.of(settings.krasWorkDir(), settings.orgCode(), "_manifest.json");
         if (!Files.exists(manifestPath)) {

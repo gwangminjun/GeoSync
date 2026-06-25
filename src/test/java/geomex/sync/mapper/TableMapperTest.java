@@ -25,18 +25,6 @@ class TableMapperTest {
     }
 
     @Test
-    void loadsKaisBaseTables() {
-        List<SyncTableDef> tables = mapper.load("../GEOMEX-SYNC-HOME/conf/kais/base-tables.xml");
-
-        assertThat(tables).isNotEmpty();
-        SyncTableDef buld = tables.stream()
-                .filter(t -> t.tgtTableName.equals("ods.tl_spbd_buld"))
-                .findFirst().orElseThrow();
-
-        assertThat(buld.hasGeometry()).isTrue();
-    }
-
-    @Test
     void buildUpsertSqlContainsOnConflict() {
         List<SyncTableDef> tables = mapper.load("../GEOMEX-SYNC-HOME/conf/kras/base-tables.xml");
         SyncTableDef cbnd = tables.stream()

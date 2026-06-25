@@ -76,16 +76,18 @@ public class SettingsController {
             try {
                 String content = Files.readString(configFile, StandardCharsets.UTF_8);
                 Map<String, Object> root = readYamlRoot(content);
-                Map<String, Object> ods = childMap(root, "ods");
-                values.put("kras_url",         extractYamlValue(content, "url",        "kras"));
-                values.put("kras_conn_sys_id", extractYamlValue(content, "conn-sys-id","kras"));
-                values.put("kras_chk_pnu",     extractYamlValue(content, "chk-pnu",   "kras"));
-                values.put("kras_schedule",    extractYamlValue(content, "schedule",   "kras"));
-                values.put("ods_schema",       yamlValue(ods, "schema", "ods"));
-                values.put("kais_work_dir",    extractYamlValue(content, "work-dir",   "kais"));
-                values.put("kais_schedule",    extractYamlValue(content, "schedule",   "kais"));
+                // SnakeYAML 파싱 결과를 직접 사용 (백슬래시 이스케이프 문제 방지)
+                Map<String, Object> kras = childMap(root, "kras");
+                Map<String, Object> ods  = childMap(root, "ods");
+                values.put("kras_url",         yamlValue(kras, "url",        ""));
+                values.put("kras_conn_sys_id", yamlValue(kras, "conn-sys-id",""));
+                values.put("kras_chk_pnu",     yamlValue(kras, "chk-pnu",   ""));
+                values.put("kras_work_dir",    yamlValue(kras, "work-dir",   ""));
+                values.put("kras_schedule",    yamlValue(kras, "schedule",   ""));
+                values.put("ods_schema",       yamlValue(ods,  "schema",     "ods"));
+                Map<String, Object> sync = childMap(root, "sync");
+                values.put("sync_org_code",    yamlValue(sync, "org-code",   orgCode));
 
-                // chk-pnu fallback
                 if (values.get("kras_chk_pnu").isEmpty()) {
                     values.put("kras_chk_pnu", defaultChkPnu);
                 }
@@ -96,6 +98,7 @@ public class SettingsController {
             }
         }
         values.putIfAbsent("ods_schema", "ods");
+        values.putIfAbsent("sync_org_code", orgCode);
 
         model.addAttribute("currentPage", "settings");
         model.addAttribute("configPath", configFile.toAbsolutePath().toString());
@@ -380,16 +383,18 @@ public class SettingsController {
             break;
         }
 
+        String krasSched = safe(p.get("kras_schedule"));
+
         sb.append("kras:\n")
           .append("  url: ").append(yaml(p.get("kras_url"))).append("\n")
           .append("  conn-sys-id: ").append(yaml(p.get("kras_conn_sys_id"))).append("\n")
           .append("  chk-pnu: ").append(yaml(p.get("kras_chk_pnu"))).append("\n")
-          .append("  schedule: ").append(yaml(p.get("kras_schedule"))).append("\n\n")
-          .append("kais:\n")
-          .append("  work-dir: ").append(yaml(p.get("kais_work_dir"))).append("\n")
-          .append("  schedule: ").append(yaml(p.get("kais_schedule"))).append("\n\n")
+          .append("  work-dir: ").append(yaml(safe(p.get("kras_work_dir")).isEmpty() ? "./workspace/kras" : p.get("kras_work_dir"))).append("\n")
+          .append("  schedule: ").append(yaml(krasSched.isEmpty() ? "0 30 4 * * *" : krasSched)).append("\n\n")
           .append("ods:\n")
           .append("  schema: ").append(yaml(safe(p.get("ods_schema")).isEmpty() ? "ods" : p.get("ods_schema"))).append("\n\n")
+          .append("sync:\n")
+          .append("  org-code: ").append(yaml(safe(p.get("sync_org_code")).isEmpty() ? "46870" : p.get("sync_org_code"))).append("\n\n")
           .append("targets:\n");
 
         for (int i = 0; i < count; i++) {

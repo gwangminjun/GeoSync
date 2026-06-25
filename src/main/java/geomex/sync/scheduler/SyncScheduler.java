@@ -1,6 +1,5 @@
 package geomex.sync.scheduler;
 
-import geomex.sync.worker.KaisWorker;
 import geomex.sync.worker.KrasWorker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,20 +17,16 @@ public class SyncScheduler {
     private static final Logger log = LoggerFactory.getLogger(SyncScheduler.class);
 
     private final KrasWorker krasWorker;
-    private final KaisWorker kaisWorker;
 
-    // 중복 실행 방지 플래그
     private final AtomicBoolean krasRunning = new AtomicBoolean(false);
-    private final AtomicBoolean kaisRunning = new AtomicBoolean(false);
     private final AtomicBoolean krasCollectRunning = new AtomicBoolean(false);
     private final AtomicBoolean krasLoadRunning = new AtomicBoolean(false);
 
     @Value("${sync.enabled:true}")
     private boolean syncEnabled;
 
-    public SyncScheduler(KrasWorker krasWorker, KaisWorker kaisWorker) {
+    public SyncScheduler(KrasWorker krasWorker) {
         this.krasWorker = krasWorker;
-        this.kaisWorker = kaisWorker;
     }
 
     public void runKras() {
@@ -47,19 +42,6 @@ public class SyncScheduler {
         }
     }
 
-    public void runKais() {
-        if (!syncEnabled) return;
-        if (!kaisRunning.compareAndSet(false, true)) {
-            log.warn("[KAIS] 이전 작업 진행 중 — 스킵");
-            return;
-        }
-        try {
-            kaisWorker.run();
-        } finally {
-            kaisRunning.set(false);
-        }
-    }
-
     public void runKrasCollect() {
         if (!syncEnabled) return;
         if (!krasCollectRunning.compareAndSet(false, true)) {
@@ -70,6 +52,19 @@ public class SyncScheduler {
             krasWorker.runCollect();
         } finally {
             krasCollectRunning.set(false);
+        }
+    }
+
+    public void runKrasScheduledLoad() {
+        if (!syncEnabled) return;
+        if (!krasLoadRunning.compareAndSet(false, true)) {
+            log.warn("[KRAS] 적재 이미 진행 중 — 스킵");
+            return;
+        }
+        try {
+            krasWorker.runScheduledLoad();
+        } finally {
+            krasLoadRunning.set(false);
         }
     }
 
@@ -107,15 +102,22 @@ public class SyncScheduler {
         }
     }
 
-    // 웹 UI 수동 트리거용 (별도 스레드, AtomicBoolean 동일 적용)
-    @Async
-    public void triggerKrasAsync() {
-        runKras();
+    public void runKrasDirectLoad(List<Integer> targetIndices, Map<Integer, String> schemaMap) {
+        if (!syncEnabled) return;
+        if (!krasLoadRunning.compareAndSet(false, true)) {
+            log.warn("[KRAS] 적재 이미 진행 중 — 스킵");
+            return;
+        }
+        try {
+            krasWorker.runDirectLoad(targetIndices, schemaMap);
+        } finally {
+            krasLoadRunning.set(false);
+        }
     }
 
     @Async
-    public void triggerKaisAsync() {
-        runKais();
+    public void triggerKrasAsync() {
+        runKras();
     }
 
     @Async
@@ -141,5 +143,10 @@ public class SyncScheduler {
     @Async
     public void triggerKrasLoadAsync(List<Integer> targetIndices, Map<Integer, String> schemaMap, java.util.Set<String> fileFilter) {
         runKrasLoad(targetIndices, schemaMap, fileFilter);
+    }
+
+    @Async
+    public void triggerKrasDirectLoadAsync(List<Integer> targetIndices, Map<Integer, String> schemaMap) {
+        runKrasDirectLoad(targetIndices, schemaMap);
     }
 }

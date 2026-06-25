@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+
+<head>
+  <title>스케줄</title>
+</head>
+
+<th:block layout:fragment="head">
+<style>
+  .card{background:#1b2029;border:1px solid #232a34;border-radius:14px;padding:26px 28px;margin-bottom:20px;}
+  .card-title{font-size:16px;font-weight:700;color:#e7eaee;margin-bottom:20px;display:flex;align-items:center;gap:10px;}
+  .badge{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:600;}
+  .badge-on{background:#0e3530;color:#3dddd4;}
+  .badge-off{background:#1e242c;color:#69707b;}
+  .meta-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:0;}
+  .meta-row{display:flex;flex-direction:column;gap:4px;padding:13px 0;border-bottom:1px solid #1e242c;}
+  .meta-row:last-child{border-bottom:none;}
+  .meta-label{font-size:11px;color:#69707b;font-weight:500;text-transform:uppercase;letter-spacing:0.04em;}
+  .meta-value{font-size:13.5px;color:#c8cdd4;font-family:'JetBrains Mono',monospace;}
+  .meta-value.accent{color:#3dddd4;}
+  .meta-value.muted{color:#4a5260;}
+  .status-success{color:#4cba7f;}
+  .status-failed{color:#e05c5c;}
+  .status-running{color:#d9b066;}
+  table.map-table{width:100%;border-collapse:collapse;font-size:13px;}
+  table.map-table th{text-align:left;padding:9px 12px;color:#69707b;font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:0.04em;border-bottom:1px solid #232a34;}
+  table.map-table td{padding:9px 12px;border-bottom:1px solid #1a1f28;vertical-align:top;}
+  table.map-table tr:last-child td{border-bottom:none;}
+  table.map-table tr:hover td{background:#1e2430;}
+  .tag{display:inline-block;padding:2px 7px;background:#1a2030;border:1px solid #2a3244;border-radius:5px;font-size:11.5px;font-family:'JetBrains Mono',monospace;color:#9aa5b8;margin:2px 2px 2px 0;}
+  .src-name{color:#8a919c;font-family:'JetBrains Mono',monospace;font-size:12px;}
+  .tgt-name{color:#3dddd4;font-family:'JetBrains Mono',monospace;font-size:12.5px;}
+</style>
+</th:block>
+
+<main layout:fragment="content">
+  <div style="margin-bottom:24px;">
+    <h1 style="font-size:22px;font-weight:700;color:#e7eaee;">스케줄 현황</h1>
+    <p style="margin-top:6px;font-size:13.5px;color:#69707b;">KRAS 자동 적재 일정과 대상 테이블을 확인합니다.</p>
+  </div>
+
+  <!-- KRAS 스케줄 요약 카드 -->
+  <div class="card">
+    <div class="card-title">
+      KRAS 파일 적재 스케줄
+      <span th:if="${krasActive}" class="badge badge-on">
+        <span style="width:6px;height:6px;border-radius:99px;background:#0e9b94;display:inline-block;"></span>활성
+      </span>
+      <span th:unless="${krasActive}" class="badge badge-off">
+        <span style="width:6px;height:6px;border-radius:99px;background:#4a5260;display:inline-block;"></span>비활성
+      </span>
+    </div>
+
+    <div class="meta-grid">
+      <div class="meta-row">
+        <div class="meta-label">Cron 표현식</div>
+        <div th:if="${krasCron != null and !#strings.isEmpty(krasCron) and krasCron != '-'}"
+             class="meta-value accent" th:text="${krasCron}"></div>
+        <div th:unless="${krasCron != null and !#strings.isEmpty(krasCron) and krasCron != '-'}"
+             class="meta-value muted">미설정</div>
+      </div>
+      <div class="meta-row">
+        <div class="meta-label">다음 실행 예정</div>
+        <div th:if="${krasNext != null}" class="meta-value accent"
+             th:text="${#temporals.format(krasNext, 'yyyy-MM-dd HH:mm:ss')}"></div>
+        <div th:unless="${krasNext != null}" class="meta-value muted">—</div>
+      </div>
+      <div class="meta-row">
+        <div class="meta-label">이전 실행 시작</div>
+        <div th:if="${krasLast != null}" class="meta-value"
+             th:text="${#temporals.format(krasLast.startTime(), 'yyyy-MM-dd HH:mm:ss')}"></div>
+        <div th:unless="${krasLast != null}" class="meta-value muted">이력 없음</div>
+      </div>
+      <div class="meta-row">
+        <div class="meta-label">이전 실행 결과</div>
+        <div th:if="${krasLast != null}" class="meta-value"
+             th:classappend="${krasLast.status() == 'SUCCESS'} ? 'status-success' : (${krasLast.status() == 'FAILED'} ? 'status-failed' : 'status-running')"
+             th:text="${krasLast.status() == 'SUCCESS'} ? '성공 (' + ${krasLast.successCount()} + '건)' : (${krasLast.status() == 'FAILED'} ? '실패 (오류 ' + ${krasLast.errorCount()} + '건)' : '실행 중')"></div>
+        <div th:unless="${krasLast != null}" class="meta-value muted">—</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 적재 대상 DB 카드 -->
+  <div class="card">
+    <div class="card-title">적재 대상 데이터베이스</div>
+
+    <div th:if="${#lists.isEmpty(targets)}"
+         style="font-size:13px;color:#4a5260;">활성화된 DB가 없습니다. 설정 페이지에서 targets를 확인하세요.</div>
+
+    <div th:unless="${#lists.isEmpty(targets)}">
+      <table class="map-table">
+        <thead>
+          <tr>
+            <th>이름</th>
+            <th>호스트</th>
+            <th>데이터베이스</th>
+            <th>스키마</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr th:each="db : ${targets}">
+            <td style="color:#c8cdd4;" th:text="${db.name}"></td>
+            <td class="src-name" th:text="${db.host + ':' + db.port}"></td>
+            <td class="tgt-name" th:text="${db.dbname}"></td>
+            <td>
+              <span class="tag" th:text="${odsSchema}"></span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- 적재 대상 테이블 카드 -->
+  <div class="card">
+    <div class="card-title" style="margin-bottom:8px;">
+      적재 대상 테이블
+      <span th:if="${hasManifest}" style="font-size:12px;font-weight:400;color:#69707b;">
+        — 스캔 기준:
+        <span th:text="${manifestCollectedAt != null} ? ${#strings.replace(#strings.substring(manifestCollectedAt, 0, 19), 'T', ' ')} : '알 수 없음'"
+              style="color:#9aa2ad;"></span>
+      </span>
+    </div>
+    <p style="font-size:12.5px;color:#5b626d;margin-bottom:16px;">
+      스케줄 실행 시 아래 파일의 데이터를 해당 테이블에 적재합니다.
+      목록은 <strong style="color:#8a919c;">파일에서 적재 준비</strong> 실행 후 갱신됩니다.
+    </p>
+
+    <div th:if="${hasManifest}">
+      <table class="map-table">
+        <thead>
+          <tr>
+            <th style="width:36%">DB 테이블 (적재 대상)</th>
+            <th style="width:28%">원본 레이어</th>
+            <th>파일</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr th:each="entry : ${tableEntries}">
+            <td class="tgt-name" th:text="${entry.tgtTable()}"></td>
+            <td class="src-name" th:text="${entry.srcTable()}"></td>
+            <td>
+              <span th:each="f : ${entry.files()}" class="tag" th:text="${f} + '.json'"></span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div th:unless="${hasManifest}"
+         style="padding:28px 0;text-align:center;color:#4a5260;font-size:13.5px;">
+      매니페스트 파일이 없습니다.<br>
+      <span style="font-size:12.5px;">대시보드 → <em style="color:#3dddd4;">파일에서 적재 준비</em>를 먼저 실행하세요.</span>
+    </div>
+  </div>
+
+  <!-- 안내 -->
+  <div style="padding:15px 20px;background:#171b21;border:1px solid #232a34;border-radius:10px;font-size:13px;color:#69707b;line-height:1.7;">
+    Cron 표현식 변경은
+    <a th:href="@{/settings}" style="color:#3dddd4;">설정</a> 페이지에서 수정 후 저장하면 즉시 반영됩니다.
+  </div>
+</main>
+
+</html>

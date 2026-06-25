@@ -117,9 +117,11 @@ tasks.register('jlinkZip', Zip) {
         into 'lib'
         include 'libgpkiapi_jni.jar'
     }
+    from('workspace') {
+        into 'workspace'
+        include '**/.gitkeep'
+    }
     into('KAIS_WORK') {}
-    into('gpki') {}
-    into('gpki/native') {}
     into('logs') {}
 }
 

@@ -11,27 +11,27 @@ class OdsTableDdlTest {
 
     @Test
     void rewritesTargetSchemaWithoutChangingTableBody() throws Exception {
-        String ddlScript = Files.readString(Path.of("conf/sql/sync_tables.sql"));
+        String ddlScript = Files.readString(Path.of("conf/sql/sync_public_tables.sql"));
 
-        String ddl = OdsTableDdl.rewriteCreateTable(ddlScript, "custom_schema.tl_spbd_buld")
+        String ddl = OdsTableDdl.rewriteCreateTable(ddlScript, "custom_schema.lt_c_uzone")
                 .orElseThrow();
 
-        assertThat(ddl).startsWith("CREATE TABLE IF NOT EXISTS custom_schema.tl_spbd_buld");
-        assertThat(ddl).contains("buld_sttus character varying(40)");
-        assertThat(ddl).contains("zip character varying(7)");
-        assertThat(ddl).contains("_geometry geometry(MultiPolygon,5186)");
-        assertThat(ddl).contains("CONSTRAINT tl_spbd_buld_pkey PRIMARY KEY (_gid)");
+        assertThat(ddl).startsWith("CREATE TABLE IF NOT EXISTS custom_schema.lt_c_uzone");
+        assertThat(ddl).contains("layer_code");
+        assertThat(ddl).contains("theme_code");
+        assertThat(ddl).contains("theme_name");
+        assertThat(ddl).contains("geom");
     }
 
     @Test
     void matchesByBaseTableName() throws Exception {
-        String ddlScript = Files.readString(Path.of("conf/sql/sync_tables.sql"));
+        String ddlScript = Files.readString(Path.of("conf/sql/sync_public_tables.sql"));
 
-        String ddl = OdsTableDdl.rewriteCreateTable(ddlScript, "ods.lt_c_uzone")
+        String ddl = OdsTableDdl.rewriteCreateTable(ddlScript, "ods.lp_pa_cbnd")
                 .orElseThrow();
 
-        assertThat(ddl).contains("remark character varying(100)");
-        assertThat(ddl).contains("alias character varying(100)");
-        assertThat(ddl).contains("uname character varying(100)");
+        assertThat(ddl).contains("pnu");
+        assertThat(ddl).contains("jibun");
+        assertThat(ddl).contains("geom");
     }
 }

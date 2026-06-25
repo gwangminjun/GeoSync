@@ -37,7 +37,6 @@ public class OdsController {
         model.addAttribute("currentPage", "ods");
         model.addAttribute("orgCode", orgCode);
         model.addAttribute("krasRunning", statusService.isRunning("KRAS"));
-        model.addAttribute("kaisRunning", statusService.isRunning("KAIS"));
         model.addAttribute("targets", targetDbService.getConfiguredTargets());
         return "ods";
     }

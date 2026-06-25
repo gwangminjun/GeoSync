@@ -8,7 +8,7 @@ import java.nio.file.Path;
 public class KrasGpkiProperties {
     private boolean enabled;
     private String id = "";
-    private String homeDir = "./gpki";
+    private String homeDir = "./lib";
     private String passwordFile = "password.txt";
     private String password = "";
     private boolean decryptResponse = true;

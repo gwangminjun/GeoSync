@@ -37,9 +37,6 @@ public class RuntimeSettingsService {
     @Value("${kras.schedule:0 30 4 * * *}")
     private String defaultKrasSchedule;
 
-    @Value("${kais.schedule:0 30 3 * * *}")
-    private String defaultKaisSchedule;
-
     @Value("${ods.schema:ods}")
     private String defaultOdsSchema;
 
@@ -72,15 +69,21 @@ public class RuntimeSettingsService {
     }
 
     public String krasWorkDir() {
-        return str(child("kras").get("work-dir"), defaultKrasWorkDir);
+        String dir = str(child("kras").get("work-dir"), defaultKrasWorkDir);
+        // kras.work-dir에 orgCode가 이미 포함된 경우 제거 (호출부에서 항상 orgCode를 붙이므로 중복 방지)
+        String org = orgCode();
+        if (org != null && !org.isBlank()) {
+            if (dir.endsWith("/" + org))  return dir.substring(0, dir.length() - org.length() - 1);
+            if (dir.endsWith("\\" + org)) return dir.substring(0, dir.length() - org.length() - 1);
+        }
+        return dir;
     }
 
     public String krasSchedule() {
-        return str(child("kras").get("schedule"), defaultKrasSchedule);
-    }
-
-    public String kaisSchedule() {
-        return str(child("kais").get("schedule"), defaultKaisSchedule);
+        // @Value 기본값은 YAML에 schedule: "" 저장 시 Spring이 빈 문자열로 주입해 무효화됨
+        // → 빈 경우 항상 하드코딩 fallback 사용
+        String v = str(child("kras").get("schedule"), defaultKrasSchedule);
+        return v.isBlank() ? "0 30 4 * * *" : v;
     }
 
     public String odsSchema() {

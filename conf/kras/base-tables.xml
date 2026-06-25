@@ -2,20 +2,36 @@
 <sync-tables>
 
     <!-- 용도지역지구 (USEZONE - 복수 레이어, API에서 목록 조회 후 처리) -->
+    <!-- ulyr: 레이어명/파일명에서 추출 (예: LSMD_CONT_UB201 → UB201), API 응답에도 포함될 수 있음 -->
+    <!-- ucode, uname: KRAS API 응답 필드 (SHP에는 없음) -->
     <table type='MULTIPOLYGON'>
         <src-table-name>USEZONE:LSMD_CONT_XXXXX</src-table-name>
         <tgt-table-name>ods.lt_c_uzone</tgt-table-name>
         <columns>
             <column><src name='mnum' type='STRING' size='33' /></column>
+            <column><src name='remark' type='STRING' size='100' /></column>
+            <column><src name='alias' type='STRING' size='100' /></column>
+            <column>
+                <src name='ucode' type='STRING' size='6' />
+                <tgt name='theme_code' type='STRING' size='6' />
+            </column>
+            <column>
+                <src name='uname' type='STRING' size='100' />
+                <tgt name='theme_name' type='STRING' size='100' />
+            </column>
+            <column>
+                <src name='ulyr' type='STRING' size='5' />
+                <tgt name='layer_code' type='STRING' size='5' />
+            </column>
             <column>
                 <src name='geometry' type='MULTIPOLYGON' size='0' />
-                <tgt name='_geometry' type='MULTIPOLYGON' size='0' />
+                <tgt name='geom' type='MULTIPOLYGON' size='0' />
             </column>
         </columns>
     </table>
 
     <!-- 토지기본정보 -->
-    <table type='ATTRIBUTE'>
+    <table type='ATTRIBUTE' disabled='true'>
         <src-table-name>ABPM_LAND_FRST_LEDG</src-table-name>
         <tgt-table-name>ods.land_frst_ledg</tgt-table-name>
         <columns>
@@ -46,7 +62,7 @@
     </table>
 
     <!-- 건물통합 -->
-    <table type='MULTIPOLYGON'>
+    <table type='MULTIPOLYGON' disabled='true'>
         <src-table-name>F_FAC_BUILDING</src-table-name>
         <tgt-table-name>ods.f_fac_building</tgt-table-name>
         <columns>
@@ -84,7 +100,7 @@
     </table>
 
     <!-- 건물 (도로명주소) -->
-    <table type='MULTIPOLYGON'>
+    <table type='MULTIPOLYGON' disabled='true'>
         <src-table-name>TL_SPBD_BULD</src-table-name>
         <tgt-table-name>ods.tl_spbd_buld</tgt-table-name>
         <columns>
@@ -134,7 +150,7 @@
     </table>
 
     <!-- 출입구 (도로명주소) -->
-    <table type='POINT'>
+    <table type='POINT' disabled='true'>
         <src-table-name>TL_SPBD_ENTRC</src-table-name>
         <tgt-table-name>ods.tl_spbd_entrc</tgt-table-name>
         <columns>
@@ -153,7 +169,7 @@
     </table>
 
     <!-- 장비구역 (도로명주소) -->
-    <table type='MULTIPOLYGON'>
+    <table type='MULTIPOLYGON' disabled='true'>
         <src-table-name>TL_SPBD_EQB</src-table-name>
         <tgt-table-name>ods.tl_spbd_eqb</tgt-table-name>
         <columns>
@@ -174,7 +190,7 @@
     </table>
 
     <!-- 접촉점 (도로명주소) -->
-    <table type='MULTILINESTRING'>
+    <table type='MULTILINESTRING' disabled='true'>
         <src-table-name>TL_SPOT_CNTC</src-table-name>
         <tgt-table-name>ods.tl_spot_cntc</tgt-table-name>
         <columns>
@@ -193,7 +209,7 @@
     </table>
 
     <!-- 시설위치 (도로명주소) -->
-    <table type='POINT'>
+    <table type='POINT' disabled='true'>
         <src-table-name>TL_SPOT_FCLTYLC</src-table-name>
         <tgt-table-name>ods.tl_spot_fcltylc</tgt-table-name>
         <columns>
@@ -217,7 +233,7 @@
     </table>
 
     <!-- 교차로 (도로명주소) -->
-    <table type='POINT'>
+    <table type='POINT' disabled='true'>
         <src-table-name>TL_SPRD_CRSRD</src-table-name>
         <tgt-table-name>ods.tl_sprd_crsrd</tgt-table-name>
         <columns>
@@ -236,7 +252,7 @@
     </table>
 
     <!-- 구간 (도로명주소) -->
-    <table type='MULTILINESTRING'>
+    <table type='MULTILINESTRING' disabled='true'>
         <src-table-name>TL_SPRD_INTRVL</src-table-name>
         <tgt-table-name>ods.tl_sprd_intrvl</tgt-table-name>
         <columns>
@@ -259,7 +275,7 @@
     </table>
 
     <!-- 도로관리 (도로명주소) -->
-    <table type='MULTILINESTRING'>
+    <table type='MULTILINESTRING' disabled='true'>
         <src-table-name>TL_SPRD_MANAGE</src-table-name>
         <tgt-table-name>ods.tl_sprd_manage</tgt-table-name>
         <columns>
@@ -299,7 +315,7 @@
     </table>
 
     <!-- 도로구역 (도로명주소) -->
-    <table type='MULTIPOLYGON'>
+    <table type='MULTIPOLYGON' disabled='true'>
         <src-table-name>TL_SPRD_RW</src-table-name>
         <tgt-table-name>ods.tl_sprd_rw</tgt-table-name>
         <columns>
@@ -316,7 +332,7 @@
     </table>
 
     <!-- 공시지가 -->
-    <table type='ATTRIBUTE'>
+    <table type='ATTRIBUTE' disabled='true'>
         <src-table-name>ABPD_PANN_JIGA</src-table-name>
         <tgt-table-name>ods.anvm_jiga</tgt-table-name>
         <columns>

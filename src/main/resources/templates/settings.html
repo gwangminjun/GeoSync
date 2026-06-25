@@ -140,6 +140,22 @@
     <div style="display:flex;flex-direction:column;gap:14px;">
       <div class="gs-section">KRAS</div>
 
+      <!-- 기관코드 + 작업 디렉토리 -->
+      <div style="display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap;">
+        <div style="max-width:160px;flex-shrink:0;">
+          <label class="gs-label">기관코드</label>
+          <input class="gs-input mono" type="text" name="sync_org_code" id="sync_org_code"
+                 th:value="${values['sync_org_code']}" placeholder="46870">
+          <div style="font-size:11px;color:#5b626d;margin-top:4px;">KRAS API 및 데이터 식별에 사용</div>
+        </div>
+        <div style="flex:1;min-width:280px;">
+          <label class="gs-label">SHP 파일 작업 디렉토리</label>
+          <input class="gs-input mono" type="text" name="kras_work_dir" id="kras_work_dir"
+                 th:value="${values['kras_work_dir']}" placeholder="./workspace/kras">
+          <div style="font-size:11.5px;color:#5b626d;margin-top:5px;">SHP/TXT 파일을 넣을 폴더. 실제 파일 위치는 이 경로/{기관코드}/ 입니다.</div>
+        </div>
+      </div>
+
       <!-- URL + 연결ID + 연결테스트 -->
       <div style="display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap;">
         <div style="flex:3;min-width:220px;">
@@ -180,31 +196,6 @@
 
     </div>
 
-    <!-- ── KAIS ── -->
-    <div style="display:flex;flex-direction:column;gap:14px;">
-      <div class="gs-section">KAIS</div>
-      <div style="flex:2;min-width:220px;">
-        <label class="gs-label">KAIS 작업 디렉토리</label>
-        <input class="gs-input mono" type="text" name="kais_work_dir"
-               th:value="${values['kais_work_dir']}" placeholder="./KAIS_WORK">
-      </div>
-
-      <!-- 스케줄 -->
-      <div>
-        <label class="gs-label">실행 스케줄</label>
-        <div class="sched-wrap">
-          <span style="font-size:13px;color:#9aa2ad;">매일</span>
-          <input type="time" class="gs-input sched-time" id="kais_time">
-          <span style="font-size:13px;color:#9aa2ad;">실행</span>
-          <span class="sched-cron" id="kais_cron_display">-</span>
-          <span class="sched-toggle" onclick="toggleRaw('kais')">고급 설정</span>
-          <input type="text" class="gs-input mono sched-raw" id="kais_raw"
-                 placeholder="0 30 3 * * *">
-          <input type="hidden" name="kais_schedule" id="kais_schedule">
-        </div>
-      </div>
-    </div>
-
     <!-- 저장 버튼 -->
     <div style="display:flex;gap:10px;padding-top:4px;">
       <button type="submit" class="btn-teal">저장</button>
@@ -222,7 +213,6 @@
   /* ── 초기값 (Thymeleaf 주입) ───────────────────────────────── */
   let rowCount   = [[${#lists.size(targets)}]];
   const initKrasCron = [[${values['kras_schedule']}]] || '';
-  const initKaisCron = [[${values['kais_schedule']}]] || '';
 
   /* ── cron ↔ time 변환 ─────────────────────────────────────── */
   function timeToCron(t) {
@@ -242,7 +232,13 @@
     return null;
   }
 
+  const SCHED_DEFAULTS = { kras: '04:30' };
+
   function initSchedule(key, cron) {
+    // CSS 클래스로 숨겨진 raw 입력을 inline style로도 명시해야
+    // toggleRaw/submit 핸들러의 style.display 체크가 정상 동작함
+    document.getElementById(key + '_raw').style.display = 'none';
+
     const time = cronToTime(cron);
     if (time) {
       document.getElementById(key + '_time').value = time;
@@ -251,6 +247,13 @@
     } else if (cron) {
       // 단순 daily 아님 → 고급 모드로 초기화
       showRaw(key, cron);
+    } else {
+      // 저장된 cron 없음 → 기본 시간 표시 (빈 폼 저장 방지)
+      const defTime = SCHED_DEFAULTS[key] || '04:30';
+      const defCron = timeToCron(defTime);
+      document.getElementById(key + '_time').value = defTime;
+      document.getElementById(key + '_cron_display').textContent = defCron;
+      document.getElementById(key + '_schedule').value = defCron;
     }
   }
 
@@ -308,7 +311,7 @@
 
   /* ── 폼 제출 전 cron 값 확정 ───────────────────────────────── */
   document.getElementById('settings-form').addEventListener('submit', function() {
-    ['kras','kais'].forEach(key => {
+    ['kras'].forEach(key => {
       const rawEl  = document.getElementById(key + '_raw');
       const timeEl = document.getElementById(key + '_time');
       const hidden = document.getElementById(key + '_schedule');
@@ -462,15 +465,10 @@
 
   document.addEventListener('DOMContentLoaded', function() {
     initSchedule('kras', initKrasCron);
-    initSchedule('kais', initKaisCron);
 
     document.getElementById('kras_time').addEventListener('change', () => updateCron('kras'));
-    document.getElementById('kais_time').addEventListener('change', () => updateCron('kais'));
     document.getElementById('kras_raw').addEventListener('input', function() {
       document.getElementById('kras_schedule').value = this.value;
-    });
-    document.getElementById('kais_raw').addEventListener('input', function() {
-      document.getElementById('kais_schedule').value = this.value;
     });
   });
 </script>

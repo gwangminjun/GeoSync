@@ -23,6 +23,7 @@ public class TableMapper {
         try {
             Document doc = new SAXBuilder().build(new File(configPath));
             for (Element tableEl : doc.getRootElement().getChildren("table")) {
+                if ("true".equalsIgnoreCase(tableEl.getAttributeValue("disabled"))) continue;
                 result.add(parseTable(tableEl));
             }
         } catch (Exception e) {

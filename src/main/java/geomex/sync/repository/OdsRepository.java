@@ -16,8 +16,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 @Repository
@@ -25,14 +27,21 @@ public class OdsRepository {
 
     private static final Logger log = LoggerFactory.getLogger(OdsRepository.class);
     private static final Pattern SAFE_IDENTIFIER = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
-    private static final int BATCH_SIZE = 500;
+
+    /** XML tgtName → 실제 DB 컬럼명 별칭 (sync_public_tables.sql 기준) */
+    private static final Map<String, String> COLUMN_ALIASES = Map.of(
+        "layer_code", "ulyr",
+        "theme_code", "ucode",
+        "theme_name", "uname"
+    );
+    private static final int BATCH_SIZE = 3000;
 
     private final JdbcTemplate jdbc;
     private final TargetTableNameService tableNameService;
     private final SyncStatusService statusService;
 
-    @Value("${ods.ddl:conf/sql/sync_tables.sql}")
-    private String ddlPath;
+    @Value("${ods.public-ddl:conf/sql/sync_public_tables.sql}")
+    private String publicDdlPath;
 
     public OdsRepository(JdbcTemplate jdbc, TargetTableNameService tableNameService,
                          SyncStatusService statusService) {
@@ -69,10 +78,11 @@ public class OdsRepository {
         String databaseName = currentDatabase(targetJdbc);
 
         try {
-            String ddlScript = Files.readString(Path.of(ddlPath), StandardCharsets.UTF_8);
+            String schemaDdlPath = ddlPathForSchema(schema);
+            String ddlScript = Files.readString(Path.of(schemaDdlPath), StandardCharsets.UTF_8);
             List<OdsTableDdl.CreateTable> tables = OdsTableDdl.createTables(ddlScript);
             if (tables.isEmpty()) {
-                throw new IllegalStateException("No CREATE TABLE statements found in " + ddlPath);
+                throw new IllegalStateException("No CREATE TABLE statements found in " + schemaDdlPath);
             }
 
             targetJdbc.execute("CREATE SCHEMA IF NOT EXISTS " + sqlSchema);
@@ -91,7 +101,7 @@ public class OdsRepository {
             }
 
             log.info("[{}] database={} recreated {} tables from {}",
-                    schema, databaseName, tables.size(), ddlPath);
+                    schema, databaseName, tables.size(), schemaDdlPath);
         } catch (Exception e) {
             throw new IllegalStateException("Failed to recreate schema tables for "
                     + databaseName + "." + schema + ": " + e.getMessage(), e);
@@ -112,31 +122,45 @@ public class OdsRepository {
     public int replaceAllTo(JdbcTemplate targetJdbc, SyncTableDef def, String orgCode,
                             int sourceEpsg, int storageEpsg, List<Map<String, Object>> rows,
                             String schemaOverride, String progressType) {
+        return replaceAllTo(targetJdbc, def, orgCode, sourceEpsg, storageEpsg, rows,
+                schemaOverride, progressType, false);
+    }
+
+    public int replaceAllTo(JdbcTemplate targetJdbc, SyncTableDef def, String orgCode,
+                            int sourceEpsg, int storageEpsg, List<Map<String, Object>> rows,
+                            String schemaOverride, String progressType, boolean tableAlreadyCreated) {
         String targetTableName = tableNameService.resolve(def.tgtTableName, schemaOverride);
         String sqlTableName = qualifiedTableName(targetTableName);
         String databaseName = currentDatabase(targetJdbc);
         log.info("[{}] database={} org_cd={} save start (rows={})",
                 targetTableName, databaseName, orgCode, rows.size());
 
-        ensureTableExists(targetJdbc, targetTableName, sqlTableName, def, storageEpsg);
-        log.info("[{}] database={} table verified", targetTableName, databaseName);
+        if (!tableAlreadyCreated) {
+            ensureTableExists(targetJdbc, targetTableName, sqlTableName, def, storageEpsg);
+            log.info("[{}] database={} table verified", targetTableName, databaseName);
+        }
+        Set<String> targetColumns = tableColumns(targetJdbc, targetTableName);
 
-        String deleteSql = "DELETE FROM " + sqlTableName + " WHERE " + quoteIdent("org_cd") + " = ?";
         try {
-            targetJdbc.update(deleteSql, orgCode);
-            log.info("[{}] org_cd={} old rows deleted", targetTableName, orgCode);
+            if (targetColumns.contains("org_cd")) {
+                String deleteSql = "DELETE FROM " + sqlTableName + " WHERE " + quoteIdent("org_cd") + " = ?";
+                targetJdbc.update(deleteSql, orgCode);
+                log.info("[{}] org_cd={} old rows deleted", targetTableName, orgCode);
+            } else {
+                targetJdbc.update("DELETE FROM " + sqlTableName);
+                log.info("[{}] old rows deleted", targetTableName);
+            }
         } catch (Exception e) {
             log.warn("[{}] DELETE skipped: {}", targetTableName, e.getMessage());
         }
 
         if (rows.isEmpty()) return 0;
 
-        String insertSql = buildInsertSql(def, sqlTableName, sourceEpsg, storageEpsg);
-        boolean hasOrgCd = def.columns.stream().anyMatch(c -> "org_cd".equals(c.tgtName));
+        InsertPlan insertPlan = buildInsertPlan(def, sqlTableName, sourceEpsg, storageEpsg, targetColumns);
 
         List<Object[]> allParams = new ArrayList<>(rows.size());
         for (Map<String, Object> row : rows) {
-            allParams.add(buildParams(def, row, orgCode, hasOrgCd));
+            allParams.add(buildParams(insertPlan, row, orgCode));
         }
 
         int count = 0;
@@ -148,9 +172,9 @@ public class OdsRepository {
             int end = Math.min(start + BATCH_SIZE, allParams.size());
             List<Object[]> batch = allParams.subList(start, end);
             try {
-                targetJdbc.batchUpdate(insertSql, batch);
+                targetJdbc.batchUpdate(insertPlan.sql(), batch);
                 count += batch.size();
-                log.info("[{}] org_cd={} INSERT progress {}/{}", targetTableName, orgCode, count, rows.size());
+                log.debug("[{}] INSERT progress {}/{}", targetTableName, count, rows.size());
             } catch (Exception e) {
                 failCount += batch.size();
                 if (firstFailure == null) firstFailure = e;
@@ -197,7 +221,7 @@ public class OdsRepository {
 
         try {
             targetJdbc.execute("CREATE SCHEMA IF NOT EXISTS " + sqlSchema);
-            String ddlScript = Files.readString(Path.of(ddlPath), StandardCharsets.UTF_8);
+            String ddlScript = Files.readString(Path.of(ddlPathForSchema(schema)), StandardCharsets.UTF_8);
             String ddl = OdsTableDdl.rewriteCreateTable(ddlScript, targetTableName, sqlTableName)
                     .orElseThrow(() -> new IllegalStateException("DDL not found: " + baseName));
             targetJdbc.execute(ddl);
@@ -274,6 +298,10 @@ public class OdsRepository {
         return odsSchema != null && !odsSchema.isBlank() ? odsSchema.trim() : "ods";
     }
 
+    private String ddlPathForSchema(String schema) {
+        return publicDdlPath;
+    }
+
     private String toSqlType(ColumnDef col) {
         return switch (col.type.toUpperCase()) {
             case "LONG", "INT", "INTEGER" -> "NUMERIC(20,0)";
@@ -283,17 +311,25 @@ public class OdsRepository {
     }
 
     private String buildInsertSql(SyncTableDef def, String sqlTableName, int sourceEpsg, int storageEpsg) {
+        return buildInsertPlan(def, sqlTableName, sourceEpsg, storageEpsg, null).sql();
+    }
+
+    private InsertPlan buildInsertPlan(SyncTableDef def, String sqlTableName, int sourceEpsg, int storageEpsg,
+                                       Set<String> targetColumns) {
         List<ColumnDef> cols = def.columns;
 
         StringBuilder colList = new StringBuilder();
         StringBuilder valList = new StringBuilder();
+        List<InsertParam> params = new ArrayList<>();
 
         for (ColumnDef col : cols) {
+            String targetName = resolveInsertColumn(col, targetColumns);
+            if (targetName == null) continue;
             if (!colList.isEmpty()) {
                 colList.append(", ");
                 valList.append(", ");
             }
-            colList.append(quoteIdent(col.tgtName));
+            colList.append(quoteIdent(targetName));
             if (col.isGeometry) {
                 String geomExpr = sourceEpsg != storageEpsg
                         ? "ST_Transform(ST_GeomFromText(?, " + sourceEpsg + "), " + storageEpsg + ")"
@@ -302,29 +338,61 @@ public class OdsRepository {
             } else {
                 valList.append("?");
             }
+            params.add(new InsertParam(col.srcName, false));
         }
 
         boolean hasOrgCd = cols.stream().anyMatch(c -> "org_cd".equals(c.tgtName));
-        if (!hasOrgCd) {
+        if (!hasOrgCd && (targetColumns == null || targetColumns.contains("org_cd"))) {
             colList.append(", ").append(quoteIdent("org_cd"));
             valList.append(", ?");
+            params.add(new InsertParam(null, true));
         }
 
-        return "INSERT INTO " + sqlTableName + " (" + colList + ") VALUES (" + valList + ")";
+        return new InsertPlan("INSERT INTO " + sqlTableName + " (" + colList + ") VALUES (" + valList + ")",
+                params);
     }
 
-    private Object[] buildParams(SyncTableDef def, Map<String, Object> row, String orgCode, boolean hasOrgCd) {
-        List<ColumnDef> cols = def.columns;
-        Object[] params = new Object[cols.size() + (hasOrgCd ? 0 : 1)];
-        int i = 0;
-        for (ColumnDef col : cols) {
-            params[i++] = row.get(col.srcName);
+    private String resolveInsertColumn(ColumnDef col, Set<String> targetColumns) {
+        if (targetColumns == null || targetColumns.contains(col.tgtName.toLowerCase())) {
+            return col.tgtName;
         }
-        if (!hasOrgCd) {
-            params[i] = orgCode;
+        if (col.isGeometry && targetColumns.contains("geom")) {
+            return "geom";
+        }
+        String alias = COLUMN_ALIASES.get(col.tgtName.toLowerCase());
+        if (alias != null && targetColumns.contains(alias)) {
+            return alias;
+        }
+        return null;
+    }
+
+    private Object[] buildParams(InsertPlan plan, Map<String, Object> row, String orgCode) {
+        Object[] params = new Object[plan.params().size()];
+        for (int i = 0; i < plan.params().size(); i++) {
+            InsertParam param = plan.params().get(i);
+            params[i] = param.orgCode() ? orgCode : row.get(param.sourceName());
         }
         return params;
     }
+
+    private Set<String> tableColumns(JdbcTemplate targetJdbc, String targetTableName) {
+        String schema = targetTableName.contains(".")
+                ? targetTableName.substring(0, targetTableName.indexOf('.'))
+                : "public";
+        String baseName = targetTableName.contains(".")
+                ? targetTableName.substring(targetTableName.indexOf('.') + 1)
+                : targetTableName;
+        return new LinkedHashSet<>(targetJdbc.queryForList(
+                "SELECT lower(column_name) FROM information_schema.columns "
+                        + "WHERE table_schema = ? AND table_name = ?",
+                String.class,
+                schema,
+                baseName));
+    }
+
+    private record InsertPlan(String sql, List<InsertParam> params) {}
+
+    private record InsertParam(String sourceName, boolean orgCode) {}
 
     private static String qualifiedTableName(String tableName) {
         String trimmed = tableName.trim();

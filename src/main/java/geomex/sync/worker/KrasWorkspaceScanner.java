@@ -51,8 +51,28 @@ public class KrasWorkspaceScanner {
      * manifest 파일 쓰기 없이 현재 상태를 조회만 한다.
      * 결과 형식: srcTableName → List&lt;fileBaseName&gt;
      */
+    /** 스캔 기본 경로 (orgCode 포함 전체 경로) */
+    public String defaultDirAbsolutePath() {
+        return resolveDir(null).toAbsolutePath().toString();
+    }
+
+    public String orgCode() {
+        return settings.orgCode();
+    }
+
+    /**
+     * customDir이 지정된 경우 해당 경로를 그대로 사용 (orgCode 미추가).
+     * 지정하지 않은 경우 kras.work-dir + orgCode를 기본 경로로 사용.
+     */
+    private Path resolveDir(String customDir) {
+        if (customDir != null && !customDir.isBlank()) {
+            return Path.of(customDir.trim());
+        }
+        return Path.of(settings.krasWorkDir(), settings.orgCode());
+    }
+
     public Map<String, List<String>> discoverWorkspaceFiles() {
-        Path dir = Path.of(settings.krasWorkDir(), settings.orgCode());
+        Path dir = resolveDir(null);
         Map<String, List<String>> result = new LinkedHashMap<>();
         if (!Files.isDirectory(dir)) return result;
 
@@ -82,8 +102,34 @@ public class KrasWorkspaceScanner {
         return result;
     }
 
+    /**
+     * base-tables.xml의 비-USEZONE 테이블 def에 대해 SHP 파일을 직접 읽어 반환한다.
+     * JSON 캐시를 거치지 않고 바로 DB 적재에 사용.
+     */
+    public List<Map<String, Object>> loadTable(SyncTableDef def) {
+        Path dir = resolveDir(null);
+        Set<String> claimed = new LinkedHashSet<>();
+        String baseName = findFile(dir, def, claimed);
+        if (baseName == null) {
+            log.warn("[Scanner] {} 파일 없음 (dir={})", def.srcTableName, dir.toAbsolutePath());
+            return List.of();
+        }
+        try {
+            List<Map<String, Object>> rows = readFile(dir, baseName, def);
+            log.info("[Scanner] {} 직접 읽기: {}건", def.srcTableName, rows.size());
+            return rows;
+        } catch (Exception e) {
+            log.error("[Scanner] {} 읽기 실패: {}", baseName, e.getMessage(), e);
+            return List.of();
+        }
+    }
+
     public ScanResult buildManifest() {
-        Path dir = Path.of(settings.krasWorkDir(), settings.orgCode());
+        return buildManifest(null);
+    }
+
+    public ScanResult buildManifest(String customDir) {
+        Path dir = resolveDir(customDir);
         List<String> messages = new ArrayList<>();
 
         if (!Files.exists(dir)) {
@@ -137,6 +183,7 @@ public class KrasWorkspaceScanner {
                 for (String baseName : candidates) {
                     try {
                         List<Map<String, Object>> rows = readFile(dir, baseName, def);
+                        injectUsezoneCode(rows, baseName, def);
                         if (!rows.isEmpty()) {
                             fileWriter.writeJson(baseName, rows);
                             written.add(baseName);
@@ -152,9 +199,10 @@ public class KrasWorkspaceScanner {
                 if (!written.isEmpty()) {
                     manifest.put(def.srcTableName, written);
                     rowCount += uzRows;
-                    messages.add("✓ USEZONE " + written.size() + "개 파일 (" + uzRows + "건)");
+                    String tgtBase = tgtBaseName(def.tgtTableName);
+                    messages.add("✓ " + tgtBase + " " + written.size() + "개 파일 (" + uzRows + "건)");
                 } else {
-                    messages.add("파일 없음: USEZONE (*.shp)");
+                    messages.add("파일 없음: " + tgtBaseName(def.tgtTableName) + " (lsmd_cont_*.shp)");
                 }
             }
 
@@ -215,11 +263,11 @@ public class KrasWorkspaceScanner {
 
     private List<Map<String, Object>> readShp(Path shpPath, SyncTableDef def) throws Exception {
         ShapefileDataStore store = new ShapefileDataStore(shpPath.toUri().toURL());
-        store.setCharset(Charset.forName("EUC-KR"));
+        store.setCharset(Charset.forName("MS949"));
         WKTWriter wktWriter = new WKTWriter();
         List<Map<String, Object>> rows = new ArrayList<>();
 
-        // 속성 컬럼: SHP 10자 잘림 이름 → srcName 매핑 (대소문자 무시)
+        // 속성 컬럼: SHP 10자 잘림 이름(소문자) → srcName 매핑
         Map<String, String> attrMap = new LinkedHashMap<>();
         ColumnDef geomCol = null;
         for (ColumnDef col : def.columns) {
@@ -235,6 +283,17 @@ public class KrasWorkspaceScanner {
 
         try {
             SimpleFeatureSource src = store.getFeatureSource();
+
+            // SHP 스키마 실제 컬럼명(소문자) → 인덱스 매핑 (DBF는 대문자 저장이 일반적)
+            Map<String, Integer> schemaIndex = new java.util.HashMap<>();
+            var schema = src.getSchema();
+            for (int i = 0; i < schema.getAttributeCount(); i++) {
+                schemaIndex.put(schema.getDescriptor(i).getLocalName().toLowerCase(), i);
+            }
+            if (log.isDebugEnabled()) {
+                log.debug("[Scanner] SHP 스키마 컬럼: {}", schemaIndex.keySet());
+            }
+
             SimpleFeatureCollection coll = src.getFeatures();
             try (SimpleFeatureIterator iter = coll.features()) {
                 while (iter.hasNext()) {
@@ -247,8 +306,8 @@ public class KrasWorkspaceScanner {
                     }
 
                     for (Map.Entry<String, String> e : attrMap.entrySet()) {
-                        Object val = feature.getAttribute(e.getKey());
-                        if (val == null) val = feature.getAttribute(e.getKey().toUpperCase());
+                        Integer idx = schemaIndex.get(e.getKey());
+                        Object val = idx != null ? feature.getAttribute(idx) : null;
                         row.put(e.getValue(), val != null ? val.toString() : null);
                     }
 
@@ -266,7 +325,7 @@ public class KrasWorkspaceScanner {
         List<Map<String, Object>> rows = new ArrayList<>();
         try (BufferedReader br = new BufferedReader(
                 new InputStreamReader(new FileInputStream(txtPath.toFile()),
-                        Charset.forName("EUC-KR")))) {
+                        Charset.forName("MS949")))) {
             String headerLine = br.readLine();
             if (headerLine == null) return rows;
             String[] headers = headerLine.split(",");
@@ -285,8 +344,24 @@ public class KrasWorkspaceScanner {
         return rows;
     }
 
+    // SHP 파일명(예: "lsmd_cont_ub201") → ulyr 코드(예: "UB201") 추출 후 row에 주입
+    private void injectUsezoneCode(List<Map<String, Object>> rows, String baseName, SyncTableDef def) {
+        boolean hasUlyr = def.columns.stream().anyMatch(c -> "ulyr".equals(c.srcName));
+        if (!hasUlyr || rows.isEmpty()) return;
+        int idx = baseName.lastIndexOf('_');
+        String code = idx >= 0 ? baseName.substring(idx + 1).toUpperCase() : baseName.toUpperCase();
+        for (Map<String, Object> row : rows) {
+            row.put("ulyr", code);
+        }
+    }
+
     private static String toFileBaseName(String layerName) {
         String name = layerName.contains(":") ? layerName.substring(layerName.indexOf(':') + 1) : layerName;
         return name.toLowerCase();
+    }
+
+    private static String tgtBaseName(String tgtTableName) {
+        int dot = tgtTableName.lastIndexOf('.');
+        return dot >= 0 ? tgtTableName.substring(dot + 1) : tgtTableName;
     }
 }
