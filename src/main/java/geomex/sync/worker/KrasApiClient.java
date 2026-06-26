@@ -44,6 +44,8 @@ public class KrasApiClient implements DisposableBean {
     /** KRAS 서비스 ID 상수 */
     private static final String SVC_LAYER_LIST = "KRAS000037";
     private static final String SVC_DOWNLOAD   = "KRAS000038";
+    private static final String SVC_JIGA_TXT   = "KRAS000039";
+    private static final String SVC_LAND_TXT   = "KRAS000040";
 
     /** SHP 파일 타입 코드 */
     public static final int FILE_TYPE_SHP = 2;
@@ -188,6 +190,24 @@ public class KrasApiClient implements DisposableBean {
         log.info("[KRAS] SHP 다운로드 완료: {} (shp={}B, dbf={}B, shx={}B)",
                 layerCd, shpData.length, dbfData.length, shxData.length);
         return baseName;
+    }
+
+    // ──────────────────────────────────────────────────────────────────
+    // TXT 다운로드 (KRAS000039 / KRAS000040)
+    // ──────────────────────────────────────────────────────────────────
+
+    /** 공시지가 TXT 다운로드 (KRAS000039) */
+    public byte[] downloadJigaTxt() throws Exception {
+        Map<String, String> params = baseParams(SVC_JIGA_TXT);
+        gpkiService.addAuthentication(params);
+        return postBinary(params);
+    }
+
+    /** 토지대장 TXT 다운로드 (KRAS000040) */
+    public byte[] downloadLandTxt() throws Exception {
+        Map<String, String> params = baseParams(SVC_LAND_TXT);
+        gpkiService.addAuthentication(params);
+        return postBinary(params);
     }
 
     // ──────────────────────────────────────────────────────────────────

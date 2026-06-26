@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}" lang="ko">
+<head>
+<title>파일 내려받기</title>
+<style>
+@keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+</style>
+</head>
+<body>
+<main layout:fragment="content">
+
+  <!-- 헤더 -->
+  <div style="margin-bottom:24px;">
+    <div style="font-size:19px;font-weight:700;color:#f3f5f7;letter-spacing:-0.01em;margin-bottom:6px;">KRAS 파일 내려받기</div>
+    <div style="font-size:12.5px;color:#69707b;">
+      KRAS estateGateway에서 파일을 내려받아 지정한 서버 경로에 저장합니다.
+      SHP 파일은 <span style="color:#66c4be;font-family:monospace;">KRAS000038</span>,
+      공시지가/토지대장 TXT는 <span style="color:#d9b066;font-family:monospace;">KRAS000039/040</span>을 사용합니다.
+    </div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:400px 1fr;gap:20px;align-items:start;">
+
+    <!-- 왼쪽: 설정 패널 -->
+    <div style="display:flex;flex-direction:column;gap:16px;">
+
+      <!-- 저장 경로 -->
+      <div style="background:#1a1f26;border:1px solid #262c35;border-radius:11px;padding:20px;">
+        <div style="font-size:12px;font-weight:600;color:#8a919c;letter-spacing:0.04em;margin-bottom:10px;">저장 경로 (서버 기준)</div>
+        <input type="text" id="outputDir"
+               th:value="${defaultOutputDir}"
+               placeholder="예: /data/kras/46870"
+               style="width:100%;box-sizing:border-box;padding:9px 12px;border-radius:8px;border:1px solid #2e3640;background:#141820;color:#e7eaee;font-size:13px;font-family:'JetBrains Mono',monospace;outline:none;">
+        <div style="font-size:11.5px;color:#5b626d;margin-top:6px;">
+          디렉터리가 없으면 자동 생성됩니다.
+        </div>
+      </div>
+
+      <!-- 다운로드 항목 -->
+      <div style="background:#1a1f26;border:1px solid #262c35;border-radius:11px;padding:20px;">
+        <div style="font-size:12px;font-weight:600;color:#8a919c;letter-spacing:0.04em;margin-bottom:12px;">다운로드 항목</div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+
+          <!-- 연속지적도 SHP -->
+          <label style="display:flex;align-items:flex-start;gap:10px;padding:12px 14px;border:1px solid #2e3640;border-radius:9px;background:#141820;cursor:pointer;">
+            <input type="checkbox" id="chkCbnd" checked
+                   style="margin-top:2px;width:15px;height:15px;accent-color:#66c4be;cursor:pointer;flex-shrink:0;">
+            <div>
+              <div style="font-size:13px;font-weight:600;color:#66c4be;font-family:'JetBrains Mono',monospace;">연속지적도 SHP</div>
+              <div style="font-size:11.5px;color:#69707b;margin-top:2px;">KRAS000038 · LSMD_CONT_LDREG · .shp/.dbf/.shx</div>
+            </div>
+          </label>
+
+          <!-- 용도지역지구 SHP -->
+          <label style="display:flex;align-items:flex-start;gap:10px;padding:12px 14px;border:1px solid #2e3640;border-radius:9px;background:#141820;cursor:pointer;">
+            <input type="checkbox" id="chkUsezone" checked
+                   style="margin-top:2px;width:15px;height:15px;accent-color:#66c4be;cursor:pointer;flex-shrink:0;">
+            <div>
+              <div style="font-size:13px;font-weight:600;color:#66c4be;font-family:'JetBrains Mono',monospace;">용도지역지구 SHP</div>
+              <div style="font-size:11.5px;color:#69707b;margin-top:2px;">KRAS000038 · USEZONE 전체 레이어 · .shp/.dbf/.shx</div>
+              <div style="font-size:11px;color:#45505a;margin-top:2px;">KRAS000037 레이어 목록에서 LSMD_CONT_U* 패턴 자동 탐색</div>
+            </div>
+          </label>
+
+          <!-- 공시지가 TXT -->
+          <label style="display:flex;align-items:flex-start;gap:10px;padding:12px 14px;border:1px solid #2e3640;border-radius:9px;background:#141820;cursor:pointer;">
+            <input type="checkbox" id="chkJiga" checked
+                   style="margin-top:2px;width:15px;height:15px;accent-color:#d9b066;cursor:pointer;flex-shrink:0;">
+            <div>
+              <div style="font-size:13px;font-weight:600;color:#d9b066;font-family:'JetBrains Mono',monospace;">공시지가 TXT</div>
+              <div style="font-size:11.5px;color:#69707b;margin-top:2px;">KRAS000039 · kras_jiga.txt</div>
+            </div>
+          </label>
+
+          <!-- 토지대장 TXT -->
+          <label style="display:flex;align-items:flex-start;gap:10px;padding:12px 14px;border:1px solid #2e3640;border-radius:9px;background:#141820;cursor:pointer;">
+            <input type="checkbox" id="chkLand" checked
+                   style="margin-top:2px;width:15px;height:15px;accent-color:#d9b066;cursor:pointer;flex-shrink:0;">
+            <div>
+              <div style="font-size:13px;font-weight:600;color:#d9b066;font-family:'JetBrains Mono',monospace;">토지대장 TXT</div>
+              <div style="font-size:11.5px;color:#69707b;margin-top:2px;">KRAS000040 · kras_land.txt</div>
+            </div>
+          </label>
+
+        </div>
+        <div id="itemError" style="display:none;color:#e88a82;font-size:12px;margin-top:8px;">항목을 하나 이상 선택하세요.</div>
+      </div>
+
+      <!-- 실행 버튼 -->
+      <button type="button" id="startBtn" onclick="startDownload()"
+              style="width:100%;padding:12px;border-radius:9px;border:none;background:#0e9b94;color:#fff;font-size:14px;font-weight:700;font-family:inherit;cursor:pointer;">
+        내려받기 시작
+      </button>
+    </div>
+
+    <!-- 오른쪽: 진행/결과 패널 -->
+    <div id="resultPanel" style="display:flex;flex-direction:column;gap:16px;">
+
+      <!-- 초기 안내 -->
+      <div id="idleMsg" style="background:#1a1f26;border:1px solid #262c35;border-radius:11px;padding:32px 24px;text-align:center;">
+        <div style="font-size:32px;margin-bottom:12px;">📂</div>
+        <div style="font-size:14px;color:#69707b;">항목을 선택하고 내려받기를 시작하면<br>여기에 진행 상황이 표시됩니다.</div>
+      </div>
+
+      <!-- 진행 중 -->
+      <div id="progressCard" style="display:none;background:#1a1f26;border:1px solid #262c35;border-radius:11px;padding:20px;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+          <div style="width:14px;height:14px;border-radius:50%;border:2px solid #0e9b94;border-top-color:transparent;animation:spin .8s linear infinite;flex-shrink:0;"></div>
+          <span style="font-size:14px;font-weight:600;color:#e7eaee;">다운로드 진행 중</span>
+          <span id="progressCount" style="margin-left:auto;font-size:12px;color:#69707b;font-family:'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;">0 / 0</span>
+        </div>
+        <div style="height:6px;background:#1e242c;border-radius:99px;overflow:hidden;margin-bottom:10px;">
+          <div id="progressBar" style="height:100%;width:0%;background:#0e9b94;transition:width .3s ease;border-radius:99px;"></div>
+        </div>
+        <div id="currentItem" style="font-size:12px;color:#9aa2ad;font-family:'JetBrains Mono',monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></div>
+      </div>
+
+      <!-- 오류 -->
+      <div id="fatalErrorCard" style="display:none;background:#1e1414;border:1px solid #3a2828;border-radius:11px;padding:16px 20px;">
+        <div style="font-size:13px;font-weight:600;color:#e88a82;margin-bottom:4px;">오류 발생</div>
+        <div id="fatalErrorMsg" style="font-size:12.5px;color:#c87070;word-break:break-all;"></div>
+      </div>
+
+      <!-- 결과 목록 -->
+      <div id="resultsCard" style="display:none;background:#1a1f26;border:1px solid #262c35;border-radius:11px;overflow:hidden;">
+        <div style="padding:14px 20px;border-bottom:1px solid #262c35;display:flex;align-items:center;justify-content:space-between;">
+          <div style="font-size:13.5px;font-weight:700;color:#f3f5f7;">다운로드 결과</div>
+          <div id="resultSummary" style="font-size:12px;color:#69707b;"></div>
+        </div>
+        <div id="resultsList" style="display:flex;flex-direction:column;"></div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    var _pollTimer = null;
+
+    function startDownload() {
+      var cbnd    = document.getElementById('chkCbnd').checked;
+      var usezone = document.getElementById('chkUsezone').checked;
+      var jiga    = document.getElementById('chkJiga').checked;
+      var land    = document.getElementById('chkLand').checked;
+      var dir     = document.getElementById('outputDir').value.trim();
+
+      if (!cbnd && !usezone && !jiga && !land) {
+        document.getElementById('itemError').style.display = 'block';
+        return;
+      }
+      document.getElementById('itemError').style.display = 'none';
+
+      if (!dir) {
+        document.getElementById('outputDir').focus();
+        return;
+      }
+
+      var btn = document.getElementById('startBtn');
+      btn.disabled = true;
+      btn.textContent = '요청 중...';
+
+      var params = new URLSearchParams();
+      params.append('outputDir',   dir);
+      params.append('cbndShp',     cbnd);
+      params.append('usezoneShp',  usezone);
+      params.append('jigaTxt',     jiga);
+      params.append('landTxt',     land);
+
+      fetch('/file-download/start', {
+        method: 'POST', body: params,
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+      })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          if (!d.started) {
+            btn.disabled = false;
+            btn.textContent = '내려받기 시작';
+            alert(d.error || '시작 실패');
+            return;
+          }
+          btn.textContent = '다운로드 중...';
+          showProgress();
+          startPolling();
+        })
+        .catch(function(e) {
+          btn.disabled = false;
+          btn.textContent = '내려받기 시작';
+          alert('요청 오류: ' + e);
+        });
+    }
+
+    function showProgress() {
+      document.getElementById('idleMsg').style.display = 'none';
+      document.getElementById('progressCard').style.display = 'block';
+      document.getElementById('fatalErrorCard').style.display = 'none';
+      document.getElementById('resultsCard').style.display = 'none';
+    }
+
+    function startPolling() {
+      if (_pollTimer) return;
+      _pollTimer = setInterval(pollStatus, 1500);
+      pollStatus();
+    }
+
+    function stopPolling() {
+      if (_pollTimer) { clearInterval(_pollTimer); _pollTimer = null; }
+    }
+
+    function pollStatus() {
+      fetch('/file-download/status')
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          updateProgress(d);
+          if (!d.running && d.done) {
+            stopPolling();
+            finalize(d);
+          }
+        })
+        .catch(function() { /* 무시 */ });
+    }
+
+    function updateProgress(d) {
+      var total     = d.total || 0;
+      var completed = d.completed || 0;
+      var pct       = total > 0 ? Math.round(completed / total * 100) : 0;
+      document.getElementById('progressBar').style.width = pct + '%';
+      document.getElementById('progressCount').textContent = completed + ' / ' + total + ' (' + pct + '%)';
+      document.getElementById('currentItem').textContent = d.current || '';
+
+      // 결과 중간 표시
+      renderResults(d.results || []);
+    }
+
+    function finalize(d) {
+      document.getElementById('progressCard').style.display = 'none';
+
+      var btn = document.getElementById('startBtn');
+      btn.disabled = false;
+      btn.textContent = '내려받기 시작';
+
+      if (d.fatalError) {
+        document.getElementById('fatalErrorCard').style.display = 'block';
+        document.getElementById('fatalErrorMsg').textContent = d.fatalError;
+      }
+
+      var results = d.results || [];
+      renderResults(results);
+    }
+
+    function renderResults(results) {
+      if (results.length === 0) return;
+      document.getElementById('resultsCard').style.display = 'block';
+
+      var ok   = results.filter(function(r) { return r.success; }).length;
+      var fail = results.length - ok;
+      var summaryEl = document.getElementById('resultSummary');
+      summaryEl.innerHTML =
+        '<span style="color:#5fc98a;font-weight:600;">' + ok + '개 성공</span>' +
+        (fail > 0 ? ' · <span style="color:#e88a82;font-weight:600;">' + fail + '개 실패</span>' : '');
+
+      var html = '';
+      results.forEach(function(r, i) {
+        var isEven = i % 2 === 0;
+        var bg = isEven ? '#1a1f26' : '#141820';
+        var icon = r.success ? '✓' : '✕';
+        var iconColor = r.success ? '#5fc98a' : '#e88a82';
+        var sizeStr = r.success ? formatBytes(r.bytes) : '';
+        html +=
+          '<div style="display:flex;align-items:flex-start;gap:10px;padding:12px 20px;background:' + bg + ';border-bottom:1px solid #21262e;">' +
+            '<span style="font-size:15px;color:' + iconColor + ';font-weight:700;line-height:1.4;flex-shrink:0;">' + icon + '</span>' +
+            '<div style="flex:1;min-width:0;">' +
+              '<div style="font-size:13px;font-weight:600;color:#e7eaee;font-family:monospace;">' + esc(r.name) + '</div>' +
+              '<div style="font-size:11.5px;color:#5b626d;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + esc(r.filePath) + '">' + esc(r.filePath) + '</div>' +
+              (r.error ? '<div style="font-size:11.5px;color:#e88a82;margin-top:2px;">' + esc(r.error) + '</div>' : '') +
+            '</div>' +
+            (sizeStr ? '<span style="font-size:11.5px;color:#69707b;font-family:monospace;white-space:nowrap;flex-shrink:0;">' + sizeStr + '</span>' : '') +
+          '</div>';
+      });
+      document.getElementById('resultsList').innerHTML = html;
+    }
+
+    function formatBytes(bytes) {
+      if (bytes === 0) return '0 B';
+      if (bytes < 1024) return bytes + ' B';
+      if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+      return (bytes / 1048576).toFixed(1) + ' MB';
+    }
+
+    function esc(s) {
+      return String(s == null ? '' : s)
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    // 페이지 로드 시 이미 실행 중이면 폴링 시작
+    (function() {
+      var downloading = /*[[${downloading}]]*/ false;
+      if (downloading) { showProgress(); startPolling(); }
+    })();
+  </script>
+
+</main>
+</body>
+</html>
