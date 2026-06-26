@@ -441,11 +441,16 @@ public class KrasWorker {
     // ──────────────────────────────────────────────────────────────────
 
     public void runDirectLoad(List<Integer> targetIndices, Map<Integer, String> schemaMap) {
-        runDirectLoad(targetIndices, schemaMap, "MANUAL");
+        runDirectLoad(targetIndices, schemaMap, "MANUAL", null);
     }
 
     public void runDirectLoad(List<Integer> targetIndices, Map<Integer, String> schemaMap, String triggeredBy) {
-        log.info("[KRAS] 직접 적재 시작 (lt_c_uzone=API, lp_pa_cbnd=SHP, triggeredBy={})", triggeredBy);
+        runDirectLoad(targetIndices, schemaMap, triggeredBy, null);
+    }
+
+    public void runDirectLoad(List<Integer> targetIndices, Map<Integer, String> schemaMap,
+                              String triggeredBy, Set<String> tableFilter) {
+        log.info("[KRAS] 직접 적재 시작 (triggeredBy={}, tableFilter={})", triggeredBy, tableFilter);
         Long logId = executionLogService.start("KRAS_LOAD", triggeredBy, settings.krasSchedule());
         usezoneCodeService.refresh();
         statusService.recordStart("KRAS_LOAD");
@@ -462,7 +467,17 @@ public class KrasWorker {
                 return;
             }
 
-            List<SyncTableDef> tableDefs = tableMapper.load(settings.krasConfig());
+            List<SyncTableDef> allDefs = tableMapper.load(settings.krasConfig());
+            List<SyncTableDef> tableDefs;
+            if (tableFilter != null && !tableFilter.isEmpty()) {
+                tableDefs = new ArrayList<>();
+                for (SyncTableDef d : allDefs) {
+                    if (tableFilter.contains(tableBaseName(d.tgtTableName))) tableDefs.add(d);
+                }
+            } else {
+                tableDefs = allDefs;
+            }
+
             boolean apiOk = checkConnection();
             if (!apiOk) log.warn("[KRAS] KRAS API 연결 불가 — SHP 다운로드 불가, 로컬 워크스페이스 파일로 대체");
 

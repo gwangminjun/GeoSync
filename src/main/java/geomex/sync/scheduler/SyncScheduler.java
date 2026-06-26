@@ -108,13 +108,18 @@ public class SyncScheduler {
     }
 
     public void runKrasDirectLoad(List<Integer> targetIndices, Map<Integer, String> schemaMap) {
+        runKrasDirectLoad(targetIndices, schemaMap, null);
+    }
+
+    public void runKrasDirectLoad(List<Integer> targetIndices, Map<Integer, String> schemaMap,
+                                  java.util.Set<String> tableFilter) {
         if (!settings.syncEnabled()) return;
         if (!krasLoadRunning.compareAndSet(false, true)) {
             log.warn("[KRAS] 적재 이미 진행 중 — 스킵");
             return;
         }
         try {
-            krasWorker.runDirectLoad(targetIndices, schemaMap);
+            krasWorker.runDirectLoad(targetIndices, schemaMap, "MANUAL", tableFilter);
         } finally {
             krasLoadRunning.set(false);
         }
@@ -158,6 +163,12 @@ public class SyncScheduler {
 
     @Async
     public void triggerKrasDirectLoadAsync(List<Integer> targetIndices, Map<Integer, String> schemaMap) {
-        runKrasDirectLoad(targetIndices, schemaMap);
+        runKrasDirectLoad(targetIndices, schemaMap, null);
+    }
+
+    @Async
+    public void triggerKrasDirectLoadAsync(List<Integer> targetIndices, Map<Integer, String> schemaMap,
+                                           java.util.Set<String> tableFilter) {
+        runKrasDirectLoad(targetIndices, schemaMap, tableFilter);
     }
 }

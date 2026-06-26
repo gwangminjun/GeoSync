@@ -82,6 +82,7 @@ public class SyncController {
     @PostMapping("/kras-direct-load")
     public String triggerKrasDirectLoad(
             @RequestParam(required = false) List<Integer> targetIdx,
+            @RequestParam(required = false) List<String> tables,
             @RequestParam Map<String, String> allParams,
             RedirectAttributes ra) {
 
@@ -98,11 +99,15 @@ public class SyncController {
             }
         }
 
-        statusService.recordStart("KRAS_LOAD");
-        scheduler.triggerKrasDirectLoadAsync(targetIdx, schemaMap.isEmpty() ? null : schemaMap);
+        java.util.Set<String> tableFilter = (tables != null && !tables.isEmpty())
+                ? new java.util.HashSet<>(tables) : null;
 
+        statusService.recordStart("KRAS_LOAD");
+        scheduler.triggerKrasDirectLoadAsync(targetIdx, schemaMap.isEmpty() ? null : schemaMap, tableFilter);
+
+        String tableDesc = tableFilter == null ? "전체 테이블" : String.join(", ", tableFilter);
         String targetDesc = (targetIdx == null || targetIdx.isEmpty()) ? "전체 DB" : targetIdx.size() + "개 DB";
-        ra.addFlashAttribute("message", "KRAS 적재를 시작했습니다 (" + targetDesc + ").");
+        ra.addFlashAttribute("message", "KRAS 적재를 시작했습니다 (" + targetDesc + " / " + tableDesc + ").");
         return "redirect:/";
     }
 
