@@ -3,7 +3,6 @@ package geomex.sync.worker;
 import com.fasterxml.jackson.databind.JsonNode;
 import geomex.sync.geo.CoordTransformer;
 import geomex.sync.mapper.TableMapper;
-import geomex.sync.model.ColumnDef;
 import geomex.sync.model.SyncTableDef;
 import geomex.sync.repository.OdsRepository;
 import geomex.sync.service.RuntimeSettingsService;
@@ -16,8 +15,10 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -249,20 +250,33 @@ public class KrasWorker {
 
     private List<String> collectTable(SyncTableDef def) {
         List<String> written = new ArrayList<>();
+        Path workDir = Path.of(settings.krasWorkDir(), settings.orgCode());
         if (def.srcTableName.startsWith("USEZONE:")) {
             List<String> layerNames = fetchAvailableUsezoneLayers();
             for (String layerName : layerNames) {
-                List<Map<String, Object>> rows = fetchFeatures(layerName, def);
-                injectUsezoneCode(rows, layerName);
-                fileWriter.write(layerName, def, rows);
-                fileWriter.writeJson(layerName, rows);
-                written.add(toFileBaseName(layerName));
+                try {
+                    String baseName = apiClient.downloadLayer(layerName, workDir);
+                    Path shpPath = workDir.resolve(baseName + ".shp");
+                    List<Map<String, Object>> rows = workspaceScanner.loadShpFile(shpPath, def);
+                    injectUsezoneCode(rows, layerName);
+                    fileWriter.write(layerName, def, rows);
+                    fileWriter.writeJson(layerName, rows);
+                    written.add(toFileBaseName(layerName));
+                } catch (Exception e) {
+                    log.error("[KRAS] {} 다운로드/파싱 실패: {}", layerName, e.getMessage(), e);
+                }
             }
         } else {
-            List<Map<String, Object>> rows = fetchFeatures(def.srcTableName, def);
-            fileWriter.write(def.srcTableName, def, rows);
-            fileWriter.writeJson(def.srcTableName, rows);
-            written.add(toFileBaseName(def.srcTableName));
+            try {
+                String baseName = apiClient.downloadLayer(def.srcTableName, workDir);
+                Path shpPath = workDir.resolve(baseName + ".shp");
+                List<Map<String, Object>> rows = workspaceScanner.loadShpFile(shpPath, def);
+                fileWriter.write(def.srcTableName, def, rows);
+                fileWriter.writeJson(def.srcTableName, rows);
+                written.add(toFileBaseName(def.srcTableName));
+            } catch (Exception e) {
+                log.warn("[KRAS] {} SHP 다운로드 실패: {}", def.srcTableName, e.getMessage());
+            }
         }
         return written;
     }
@@ -449,8 +463,8 @@ public class KrasWorker {
             }
 
             List<SyncTableDef> tableDefs = tableMapper.load(settings.krasConfig());
-            boolean needsApi = tableDefs.stream().anyMatch(d -> d.srcTableName.startsWith("USEZONE:"));
-            boolean apiOk = !needsApi || checkConnection();
+            boolean apiOk = checkConnection();
+            if (!apiOk) log.warn("[KRAS] KRAS API 연결 불가 — SHP 다운로드 불가, 로컬 워크스페이스 파일로 대체");
 
             statusService.startProgress("KRAS_LOAD", tableDefs.size(), "");
             int completed = 0;
@@ -481,6 +495,8 @@ public class KrasWorker {
 
     private int directLoadTable(SyncTableDef def, List<TargetWithSchema> targets, boolean apiOk) {
         List<Map<String, Object>> rows;
+        Path workDir = Path.of(settings.krasWorkDir(), settings.orgCode());
+
         if (def.srcTableName.startsWith("USEZONE:")) {
             if (!apiOk) {
                 log.warn("[KRAS] API 연결 불가 — {} 건너뜀", def.tgtTableName);
@@ -489,13 +505,30 @@ public class KrasWorker {
             List<String> layerNames = fetchAvailableUsezoneLayers();
             rows = new ArrayList<>();
             for (String layerName : layerNames) {
-                List<Map<String, Object>> layerRows = fetchFeatures(layerName, def);
-                injectUsezoneCode(layerRows, layerName);
-                deriveUsezoneFields(layerRows);
-                rows.addAll(layerRows);
-                log.info("[KRAS] {} 수신: {}건 (누계 {}건)", layerName, layerRows.size(), rows.size());
+                try {
+                    // KRAS000038으로 SHP/DBF/SHX 다운로드 → 워크스페이스에 저장
+                    String baseName = apiClient.downloadLayer(layerName, workDir);
+                    Path shpPath = workDir.resolve(baseName + ".shp");
+                    List<Map<String, Object>> layerRows = workspaceScanner.loadShpFile(shpPath, def);
+                    injectUsezoneCode(layerRows, layerName);
+                    deriveUsezoneFields(layerRows);
+                    rows.addAll(layerRows);
+                    log.info("[KRAS] {} 다운로드/파싱: {}건 (누계 {}건)",
+                            layerName, layerRows.size(), rows.size());
+                } catch (Exception e) {
+                    log.error("[KRAS] {} 다운로드/파싱 실패: {}", layerName, e.getMessage(), e);
+                }
             }
         } else {
+            // KRAS000038으로 SHP 다운로드 시도 → 실패 시 로컬 워크스페이스 파일 사용
+            if (apiOk) {
+                try {
+                    apiClient.downloadLayer(def.srcTableName, workDir);
+                    log.info("[KRAS] {} SHP 다운로드 완료", def.srcTableName);
+                } catch (Exception e) {
+                    log.warn("[KRAS] {} SHP 다운로드 실패 — 로컬 파일 사용: {}", def.srcTableName, e.getMessage());
+                }
+            }
             rows = workspaceScanner.loadTable(def);
         }
 
@@ -506,7 +539,7 @@ public class KrasWorker {
 
         int saved = 0;
         for (TargetWithSchema ts : targets) {
-            log.info("[KRAS] direct loading {} → {} (schema={}, rows={})",
+            log.info("[KRAS] {} → {} 적재 (schema={}, rows={})",
                     def.tgtTableName, ts.target().label(),
                     ts.schema() != null ? ts.schema() : "default", rows.size());
             saved = odsRepository.replaceAllTo(ts.target().jdbc(), def, settings.orgCode(),
@@ -527,8 +560,37 @@ public class KrasWorker {
         return apiClient.testLayerList();
     }
 
+    /**
+     * 레이어 미리보기: KRAS000038으로 SHP 임시 다운로드 후 첫 N건 반환.
+     */
     public Map<String, Object> testFeatures(String layerName, int limit) throws Exception {
-        return apiClient.testFeatures(layerName, limit);
+        List<SyncTableDef> defs = tableMapper.load(settings.krasConfig());
+        SyncTableDef def = defs.stream()
+                .filter(d -> d.srcTableName.startsWith("USEZONE:") ||
+                        tableBaseName(d.tgtTableName).equalsIgnoreCase(layerName))
+                .findFirst()
+                .orElse(defs.stream()
+                        .filter(d -> d.srcTableName.startsWith("USEZONE:"))
+                        .findFirst().orElse(null));
+        if (def == null) return Map.of("error", "테이블 정의 없음: " + layerName);
+
+        Path tmpDir = Files.createTempDirectory("kras_preview_");
+        try {
+            String baseName = apiClient.downloadLayer(layerName, tmpDir);
+            Path shpPath = tmpDir.resolve(baseName + ".shp");
+            List<Map<String, Object>> rows = workspaceScanner.loadShpFile(shpPath, def);
+            int safeLimit = Math.min(limit, rows.size());
+            List<Map<String, Object>> preview = rows.subList(0, safeLimit);
+            List<String> columns = preview.isEmpty()
+                    ? List.of() : new ArrayList<>(preview.get(0).keySet());
+            return Map.of("total", rows.size(), "rows", preview, "columns", columns);
+        } finally {
+            try {
+                Files.walk(tmpDir)
+                        .sorted(Comparator.reverseOrder())
+                        .forEach(p -> { try { Files.delete(p); } catch (Exception ignored) {} });
+            } catch (Exception ignored) {}
+        }
     }
 
     private boolean checkConnection() {
@@ -548,20 +610,34 @@ public class KrasWorker {
                              List<TargetDbService.ActiveTarget> targets) {
         List<String> written = new ArrayList<>();
         List<Map<String, Object>> rows;
+        Path workDir = Path.of(settings.krasWorkDir(), settings.orgCode());
         if (def.srcTableName.startsWith("USEZONE:")) {
             List<String> layerNames = fetchAvailableUsezoneLayers();
             rows = new ArrayList<>();
             for (String layerName : layerNames) {
-                List<Map<String, Object>> layerRows = fetchFeatures(layerName, def);
-                injectUsezoneCode(layerRows, layerName);
-                deriveUsezoneFields(layerRows);
-                fileWriter.write(layerName, def, layerRows);
-                fileWriter.writeJson(layerName, layerRows);
-                written.add(toFileBaseName(layerName));
-                rows.addAll(layerRows);
+                try {
+                    String baseName = apiClient.downloadLayer(layerName, workDir);
+                    Path shpPath = workDir.resolve(baseName + ".shp");
+                    List<Map<String, Object>> layerRows = workspaceScanner.loadShpFile(shpPath, def);
+                    injectUsezoneCode(layerRows, layerName);
+                    deriveUsezoneFields(layerRows);
+                    fileWriter.write(layerName, def, layerRows);
+                    fileWriter.writeJson(layerName, layerRows);
+                    written.add(toFileBaseName(layerName));
+                    rows.addAll(layerRows);
+                } catch (Exception e) {
+                    log.error("[KRAS] {} 다운로드/파싱 실패: {}", layerName, e.getMessage(), e);
+                }
             }
         } else {
-            rows = fetchFeatures(def.srcTableName, def);
+            try {
+                String baseName = apiClient.downloadLayer(def.srcTableName, workDir);
+                Path shpPath = workDir.resolve(baseName + ".shp");
+                rows = workspaceScanner.loadShpFile(shpPath, def);
+            } catch (Exception e) {
+                log.warn("[KRAS] {} SHP 다운로드 실패 — 로컬 파일 사용: {}", def.srcTableName, e.getMessage());
+                rows = workspaceScanner.loadTable(def);
+            }
             fileWriter.write(def.srcTableName, def, rows);
             fileWriter.writeJson(def.srcTableName, rows);
             written.add(toFileBaseName(def.srcTableName));
@@ -609,44 +685,6 @@ public class KrasWorker {
         if (idx < 0) return false;
         int codeStart = idx + "LSMD_CONT_U".length();
         return codeStart < layerName.length() && Character.isLetter(layerName.charAt(codeStart));
-    }
-
-    private List<Map<String, Object>> fetchFeatures(String layerName, SyncTableDef def) {
-        try {
-            JsonNode res = apiClient.features(layerName);
-            if (!"00".equals(res.path("resultCode").asText(""))) {
-                log.warn("[KRAS] GetFeature 실패: layerName={}, code={}", layerName,
-                        res.path("resultCode").asText());
-                return List.of();
-            }
-
-            List<Map<String, Object>> rows = new ArrayList<>();
-            for (JsonNode feature : res.path("features")) {
-                rows.add(parseFeature(feature, def));
-            }
-            log.info("[KRAS] {} → {}건 수신", layerName, rows.size());
-            return rows;
-
-        } catch (Exception e) {
-            log.error("[KRAS] {} 수집 실패: {}", layerName, e.getMessage());
-            return List.of();
-        }
-    }
-
-    private Map<String, Object> parseFeature(JsonNode feature, SyncTableDef def) {
-        Map<String, Object> row = new HashMap<>();
-        for (ColumnDef col : def.columns) {
-            if (col.isGeometry) {
-                String wkt = feature.path("wkt").asText(null);
-                if (wkt != null) {
-                    row.put(col.srcName, wkt);
-                }
-            } else {
-                JsonNode val = feature.path(col.srcName);
-                row.put(col.srcName, val.isMissingNode() ? null : val.asText(null));
-            }
-        }
-        return row;
     }
 
 }

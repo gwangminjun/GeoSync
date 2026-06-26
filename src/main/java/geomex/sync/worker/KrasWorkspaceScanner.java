@@ -113,6 +113,25 @@ public class KrasWorkspaceScanner {
     }
 
     /**
+     * 지정한 SHP 파일을 직접 읽어 반환한다.
+     * API에서 다운로드한 SHP 파일을 파싱할 때 사용.
+     */
+    public List<Map<String, Object>> loadShpFile(Path shpPath, SyncTableDef def) {
+        if (!Files.exists(shpPath)) {
+            log.warn("[Scanner] SHP 파일 없음: {}", shpPath);
+            return List.of();
+        }
+        try {
+            List<Map<String, Object>> rows = readShp(shpPath, def);
+            log.info("[Scanner] SHP 읽기 완료 (path={}): {}건", shpPath.getFileName(), rows.size());
+            return rows;
+        } catch (Exception e) {
+            log.error("[Scanner] SHP 읽기 실패 ({}): {}", shpPath.getFileName(), e.getMessage(), e);
+            return List.of();
+        }
+    }
+
+    /**
      * base-tables.xml의 비-USEZONE 테이블 def에 대해 SHP 파일을 직접 읽어 반환한다.
      * JSON 캐시를 거치지 않고 바로 DB 적재에 사용.
      */
