@@ -16,12 +16,14 @@ spring:
 
 kras:
   url: ${KRAS_URL:http://110.20.1.12:8385/conn/estateGateway}
+  conn-svc-id: ${KRAS_CONN_SVC_ID:KRAS000037}
   conn-sys-id: ${KRAS_CONN_SYS_ID:HOH4-N9PX-73Y6-B393}
   chk-pnu: ${KRAS_CHK_PNU:4687025625111190010}
   config: ${KRAS_CONFIG:conf/kras/base-tables.xml}
   schedule: ${KRAS_SCHEDULE:0 30 4 * * *}
   timeout-seconds: 300
   work-dir: ${KRAS_WORK_DIR:./workspace/kras}
+  shp-charset: ${KRAS_SHP_CHARSET:MS949}
 
 ods:
   schema: ${ODS_SCHEMA:ods}

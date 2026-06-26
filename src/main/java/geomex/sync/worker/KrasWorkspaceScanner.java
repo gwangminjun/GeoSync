@@ -71,8 +71,18 @@ public class KrasWorkspaceScanner {
         return Path.of(settings.krasWorkDir(), settings.orgCode());
     }
 
-    public Map<String, List<String>> discoverWorkspaceFiles() {
+    private Path ensureDefaultDir() {
         Path dir = resolveDir(null);
+        try {
+            Files.createDirectories(dir);
+        } catch (IOException e) {
+            log.warn("[Scanner] 워크스페이스 디렉토리 생성 실패: {}", e.getMessage());
+        }
+        return dir;
+    }
+
+    public Map<String, List<String>> discoverWorkspaceFiles() {
+        Path dir = ensureDefaultDir();
         Map<String, List<String>> result = new LinkedHashMap<>();
         if (!Files.isDirectory(dir)) return result;
 
@@ -107,7 +117,7 @@ public class KrasWorkspaceScanner {
      * JSON 캐시를 거치지 않고 바로 DB 적재에 사용.
      */
     public List<Map<String, Object>> loadTable(SyncTableDef def) {
-        Path dir = resolveDir(null);
+        Path dir = ensureDefaultDir();
         Set<String> claimed = new LinkedHashSet<>();
         String baseName = findFile(dir, def, claimed);
         if (baseName == null) {
@@ -133,8 +143,12 @@ public class KrasWorkspaceScanner {
         List<String> messages = new ArrayList<>();
 
         if (!Files.exists(dir)) {
-            messages.add("워크스페이스 디렉토리 없음: " + dir.toAbsolutePath());
-            return new ScanResult(0, 0, messages);
+            try {
+                Files.createDirectories(dir);
+            } catch (IOException e) {
+                messages.add("워크스페이스 디렉토리 생성 실패: " + dir.toAbsolutePath());
+                return new ScanResult(0, 0, messages);
+            }
         }
 
         int fileCount = 0, rowCount = 0;
@@ -263,7 +277,7 @@ public class KrasWorkspaceScanner {
 
     private List<Map<String, Object>> readShp(Path shpPath, SyncTableDef def) throws Exception {
         ShapefileDataStore store = new ShapefileDataStore(shpPath.toUri().toURL());
-        store.setCharset(Charset.forName("MS949"));
+        store.setCharset(Charset.forName(settings.krasShpCharset()));
         WKTWriter wktWriter = new WKTWriter();
         List<Map<String, Object>> rows = new ArrayList<>();
 
@@ -325,7 +339,7 @@ public class KrasWorkspaceScanner {
         List<Map<String, Object>> rows = new ArrayList<>();
         try (BufferedReader br = new BufferedReader(
                 new InputStreamReader(new FileInputStream(txtPath.toFile()),
-                        Charset.forName("MS949")))) {
+                        Charset.forName(settings.krasShpCharset())))) {
             String headerLine = br.readLine();
             if (headerLine == null) return rows;
             String[] headers = headerLine.split(",");

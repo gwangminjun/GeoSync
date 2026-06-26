@@ -1,0 +1,219 @@
+{
+  "info": {
+    "name": "KRAS / GEOMEX Sync API Tests",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Existing-code based KRAS API test collection. Set variables before running."
+  },
+  "variable": [
+    { "key": "gatewayBaseUrl", "value": "http://110.20.1.12:8385" },
+    { "key": "krasBaseUrl", "value": "http://localhost:8080/kras" },
+    { "key": "connSysId", "value": "HOH4-N9PX-73Y6-B393" },
+    { "key": "admSecCd", "value": "46870" },
+    { "key": "gpkiId", "value": "null" },
+    { "key": "pnu", "value": "4687025625111190010" },
+    { "key": "bno", "value": "" },
+    { "key": "user", "value": "test" },
+    { "key": "layerCd", "value": "LSMD_CONT_LDREG" },
+    { "key": "mapWidth", "value": "400" },
+    { "key": "mapHeight", "value": "300" },
+    { "key": "legendWidth", "value": "20" },
+    { "key": "legendHeight", "value": "20" },
+    { "key": "scale", "value": "5500" }
+  ],
+  "item": [
+    {
+      "name": "estateGateway direct",
+      "item": [
+        {
+          "name": "KRAS000037 - usezone layer list",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/x-www-form-urlencoded" }],
+            "url": "{{gatewayBaseUrl}}/conn/estateGateway",
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "conn_svc_id", "value": "KRAS000037" },
+                { "key": "conn_sys_id", "value": "{{connSysId}}" },
+                { "key": "adm_sec_cd", "value": "{{admSecCd}}" },
+                { "key": "gpki_id", "value": "{{gpkiId}}" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "KRAS000038 - download SHP",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/x-www-form-urlencoded" }],
+            "url": "{{gatewayBaseUrl}}/conn/estateGateway",
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "conn_svc_id", "value": "KRAS000038" },
+                { "key": "conn_sys_id", "value": "{{connSysId}}" },
+                { "key": "adm_sec_cd", "value": "{{admSecCd}}" },
+                { "key": "layer_cd", "value": "{{layerCd}}" },
+                { "key": "file_type", "value": "2" },
+                { "key": "gpki_id", "value": "{{gpkiId}}" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "KRAS000038 - download DBF",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/x-www-form-urlencoded" }],
+            "url": "{{gatewayBaseUrl}}/conn/estateGateway",
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "conn_svc_id", "value": "KRAS000038" },
+                { "key": "conn_sys_id", "value": "{{connSysId}}" },
+                { "key": "adm_sec_cd", "value": "{{admSecCd}}" },
+                { "key": "layer_cd", "value": "{{layerCd}}" },
+                { "key": "file_type", "value": "3" },
+                { "key": "gpki_id", "value": "{{gpkiId}}" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "KRAS000038 - download SHX",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/x-www-form-urlencoded" }],
+            "url": "{{gatewayBaseUrl}}/conn/estateGateway",
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "conn_svc_id", "value": "KRAS000038" },
+                { "key": "conn_sys_id", "value": "{{connSysId}}" },
+                { "key": "adm_sec_cd", "value": "{{admSecCd}}" },
+                { "key": "layer_cd", "value": "{{layerCd}}" },
+                { "key": "file_type", "value": "4" },
+                { "key": "gpki_id", "value": "{{gpkiId}}" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "KRAS000039 - official land price TXT",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/x-www-form-urlencoded" }],
+            "url": "{{gatewayBaseUrl}}/conn/estateGateway",
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "conn_svc_id", "value": "KRAS000039" },
+                { "key": "conn_sys_id", "value": "{{connSysId}}" },
+                { "key": "adm_sec_cd", "value": "{{admSecCd}}" },
+                { "key": "gpki_id", "value": "{{gpkiId}}" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "KRAS000040 - land ledger TXT",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/x-www-form-urlencoded" }],
+            "url": "{{gatewayBaseUrl}}/conn/estateGateway",
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "conn_svc_id", "value": "KRAS000040" },
+                { "key": "conn_sys_id", "value": "{{connSysId}}" },
+                { "key": "adm_sec_cd", "value": "{{admSecCd}}" },
+                { "key": "gpki_id", "value": "{{gpkiId}}" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "KRAS000011 - land price existence check",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/x-www-form-urlencoded" }],
+            "url": "{{gatewayBaseUrl}}/conn/estateGateway",
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "conn_svc_id", "value": "KRAS000011" },
+                { "key": "conn_sys_id", "value": "{{connSysId}}" },
+                { "key": "adm_sec_cd", "value": "{{admSecCd}}" },
+                { "key": "pnu", "value": "{{pnu}}" },
+                { "key": "gpki_id", "value": "{{gpkiId}}" }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "kras JSP samples",
+      "item": [
+        { "name": "getKRAS1", "request": { "method": "GET", "url": "{{krasBaseUrl}}/getKRAS1.jsp?pnu={{pnu}}" } },
+        { "name": "getKRAS2", "request": { "method": "GET", "url": "{{krasBaseUrl}}/getKRAS2.jsp?pnu={{pnu}}" } },
+        { "name": "getKRAS26 - HTML image", "request": { "method": "GET", "url": "{{krasBaseUrl}}/getKRAS26.jsp?pnu={{pnu}}" } },
+        { "name": "getImg - base64 image", "request": { "method": "GET", "url": "{{krasBaseUrl}}/getImg.jsp?pnu={{pnu}}" } },
+        { "name": "getKRAS29", "request": { "method": "GET", "url": "{{krasBaseUrl}}/getKRAS29.jsp?pnu={{pnu}}" } },
+        { "name": "getPrice", "request": { "method": "GET", "url": "{{krasBaseUrl}}/getPrice.jsp?pnu={{pnu}}" } },
+        { "name": "getKRAS38 - layer SHP text", "request": { "method": "GET", "url": "{{krasBaseUrl}}/getKRAS38.jsp?lyr_cd={{layerCd}}" } },
+        { "name": "get_kras_land", "request": { "method": "GET", "url": "{{krasBaseUrl}}/get_kras_land.jsp?pnu={{pnu}}" } },
+        { "name": "get_kras_toji", "request": { "method": "GET", "url": "{{krasBaseUrl}}/get_kras_toji.jsp?pnu={{pnu}}" } }
+      ]
+    },
+    {
+      "name": "kras /conn XML APIs",
+      "item": [
+        { "name": "land_info", "request": { "method": "GET", "url": "{{krasBaseUrl}}/conn/land_info?pnu={{pnu}}" } },
+        { "name": "land_info body", "request": { "method": "GET", "url": "{{krasBaseUrl}}/conn/land_info/body?pnu={{pnu}}" } },
+        { "name": "land_attr", "request": { "method": "GET", "url": "{{krasBaseUrl}}/conn/land_attr?pnu={{pnu}}" } },
+        { "name": "land_bldg_check", "request": { "method": "GET", "url": "{{krasBaseUrl}}/conn/land_bldg_check?pnu={{pnu}}" } },
+        { "name": "land_jiga", "request": { "method": "GET", "url": "{{krasBaseUrl}}/conn/land_jiga?pnu={{pnu}}" } },
+        { "name": "land_mov_hist", "request": { "method": "GET", "url": "{{krasBaseUrl}}/conn/land_mov_hist?pnu={{pnu}}" } },
+        { "name": "land_use_plan_attr", "request": { "method": "GET", "url": "{{krasBaseUrl}}/conn/land_use_plan_attr?pnu={{pnu}}" } },
+        { "name": "land_use_plan_attr body", "request": { "method": "GET", "url": "{{krasBaseUrl}}/conn/land_use_plan_attr/body?pnu={{pnu}}" } },
+        { "name": "land_use_plan_info", "request": { "method": "GET", "url": "{{krasBaseUrl}}/conn/land_use_plan_info?pnu={{pnu}}&map_width={{mapWidth}}&map_height={{mapHeight}}&legend_width={{legendWidth}}&legend_height={{legendHeight}}&scale={{scale}}" } },
+        { "name": "land_use_plan_info body", "request": { "method": "GET", "url": "{{krasBaseUrl}}/conn/land_use_plan_info/body?pnu={{pnu}}&map_width={{mapWidth}}&map_height={{mapHeight}}&legend_width={{legendWidth}}&legend_height={{legendHeight}}&scale={{scale}}" } },
+        { "name": "own_rgt_hist", "request": { "method": "GET", "url": "{{krasBaseUrl}}/conn/own_rgt_hist?pnu={{pnu}}" } },
+        { "name": "read_dec_jiga", "request": { "method": "GET", "url": "{{krasBaseUrl}}/conn/read_dec_jiga?pnu={{pnu}}" } },
+        { "name": "shr_ymb", "request": { "method": "GET", "url": "{{krasBaseUrl}}/conn/shr_ymb?pnu={{pnu}}" } },
+        { "name": "use_zone", "request": { "method": "GET", "url": "{{krasBaseUrl}}/conn/use_zone?pnu={{pnu}}" } },
+        { "name": "fin_dec_jiga", "request": { "method": "GET", "url": "{{krasBaseUrl}}/conn/fin_dec_jiga?pnu={{pnu}}" } },
+        { "name": "bldg_dong_info", "request": { "method": "GET", "url": "{{krasBaseUrl}}/conn/bldg_dong_info?pnu={{pnu}}&bno={{bno}}" } },
+        { "name": "bldg_hds_info", "request": { "method": "GET", "url": "{{krasBaseUrl}}/conn/bldg_hds_info?pnu={{pnu}}&bno={{bno}}" } },
+        { "name": "bldg_ho_info", "request": { "method": "GET", "url": "{{krasBaseUrl}}/conn/bldg_ho_info?pnu={{pnu}}&bno={{bno}}" } },
+        { "name": "bldg_ledg_gen_hds_info", "request": { "method": "GET", "url": "{{krasBaseUrl}}/conn/bldg_ledg_gen_hds_info?pnu={{pnu}}&bno={{bno}}" } },
+        { "name": "cbldg_dfhs_info", "request": { "method": "GET", "url": "{{krasBaseUrl}}/conn/cbldg_dfhs_info?pnu={{pnu}}&bno={{bno}}" } },
+        { "name": "cbldg_hds_info", "request": { "method": "GET", "url": "{{krasBaseUrl}}/conn/cbldg_hds_info?pnu={{pnu}}&bno={{bno}}" } },
+        { "name": "house_info", "request": { "method": "GET", "url": "{{krasBaseUrl}}/conn/house_info?pnu={{pnu}}&bno={{bno}}" } }
+      ]
+    },
+    {
+      "name": "kras /svc GMX APIs",
+      "item": [
+        { "name": "GetLandInfo", "request": { "method": "GET", "url": "{{krasBaseUrl}}/svc/GetLandInfo?pnu={{pnu}}" } },
+        { "name": "GetJigaInfo", "request": { "method": "GET", "url": "{{krasBaseUrl}}/svc/GetJigaInfo?pnu={{pnu}}" } },
+        { "name": "GetShareInfo", "request": { "method": "GET", "url": "{{krasBaseUrl}}/svc/GetShareInfo?pnu={{pnu}}" } },
+        { "name": "GetLandHistInfo", "request": { "method": "GET", "url": "{{krasBaseUrl}}/svc/GetLandHistInfo?pnu={{pnu}}" } },
+        { "name": "GetOwnerHistInfo", "request": { "method": "GET", "url": "{{krasBaseUrl}}/svc/GetOwnerHistInfo?pnu={{pnu}}" } },
+        { "name": "GetTojiDaejangPrint", "request": { "method": "GET", "url": "{{krasBaseUrl}}/svc/GetTojiDaejangPrint?pnu={{pnu}}&user={{user}}" } },
+        { "name": "GetTojiDaejangPrint2", "request": { "method": "GET", "url": "{{krasBaseUrl}}/svc/GetTojiDaejangPrint2?pnu={{pnu}}&user={{user}}" } },
+        { "name": "GetUseZoneList", "request": { "method": "GET", "url": "{{krasBaseUrl}}/svc/GetUseZoneList?pnu={{pnu}}" } },
+        { "name": "GetLandUsePlanInfo", "request": { "method": "GET", "url": "{{krasBaseUrl}}/svc/GetLandUsePlanInfo?pnu={{pnu}}&mw={{mapWidth}}&mh={{mapHeight}}&lw={{legendWidth}}&lh={{legendHeight}}&sc={{scale}}" } },
+        { "name": "GetBldgInfo", "request": { "method": "GET", "url": "{{krasBaseUrl}}/svc/GetBldgInfo?pnu={{pnu}}" } },
+        { "name": "GetBldgList", "request": { "method": "GET", "url": "{{krasBaseUrl}}/svc/GetBldgList?pnu={{pnu}}" } },
+        { "name": "GetDjyrecaptitle", "request": { "method": "GET", "url": "{{krasBaseUrl}}/svc/GetDjyrecaptitle?pnu={{pnu}}&user={{user}}" } },
+        { "name": "GetDjytitle", "request": { "method": "GET", "url": "{{krasBaseUrl}}/svc/GetDjytitle?pnu={{pnu}}&user={{user}}" } },
+        { "name": "GetJeonyubldg", "request": { "method": "GET", "url": "{{krasBaseUrl}}/svc/GetJeonyubldg?pnu={{pnu}}&user={{user}}" } },
+        { "name": "GetDjyexpos", "request": { "method": "GET", "url": "{{krasBaseUrl}}/svc/GetDjyexpos?pnu={{pnu}}&user={{user}}" } },
+        { "name": "GetHouseInfo", "request": { "method": "GET", "url": "{{krasBaseUrl}}/svc/GetHouseInfo?pnu={{pnu}}" } },
+        { "name": "LandUsePlanAttr", "request": { "method": "GET", "url": "{{krasBaseUrl}}/svc/LandUsePlanAttr?pnu={{pnu}}" } }
+      ]
+    }
+  ]
+}

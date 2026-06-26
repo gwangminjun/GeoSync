@@ -5,10 +5,10 @@ import geomex.sync.mapper.TableMapper;
 import geomex.sync.model.SyncHistory;
 import geomex.sync.scheduler.DynamicScheduleManager;
 import geomex.sync.service.RuntimeSettingsService;
+import geomex.sync.service.SyncExecutionLogService;
 import geomex.sync.service.SyncStatusService;
 import geomex.sync.worker.KrasFileReader;
 import geomex.sync.worker.KrasFileReader.ManifestInfo;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -24,20 +24,20 @@ public class ScheduleController {
     private final KrasFileReader fileReader;
     private final TableMapper tableMapper;
     private final RuntimeSettingsService settings;
-
-    @Value("${sync.org-code:46870}")
-    private String orgCode;
+    private final SyncExecutionLogService executionLogService;
 
     public ScheduleController(DynamicScheduleManager scheduleManager,
                               SyncStatusService statusService,
                               KrasFileReader fileReader,
                               TableMapper tableMapper,
-                              RuntimeSettingsService settings) {
+                              RuntimeSettingsService settings,
+                              SyncExecutionLogService executionLogService) {
         this.scheduleManager = scheduleManager;
         this.statusService = statusService;
         this.fileReader = fileReader;
         this.tableMapper = tableMapper;
         this.settings = settings;
+        this.executionLogService = executionLogService;
     }
 
     public record TableEntry(String srcTable, String tgtTable, List<String> files) {}
@@ -45,7 +45,7 @@ public class ScheduleController {
     @GetMapping("/schedule")
     public String schedulePage(Model model) {
         model.addAttribute("currentPage", "schedule");
-        model.addAttribute("orgCode", orgCode);
+        model.addAttribute("orgCode", settings.orgCode());
         model.addAttribute("krasRunning", statusService.isRunning("KRAS") || statusService.isRunning("KRAS_LOAD"));
 
         String krasCron = scheduleManager.getKrasCron();
@@ -85,6 +85,10 @@ public class ScheduleController {
                 .filter(TargetDb::isEnabled).toList();
         model.addAttribute("targets", targets);
         model.addAttribute("odsSchema", settings.odsSchema());
+
+        // 실행 이력 (최근 30건)
+        model.addAttribute("executionLogs", executionLogService.recent(30));
+        model.addAttribute("krasInterval", scheduleManager.isKrasInterval());
 
         return "schedule";
     }

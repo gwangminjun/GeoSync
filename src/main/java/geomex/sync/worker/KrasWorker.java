@@ -1,24 +1,16 @@
 package geomex.sync.worker;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import geomex.sync.geo.CoordTransformer;
 import geomex.sync.mapper.TableMapper;
 import geomex.sync.model.ColumnDef;
 import geomex.sync.model.SyncTableDef;
 import geomex.sync.repository.OdsRepository;
-import geomex.sync.service.KrasGpkiService;
 import geomex.sync.service.RuntimeSettingsService;
+import geomex.sync.service.SyncExecutionLogService;
 import geomex.sync.service.SyncStatusService;
 import geomex.sync.service.TargetDbService;
 import geomex.sync.service.UsezoneCodeService;
-import org.apache.hc.client5.http.classic.methods.HttpPost;
-import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
-import org.apache.hc.client5.http.impl.classic.HttpClients;
-import org.apache.hc.core5.http.ContentType;
-import org.apache.hc.core5.http.io.entity.EntityUtils;
-import org.apache.hc.core5.http.io.entity.StringEntity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -37,9 +29,6 @@ public class KrasWorker {
     private static final Logger log = LoggerFactory.getLogger(KrasWorker.class);
     private static final int KRAS_EPSG = 5174;
 
-    /** 스케줄 자동 적재 대상 테이블 (tgt 테이블명 기준, 스키마 제외) */
-    private static final Set<String> SCHEDULED_TABLES = Set.of("lt_c_uzone", "lp_pa_cbnd");
-
     private final TableMapper tableMapper;
     private final OdsRepository odsRepository;
     private final CoordTransformer coordTransformer;
@@ -47,18 +36,19 @@ public class KrasWorker {
     private final TargetDbService targetDbService;
     private final KrasFileWriter fileWriter;
     private final KrasFileReader fileReader;
-    private final KrasGpkiService gpkiService;
+    private final KrasApiClient apiClient;
     private final RuntimeSettingsService settings;
     private final KrasWorkspaceScanner workspaceScanner;
     private final UsezoneCodeService usezoneCodeService;
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final SyncExecutionLogService executionLogService;
 
     public KrasWorker(TableMapper tableMapper, OdsRepository odsRepository,
                       CoordTransformer coordTransformer, SyncStatusService statusService,
                       TargetDbService targetDbService, KrasFileWriter fileWriter,
-                      KrasFileReader fileReader, KrasGpkiService gpkiService,
+                      KrasFileReader fileReader, KrasApiClient apiClient,
                       RuntimeSettingsService settings, KrasWorkspaceScanner workspaceScanner,
-                      UsezoneCodeService usezoneCodeService) {
+                      UsezoneCodeService usezoneCodeService,
+                      SyncExecutionLogService executionLogService) {
         this.tableMapper = tableMapper;
         this.odsRepository = odsRepository;
         this.coordTransformer = coordTransformer;
@@ -66,12 +56,14 @@ public class KrasWorker {
         this.targetDbService = targetDbService;
         this.fileWriter = fileWriter;
         this.fileReader = fileReader;
-        this.gpkiService = gpkiService;
+        this.apiClient = apiClient;
         this.settings = settings;
         this.workspaceScanner = workspaceScanner;
         this.usezoneCodeService = usezoneCodeService;
+        this.executionLogService = executionLogService;
     }
 
+    @Deprecated
     public void run() {
         log.info("[KRAS] 동기화 시작 (url={})", settings.krasUrl());
         statusService.recordStart("KRAS");
@@ -111,6 +103,7 @@ public class KrasWorker {
         }
     }
 
+    @Deprecated
     public void runCollect() {
         log.info("[KRAS] 수집 시작 (API → 파일, url={})", settings.krasUrl());
         statusService.recordStart("KRAS_COLLECT");
@@ -154,28 +147,31 @@ public class KrasWorker {
      * SCHEDULED_TABLES(lt_c_uzone, lp_pa_cbnd)만 적재한다.
      */
     public void runScheduledLoad() {
-        log.info("[KRAS] 스케줄 적재 시작 — 워크스페이스 스캔 후 {} 적재", SCHEDULED_TABLES);
-        KrasWorkspaceScanner.ScanResult scan = workspaceScanner.buildManifest();
-        log.info("[KRAS] 워크스페이스 스캔 완료 (파일={}, 행={})", scan.fileCount(), scan.rowCount());
-        runLoad(null, (Map<Integer, String>) null, null, SCHEDULED_TABLES);
+        log.info("[KRAS] 스케줄 적재 시작 (lt_c_uzone=API, lp_pa_cbnd=SHP)");
+        runDirectLoad(null, null, "SCHEDULE");
     }
 
+    @Deprecated
     public void runLoad() {
         runLoad(null, (Map<Integer, String>) null, null);
     }
 
+    @Deprecated
     public void runLoad(List<Integer> targetIndices, String schemaOverride) {
         runLoad(targetIndices, schemaOverride, null);
     }
 
+    @Deprecated
     public void runLoad(List<Integer> targetIndices, String schemaOverride, java.util.Set<String> fileFilter) {
         runLoad(targetIndices, (Map<Integer, String>) null, fileFilter);
     }
 
+    @Deprecated
     public void runLoad(List<Integer> targetIndices, Map<Integer, String> schemaMap, java.util.Set<String> fileFilter) {
         runLoad(targetIndices, schemaMap, fileFilter, null);
     }
 
+    @Deprecated
     public void runLoad(List<Integer> targetIndices, Map<Integer, String> schemaMap,
                         java.util.Set<String> fileFilter, Set<String> tgtTableFilter) {
         log.info("[KRAS] 적재 시작 (파일 → DB, targets={}, files={})",
@@ -320,7 +316,7 @@ public class KrasWorker {
         List<Map<String, Object>> results = new ArrayList<>();
         int storageEpsg = coordTransformer.getStorageEpsg();
 
-        // lt_c_uzone: mock 3건 (EPSG:5186 그대로 저장)
+        // lt_c_uzone: mock 3건 (EPSG:5174 → 5186 변환 적재)
         SyncTableDef uzoneDef = defs.stream()
                 .filter(d -> d.srcTableName.startsWith("USEZONE:")).findFirst().orElse(null);
         if (uzoneDef != null) {
@@ -329,7 +325,7 @@ public class KrasWorker {
             for (TargetWithSchema ts : selected) {
                 try {
                     int saved = odsRepository.replaceAllTo(ts.target().jdbc(), uzoneDef,
-                            settings.orgCode(), storageEpsg, storageEpsg,
+                            settings.orgCode(), KRAS_EPSG, storageEpsg,
                             mockRows, safeSchema, null, false);
                     results.add(Map.of("table", "lt_c_uzone", "source", "mock", "rows", mockRows.size(),
                             "saved", saved, "target", ts.target().label()));
@@ -420,10 +416,10 @@ public class KrasWorker {
         return dot >= 0 ? tgtTableName.substring(dot + 1) : tgtTableName;
     }
 
-    // USEZONE: API가 이미 storage CRS(5186)로 반환 → 변환 불필요
-    // SHP(lp_pa_cbnd 등): KRAS_EPSG(5174) → storage CRS(5186) 변환
+    // API(GetFeature, srsName:5174)와 SHP 파일 모두 KRAS_EPSG(5174)로 제공된다.
+    // replaceAllTo()에서 sourceEpsg != storageEpsg이면 ST_Transform(wkt, 5174→5186) 적용.
     private int sourceEpsg(SyncTableDef def) {
-        return def.srcTableName.startsWith("USEZONE:") ? coordTransformer.getStorageEpsg() : KRAS_EPSG;
+        return KRAS_EPSG;
     }
 
     // ──────────────────────────────────────────────────────────────────
@@ -431,16 +427,24 @@ public class KrasWorker {
     // ──────────────────────────────────────────────────────────────────
 
     public void runDirectLoad(List<Integer> targetIndices, Map<Integer, String> schemaMap) {
-        log.info("[KRAS] 직접 적재 시작 (lt_c_uzone=API, lp_pa_cbnd=SHP)");
+        runDirectLoad(targetIndices, schemaMap, "MANUAL");
+    }
+
+    public void runDirectLoad(List<Integer> targetIndices, Map<Integer, String> schemaMap, String triggeredBy) {
+        log.info("[KRAS] 직접 적재 시작 (lt_c_uzone=API, lp_pa_cbnd=SHP, triggeredBy={})", triggeredBy);
+        Long logId = executionLogService.start("KRAS_LOAD", triggeredBy, settings.krasSchedule());
+        usezoneCodeService.refresh();
         statusService.recordStart("KRAS_LOAD");
         int totalSuccess = 0, totalError = 0;
         boolean failed = false;
+        String errorMsg = null;
         try {
             List<TargetDbService.ActiveTarget> allTargets = targetDbService.getConfiguredTargets();
             List<TargetWithSchema> selected = buildTargetsWithSchema(allTargets, targetIndices, schemaMap);
             if (selected.isEmpty()) {
                 log.warn("[KRAS] 선택된 대상 DB 없음 — 직접 적재 중단");
                 failed = true;
+                errorMsg = "활성 대상 DB 없음";
                 return;
             }
 
@@ -459,6 +463,7 @@ public class KrasWorker {
                 } catch (Exception e) {
                     log.error("[KRAS] {} 직접 적재 실패: {}", def.tgtTableName, e.getMessage(), e);
                     totalError++;
+                    if (errorMsg == null) errorMsg = def.tgtTableName + ": " + e.getMessage();
                 }
                 completed++;
                 statusService.updateProgress("KRAS_LOAD", completed, tableDefs.size(), def.tgtTableName);
@@ -467,8 +472,10 @@ public class KrasWorker {
         } catch (Exception e) {
             log.error("[KRAS] 직접 적재 중 오류: {}", e.getMessage(), e);
             failed = true;
+            errorMsg = e.getMessage();
         } finally {
             statusService.recordEnd("KRAS_LOAD", totalSuccess, totalError, failed);
+            executionLogService.finish(logId, totalSuccess, totalError, failed, errorMsg);
         }
     }
 
@@ -513,90 +520,20 @@ public class KrasWorker {
     // ──────────────────────────────────────────────────────────────────
 
     public Map<String, Object> testConnection() {
-        Map<String, Object> result = new LinkedHashMap<>();
-        try {
-            gpkiService.assertReady();
-            ObjectNode req = objectMapper.createObjectNode();
-            req.put("service", "CHECK");
-            req.put("connSysId", settings.krasConnSysId());
-            req.put("orgCode", settings.orgCode());
-            req.put("chkPnu", settings.krasChkPnu());
-            JsonNode res = post(req);
-            result.put("resultCode", res.path("resultCode").asText(""));
-            result.put("resultMsg", res.path("resultMsg").asText(""));
-            result.put("success", "00".equals(res.path("resultCode").asText("")));
-            result.put("orgCode", settings.orgCode());
-            result.put("url", settings.krasUrl());
-        } catch (Exception e) {
-            result.put("success", false);
-            result.put("error", e.getMessage());
-        }
-        return result;
+        return apiClient.testConnection();
     }
 
     public List<Map<String, Object>> testLayerList() throws Exception {
-        ObjectNode req = objectMapper.createObjectNode();
-        req.put("service", "GetLayerList");
-        req.put("connSysId", settings.krasConnSysId());
-        req.put("orgCode", settings.orgCode());
-        JsonNode res = post(req);
-        List<Map<String, Object>> layers = new ArrayList<>();
-        for (JsonNode layer : res.path("layers")) {
-            Map<String, Object> info = new LinkedHashMap<>();
-            info.put("layerName", layer.path("layerName").asText(""));
-            info.put("layerAlias", layer.path("layerAlias").asText(""));
-            layers.add(info);
-        }
-        return layers;
+        return apiClient.testLayerList();
     }
 
     public Map<String, Object> testFeatures(String layerName, int limit) throws Exception {
-        Map<String, Object> result = new LinkedHashMap<>();
-        ObjectNode req = objectMapper.createObjectNode();
-        req.put("service", "GetFeature");
-        req.put("connSysId", settings.krasConnSysId());
-        req.put("orgCode", settings.orgCode());
-        req.put("layerName", layerName);
-        req.put("srsName", "EPSG:" + KRAS_EPSG);
-        JsonNode res = post(req);
-        result.put("resultCode", res.path("resultCode").asText(""));
-        result.put("resultMsg", res.path("resultMsg").asText(""));
-        int total = 0;
-        List<Map<String, Object>> rows = new ArrayList<>();
-        for (JsonNode feature : res.path("features")) {
-            total++;
-            if (rows.size() < Math.min(limit, 100)) {
-                Map<String, Object> row = new LinkedHashMap<>();
-                feature.fields().forEachRemaining(e -> {
-                    String k = e.getKey();
-                    String v = e.getValue().asText(null);
-                    if ("wkt".equals(k) && v != null && v.length() > 60) {
-                        row.put(k, v.substring(0, 60) + "…");
-                    } else {
-                        row.put(k, v);
-                    }
-                });
-                rows.add(row);
-            }
-        }
-        result.put("total", total);
-        result.put("rows", rows);
-        return result;
+        return apiClient.testFeatures(layerName, limit);
     }
 
     private boolean checkConnection() {
         try {
-            gpkiService.assertReady();
-            if (gpkiService.isEnabled()) {
-                log.info("[KRAS] GPKI authentication enabled (gpki_id={})", gpkiService.gpkiId());
-            }
-            ObjectNode req = objectMapper.createObjectNode();
-            req.put("service", "CHECK");
-            req.put("connSysId", settings.krasConnSysId());
-            req.put("orgCode", settings.orgCode());
-            req.put("chkPnu", settings.krasChkPnu());
-
-            JsonNode res = post(req);
+            JsonNode res = apiClient.check();
             String code = res.path("resultCode").asText("");
             log.info("[KRAS] 연결 확인: resultCode={}, msg={}", code,
                     res.path("resultMsg").asText(""));
@@ -643,24 +580,20 @@ public class KrasWorker {
         for (TargetDbService.ActiveTarget target : targets) {
             log.info("[KRAS] loading {} into target {}", def.tgtTableName, target.label());
             saved = odsRepository.replaceAllTo(target.jdbc(), def, settings.orgCode(),
-                    sourceEpsg(def), coordTransformer.getStorageEpsg(), rows, null, "KRAS");
+                    sourceEpsg(def), coordTransformer.getStorageEpsg(), rows, settings.odsSchema(), "KRAS");
         }
         return saved;
     }
 
     private List<String> fetchAvailableUsezoneLayers() {
         try {
-            ObjectNode req = objectMapper.createObjectNode();
-            req.put("service", "GetLayerList");
-            req.put("connSysId", settings.krasConnSysId());
-            req.put("orgCode", settings.orgCode());
-
-            JsonNode res = post(req);
+            JsonNode res = apiClient.layerList();
             List<String> names = new ArrayList<>();
             for (JsonNode layer : res.path("layers")) {
                 String name = layer.path("layerName").asText("");
-                // API 응답 레이어명은 "LSMD_CONT_UB201" 형태; "USEZONE:"는 XML 내부 구분자
-                if (!name.isBlank()) names.add(name);
+                // estateGateway는 전체 레이어 목록을 반환하므로 USEZONE 레이어만 필터링
+                // USEZONE 레이어 패턴: LSMD_CONT_U{코드} (예: LSMD_CONT_UB201, LSMD_CONT_UQ112)
+                if (!name.isBlank() && isUsezoneLayer(name)) names.add(name);
             }
             log.info("[KRAS] USEZONE 레이어 목록: {}개 ({})", names.size(), names);
             return names;
@@ -670,16 +603,17 @@ public class KrasWorker {
         }
     }
 
+    private static boolean isUsezoneLayer(String layerName) {
+        // "LSMD_CONT_U" 이후에 알파벳 코드가 오는 용도지역지구 레이어만 포함
+        int idx = layerName.indexOf("LSMD_CONT_U");
+        if (idx < 0) return false;
+        int codeStart = idx + "LSMD_CONT_U".length();
+        return codeStart < layerName.length() && Character.isLetter(layerName.charAt(codeStart));
+    }
+
     private List<Map<String, Object>> fetchFeatures(String layerName, SyncTableDef def) {
         try {
-            ObjectNode req = objectMapper.createObjectNode();
-            req.put("service", "GetFeature");
-            req.put("connSysId", settings.krasConnSysId());
-            req.put("orgCode", settings.orgCode());
-            req.put("layerName", layerName);
-            req.put("srsName", "EPSG:" + KRAS_EPSG);
-
-            JsonNode res = post(req);
+            JsonNode res = apiClient.features(layerName);
             if (!"00".equals(res.path("resultCode").asText(""))) {
                 log.warn("[KRAS] GetFeature 실패: layerName={}, code={}", layerName,
                         res.path("resultCode").asText());
@@ -715,17 +649,4 @@ public class KrasWorker {
         return row;
     }
 
-    private JsonNode post(ObjectNode body) throws Exception {
-        gpkiService.addAuthentication(body);
-        try (CloseableHttpClient client = HttpClients.createDefault()) {
-            HttpPost request = new HttpPost(settings.krasUrl());
-            request.setEntity(new StringEntity(objectMapper.writeValueAsString(body),
-                    ContentType.APPLICATION_JSON));
-
-            return client.execute(request, response -> {
-                String responseText = EntityUtils.toString(response.getEntity());
-                return objectMapper.readTree(gpkiService.decodeResponse(responseText));
-            });
-        }
-    }
 }

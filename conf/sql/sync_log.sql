@@ -1,0 +1,21 @@
+-- 이 파일은 참고용입니다.
+-- 실제 테이블 생성은 SyncExecutionLogService.init()의 인라인 DDL로 수행됩니다.
+-- 스키마는 conf/application.yml의 sync.log-schema 값을 따릅니다 (기본값: public).
+--
+-- CREATE TABLE IF NOT EXISTS "{{sync.log-schema}}".sync_execution_log (
+--     id          BIGSERIAL    PRIMARY KEY,
+--     type        VARCHAR(30)  NOT NULL,
+--     triggered   VARCHAR(20)  NOT NULL DEFAULT 'SCHEDULE',
+--     status      VARCHAR(10)  NOT NULL DEFAULT 'RUNNING',
+--     started_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+--     ended_at    TIMESTAMPTZ,
+--     duration_s  INTEGER,
+--     rows_ok     INTEGER      NOT NULL DEFAULT 0,
+--     rows_err    INTEGER      NOT NULL DEFAULT 0,
+--     error_msg   TEXT,
+--     org_code    VARCHAR(20),
+--     schedule    VARCHAR(100)
+-- );
+--
+-- CREATE INDEX IF NOT EXISTS idx_sel_started_at
+-- ON "{{sync.log-schema}}".sync_execution_log (started_at DESC);

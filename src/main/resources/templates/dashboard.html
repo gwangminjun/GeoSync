@@ -69,6 +69,21 @@
 
   </div>
 
+  <!-- DB 준비 상태 -->
+  <div style="margin-bottom:26px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+      <div style="font-size:14px;font-weight:700;color:#f3f5f7;">데이터베이스 준비 상태</div>
+      <button type="button" onclick="refreshDbStatus()"
+              id="dbRefreshBtn"
+              style="padding:5px 12px;border-radius:6px;border:1px solid #2e3640;background:#1e242c;color:#9aa2ad;font-size:12px;font-family:inherit;cursor:pointer;">
+        새로고침
+      </button>
+    </div>
+    <div id="dbStatusArea">
+      <div style="color:#69707b;font-size:13px;padding:10px 0;">확인 중...</div>
+    </div>
+  </div>
+
   <!-- 수동 실행 버튼 -->
   <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:26px;align-items:center;">
 
@@ -899,6 +914,170 @@
       return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     }
 
+    // ── DB 준비 상태 ─────────────────────────────────────────────────
+
+    var TABLE_LABELS = {
+      'lp_pa_cbnd':    '필지 경계 (SHP)',
+      'lt_c_uzone':    '용도지역 (API)',
+      'mt_usezone_cd': '용도지역 코드표',
+      'sync_execution_log': '스케줄/수동 실행 이력'
+    };
+
+    function refreshDbStatus() {
+      var area = document.getElementById('dbStatusArea');
+      var btn  = document.getElementById('dbRefreshBtn');
+      area.innerHTML = '<div style="color:#69707b;font-size:13px;padding:10px 0;">확인 중...</div>';
+      btn.disabled = true;
+
+      fetch('/db/status')
+        .then(function(r) { return r.json(); })
+        .then(function(targets) {
+          renderDbStatus(targets);
+        })
+        .catch(function(e) {
+          area.innerHTML = '<div style="color:#e88a82;font-size:13px;">조회 실패: ' + escapeHtml(String(e)) + '</div>';
+        })
+        .finally(function() { btn.disabled = false; });
+    }
+
+    function renderDbStatus(targets) {
+      var area = document.getElementById('dbStatusArea');
+      if (!targets || targets.length === 0) {
+        area.innerHTML = '<div style="color:#5b626d;font-size:13px;">설정된 대상 DB가 없습니다. 설정 페이지에서 DB를 추가하세요.</div>';
+        return;
+      }
+      var html = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:14px;">';
+      targets.forEach(function(t) {
+        var hasError  = t.error && t.error.length > 0;
+        var allOk     = !hasError && t.tables.every(function(tb) { return tb.exists; });
+        var anyMissing = !hasError && t.tables.some(function(tb) { return !tb.exists; });
+        var borderColor = hasError ? '#3a2a28' : (allOk ? '#1e3a28' : '#3a3318');
+        var statusBadge = hasError
+          ? '<span style="padding:2px 8px;border-radius:5px;font-size:11px;font-weight:600;background:#2a1a1a;color:#e88a82;">연결 실패</span>'
+          : allOk
+            ? '<span style="padding:2px 8px;border-radius:5px;font-size:11px;font-weight:600;background:#15291f;color:#5fc98a;">준비 완료</span>'
+            : '<span style="padding:2px 8px;border-radius:5px;font-size:11px;font-weight:600;background:#2a2517;color:#d9b066;">테이블 누락</span>';
+
+        html += '<div style="background:#1a1f26;border:1px solid ' + borderColor + ';border-radius:11px;padding:18px;">';
+
+        // DB 헤더
+        html += '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:14px;gap:8px;">';
+        html += '<div style="min-width:0;">';
+        html += '<div style="font-size:14px;font-weight:700;color:#f3f5f7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escapeHtml(t.name || 'DB') + '</div>';
+        html += '<div style="font-size:11.5px;color:#69707b;font-family:monospace;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escapeHtml(t.host) + ' / ' + escapeHtml(t.dbname) + '</div>';
+        html += '</div>';
+        html += statusBadge;
+        html += '</div>';
+
+        if (hasError) {
+          html += '<div style="font-size:12px;color:#e88a82;word-break:break-all;">' + escapeHtml(t.error) + '</div>';
+        } else {
+          // 테이블 목록
+          html += '<div style="display:flex;flex-direction:column;gap:6px;margin-bottom:' + (anyMissing ? '14' : '0') + 'px;">';
+          t.tables.forEach(function(tb) {
+            var exists = tb.exists;
+            html += '<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:7px;background:' +
+              (exists ? '#141820' : '#1e1a12') + ';border:1px solid ' + (exists ? '#1e242c' : '#2e2a18') + ';">';
+            html += '<span style="font-size:16px;line-height:1;">' + (exists ? '✓' : '✕') + '</span>';
+            html += '<div style="flex:1;min-width:0;">';
+            html += '<div style="font-size:12.5px;font-family:monospace;color:' + (exists ? '#c8cdd4' : '#e8d080') + ';">' + escapeHtml(tb.name) + '</div>';
+            html += '<div style="font-size:11px;color:#5b626d;margin-top:1px;">' +
+              escapeHtml(TABLE_LABELS[tb.name] || '') +
+              ' &nbsp;—&nbsp; <span style="font-family:monospace;">' + escapeHtml(tb.schema) + '</span> 스키마</div>';
+            html += '</div>';
+            if (!exists) {
+              html += '<button type="button" ' +
+                'onclick="createTable(' + t.idx + ',\'' + escapeHtml(tb.name) + '\',this)" ' +
+                'style="padding:4px 12px;border-radius:6px;border:1px solid #4a3a1a;background:#2a2010;color:#d9b066;font-size:12px;font-family:inherit;cursor:pointer;white-space:nowrap;">' +
+                '생성</button>';
+            }
+            html += '</div>';
+          });
+          html += '</div>';
+
+          if (anyMissing) {
+            var missingNames = t.tables.filter(function(tb) { return !tb.exists; }).map(function(tb) { return tb.name; });
+            html += '<button type="button" ' +
+              'onclick="createAllMissing(' + t.idx + ',[' + missingNames.map(function(n) { return '\'' + n + '\''; }).join(',') + '],this)" ' +
+              'style="width:100%;padding:8px;border-radius:7px;border:1px solid #2e4a22;background:#1a2e14;color:#5fc98a;font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer;">' +
+              '누락 테이블 전체 생성 (' + missingNames.length + '개)</button>';
+          }
+        }
+
+        html += '</div>';
+      });
+      html += '</div>';
+      document.getElementById('dbStatusArea').innerHTML = html;
+    }
+
+    function createTable(targetIdx, tableName, btn) {
+      btn.disabled = true;
+      btn.textContent = '생성 중...';
+      var body = new URLSearchParams();
+      body.append('targetIdx', targetIdx);
+      body.append('tableName', tableName);
+      fetch('/db/create-table', { method:'POST', body: body,
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'} })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          if (d.success) {
+            btn.textContent = '완료';
+            btn.style.background = '#15291f';
+            btn.style.color = '#5fc98a';
+            btn.style.borderColor = '#1e3a28';
+            setTimeout(refreshDbStatus, 800);
+          } else {
+            btn.disabled = false;
+            btn.textContent = '실패';
+            btn.style.color = '#e88a82';
+            btn.title = d.message || '';
+          }
+        })
+        .catch(function() {
+          btn.disabled = false;
+          btn.textContent = '오류';
+          btn.style.color = '#e88a82';
+        });
+    }
+
+    function createAllMissing(targetIdx, tableNames, btn) {
+      btn.disabled = true;
+      btn.textContent = '생성 중... (0/' + tableNames.length + ')';
+      var done = 0;
+      var failed = [];
+      function next(i) {
+        if (i >= tableNames.length) {
+          if (failed.length === 0) {
+            btn.textContent = '완료';
+            btn.style.background = '#15291f';
+            btn.style.color = '#5fc98a';
+          } else {
+            btn.textContent = '일부 실패: ' + failed.join(', ');
+            btn.style.color = '#e88a82';
+          }
+          setTimeout(refreshDbStatus, 800);
+          return;
+        }
+        var body = new URLSearchParams();
+        body.append('targetIdx', targetIdx);
+        body.append('tableName', tableNames[i]);
+        fetch('/db/create-table', { method:'POST', body: body,
+              headers: {'Content-Type': 'application/x-www-form-urlencoded'} })
+          .then(function(r) { return r.json(); })
+          .then(function(d) {
+            done++;
+            if (!d.success) failed.push(tableNames[i]);
+            btn.textContent = '생성 중... (' + done + '/' + tableNames.length + ')';
+            next(i + 1);
+          })
+          .catch(function() {
+            failed.push(tableNames[i]);
+            next(i + 1);
+          });
+      }
+      next(0);
+    }
+
     /* ── 로딩바 폴링 ─────────────────────────────────── */
     var _pollTimer   = null;
     var _startTimes  = {};   // type → Date (null = not running)
@@ -1059,11 +1238,14 @@
       Object.keys(_initRunning).forEach(function(type) {
         if (_initRunning[type]) {
           anyRunning = true;
-          _startTimes[type] = new Date(); // 시작 시각 미확정 → 폴링 후 보정
+          _startTimes[type] = new Date();
           showBar(type);
         }
       });
       if (anyRunning) startPolling();
+
+      // DB 준비 상태 자동 조회
+      refreshDbStatus();
     });
   </script>
 

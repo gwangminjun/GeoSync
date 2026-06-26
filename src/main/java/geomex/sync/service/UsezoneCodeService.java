@@ -2,61 +2,85 @@ package geomex.sync.service;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.RowCallbackHandler;
 import org.springframework.stereotype.Service;
 
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
+import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
- * mt_usezone_cd.sql 로딩 → use_zone_zone_cd → use_zone_zone_cd_nm 코드 맵.
- * theme_code(ucode) 기준 theme_name(uname) 조회에 사용.
+ * mt_usezone_cd DB 테이블 조회 → use_zone_zone_cd → use_zone_zone_cd_nm 코드 맵.
+ * 동기화 실행 시 첫 조회에 로드, 1시간 TTL로 캐싱.
  */
 @Service
 public class UsezoneCodeService {
 
     private static final Logger log = LoggerFactory.getLogger(UsezoneCodeService.class);
+    private static final long TTL_MS = 3_600_000L;
 
-    // VALUES('code', ...(7개)..., 'name', ...)
-    private static final Pattern INSERT_PATTERN = Pattern.compile(
-            "VALUES\\s*\\('([^']+)'(?:\\s*,\\s*'[^']*'){7}\\s*,\\s*'([^']*)'");
+    private final TargetDbService targetDbService;
+    private final TargetTableNameService tableNameService;
 
-    private final Map<String, String> codeToName;
+    private volatile Map<String, String> codeToName = null;
+    private volatile long loadedAt = 0;
 
-    public UsezoneCodeService(
-            @Value("${usezone.code-sql:conf/sql/mt_usezone_cd.sql}") String sqlPath) {
-        this.codeToName = loadCodes(Path.of(sqlPath));
-        log.info("[UsezoneCode] {} 코드 로드 (path={})", codeToName.size(), sqlPath);
+    public UsezoneCodeService(TargetDbService targetDbService, TargetTableNameService tableNameService) {
+        this.targetDbService = targetDbService;
+        this.tableNameService = tableNameService;
     }
 
     /** use_zone_zone_cd → use_zone_zone_cd_nm 반환. 없으면 null. */
     public String getName(String code) {
         if (code == null) return null;
+        ensureLoaded();
         return codeToName.get(code);
     }
 
-    private static Map<String, String> loadCodes(Path sqlFile) {
-        Map<String, String> map = new LinkedHashMap<>();
-        if (!Files.exists(sqlFile)) {
-            log.warn("[UsezoneCode] SQL 파일 없음: {}", sqlFile.toAbsolutePath());
-            return map;
-        }
+    /** 동기화 시작 시 캐시 강제 갱신용. */
+    public void refresh() {
+        loadFromDb();
+    }
+
+    private synchronized void ensureLoaded() {
+        if (codeToName != null && System.currentTimeMillis() - loadedAt < TTL_MS) return;
+        loadFromDb();
+    }
+
+    private synchronized void loadFromDb() {
+        List<TargetDbService.ActiveTarget> targets;
         try {
-            for (String line : Files.readAllLines(sqlFile, StandardCharsets.UTF_8)) {
-                Matcher m = INSERT_PATTERN.matcher(line);
-                if (m.find()) {
-                    map.put(m.group(1), m.group(2));
-                }
-            }
-        } catch (IOException e) {
-            log.warn("[UsezoneCode] SQL 파일 읽기 실패: {}", e.getMessage());
+            targets = targetDbService.getActiveTargets();
+        } catch (Exception e) {
+            log.warn("[UsezoneCode] DB 대상 조회 실패: {}", e.getMessage());
+            if (codeToName == null) codeToName = Collections.emptyMap();
+            return;
         }
-        return map;
+
+        if (targets.isEmpty()) {
+            log.warn("[UsezoneCode] 활성 DB 없음 — 코드 테이블 로드 불가");
+            if (codeToName == null) codeToName = Collections.emptyMap();
+            return;
+        }
+
+        String tableName = tableNameService.resolve("mt_usezone_cd");
+        JdbcTemplate jdbc = targets.get(0).jdbc();
+
+        try {
+            Map<String, String> map = new LinkedHashMap<>();
+            jdbc.query(
+                "SELECT use_zone_zone_cd, use_zone_zone_cd_nm FROM " + tableName
+                    + " ORDER BY use_zone_zone_cd",
+                (RowCallbackHandler) rs -> map.put(rs.getString(1), rs.getString(2))
+            );
+            codeToName = map;
+            loadedAt = System.currentTimeMillis();
+            log.info("[UsezoneCode] {} 코드 로드 (테이블={})", map.size(), tableName);
+        } catch (Exception e) {
+            log.warn("[UsezoneCode] {} 조회 실패: {}", tableName, e.getMessage());
+            if (codeToName == null) codeToName = Collections.emptyMap();
+        }
     }
 }

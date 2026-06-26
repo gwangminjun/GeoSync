@@ -32,14 +32,15 @@
     .btn-danger:hover { background:#2a1a1a; }
     .btn-teal { border:none; background:#0e9b94; color:#fff; cursor:pointer;
                 padding:10px 22px; border-radius:8px; font-size:13.5px; font-weight:600; font-family:inherit; }
-    /* schedule picker */
-    .sched-wrap { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
-    .sched-time { width:110px !important; }
-    .sched-cron { font-family:'JetBrains Mono',monospace; font-size:12px; color:#69707b;
-                  background:#14171c; padding:5px 10px; border-radius:6px; border:1px solid #262c35; white-space:nowrap; }
-    .sched-raw { display:none; width:200px !important; }
-    .sched-toggle { font-size:11.5px; color:#69707b; cursor:pointer; text-decoration:underline; }
-    .sched-toggle:hover { color:#9aa2ad; }
+    /* schedule mode selector */
+    .sched-mode-btn { padding:7px 15px; background:#14171c; border:none; border-right:1px solid #2e3640;
+                      color:#69707b; font-size:12.5px; font-family:inherit; cursor:pointer; transition:background .13s,color .13s; }
+    .sched-mode-btn:last-child { border-right:none; }
+    .sched-mode-btn:hover { background:#1a1f26; color:#9aa2ad; }
+    .sched-mode-btn.active { background:#0a2b29; color:#3dddd4; font-weight:700; }
+    .sched-val-pill { font-size:12px; font-family:'JetBrains Mono',monospace; color:#5b626d;
+                      padding:4px 10px; background:#14171c; border:1px solid #262c35; border-radius:6px; white-space:nowrap; }
+    .sched-val-pill.on { color:#3dddd4; background:#0a1c1c; border-color:#1a3838; }
     .test-result { font-size:12.5px; font-family:'JetBrains Mono',monospace; }
   </style>
   </th:block>
@@ -152,7 +153,13 @@
           <label class="gs-label">SHP 파일 작업 디렉토리</label>
           <input class="gs-input mono" type="text" name="kras_work_dir" id="kras_work_dir"
                  th:value="${values['kras_work_dir']}" placeholder="./workspace/kras">
-          <div style="font-size:11.5px;color:#5b626d;margin-top:5px;">SHP/TXT 파일을 넣을 폴더. 실제 파일 위치는 이 경로/{기관코드}/ 입니다.</div>
+          <div style="font-size:11.5px;color:#5b626d;margin-top:5px;">예: ./workspace/kras — 실제 파일 위치는 이 경로/{기관코드}/ 이며 폴더는 자동 생성됩니다.</div>
+        </div>
+        <div style="width:130px;flex-shrink:0;">
+          <label class="gs-label">SHP 인코딩</label>
+          <input class="gs-input mono" type="text" name="kras_shp_charset" id="kras_shp_charset"
+                 th:value="${values['kras_shp_charset']}" placeholder="MS949">
+          <div style="font-size:11px;color:#5b626d;margin-top:4px;">예: MS949, UTF-8</div>
         </div>
       </div>
 
@@ -182,16 +189,55 @@
       <!-- 스케줄 -->
       <div>
         <label class="gs-label">실행 스케줄</label>
-        <div class="sched-wrap">
-          <span style="font-size:13px;color:#9aa2ad;">매일</span>
-          <input type="time" class="gs-input sched-time" id="kras_time">
-          <span style="font-size:13px;color:#9aa2ad;">실행</span>
-          <span class="sched-cron" id="kras_cron_display">-</span>
-          <span class="sched-toggle" onclick="toggleRaw('kras')">고급 설정</span>
-          <input type="text" class="gs-input mono sched-raw" id="kras_raw"
-                 placeholder="0 30 4 * * *">
-          <input type="hidden" name="kras_schedule" id="kras_schedule">
+
+        <!-- 모드 탭 -->
+        <div style="display:flex;gap:0;border:1px solid #2e3640;border-radius:8px;overflow:hidden;width:fit-content;margin-bottom:14px;">
+          <button type="button" class="sched-mode-btn" id="kras-mode-daily"    onclick="setSchedMode('kras','daily')">매일 실행</button>
+          <button type="button" class="sched-mode-btn" id="kras-mode-interval" onclick="setSchedMode('kras','interval')">인터벌 반복</button>
+          <button type="button" class="sched-mode-btn" id="kras-mode-cron"     onclick="setSchedMode('kras','cron')">Cron 직접 입력</button>
+          <button type="button" class="sched-mode-btn" id="kras-mode-off"      onclick="setSchedMode('kras','off')">비활성</button>
         </div>
+
+        <!-- 패널: 매일 실행 -->
+        <div id="kras-panel-daily">
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+            <span style="font-size:13px;color:#9aa2ad;">매일</span>
+            <input type="time" class="gs-input" id="kras_time" style="width:130px;"
+                   oninput="updateDailyCron('kras')">
+            <span style="font-size:13px;color:#9aa2ad;">에 실행</span>
+            <span class="sched-val-pill" id="kras_cron_display"></span>
+          </div>
+        </div>
+
+        <!-- 패널: 인터벌 반복 -->
+        <div id="kras-panel-interval" style="display:none;">
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+            <input type="number" class="gs-input" id="kras_iv_h" min="0" max="99" value="6"
+                   style="width:72px;text-align:right;" oninput="updateInterval('kras')">
+            <span style="font-size:13px;color:#9aa2ad;">시간</span>
+            <input type="number" class="gs-input" id="kras_iv_m" min="0" max="59" value="0"
+                   style="width:72px;text-align:right;" oninput="updateInterval('kras')">
+            <span style="font-size:13px;color:#9aa2ad;">분마다 반복</span>
+            <span class="sched-val-pill on" id="kras_iv_display">@every 6h</span>
+          </div>
+          <div style="font-size:11.5px;color:#5b626d;margin-top:6px;">서버 시작 후 첫 실행, 이후 완료 시점부터 지정한 간격으로 재실행됩니다.</div>
+        </div>
+
+        <!-- 패널: Cron 직접 입력 -->
+        <div id="kras-panel-cron" style="display:none;">
+          <input type="text" class="gs-input mono" id="kras_raw" style="max-width:280px;"
+                 placeholder="0 30 4 * * *" oninput="updateRaw('kras')">
+          <div style="font-size:11.5px;color:#5b626d;margin-top:6px;">
+            6개 필드 (초 분 시 일 월 요일) &nbsp;|&nbsp; 예: <code style="color:#9aa2ad;">0 30 4 * * *</code> = 매일 04:30 &nbsp;|&nbsp; <code style="color:#9aa2ad;">-</code> = 비활성화
+          </div>
+        </div>
+
+        <!-- 패널: 비활성 -->
+        <div id="kras-panel-off" style="display:none;">
+          <div style="font-size:13px;color:#5b626d;padding:6px 0;">스케줄이 비활성화됩니다. 대시보드에서 수동으로만 적재할 수 있습니다.</div>
+        </div>
+
+        <input type="hidden" name="kras_schedule" id="kras_schedule">
       </div>
 
     </div>
@@ -232,94 +278,76 @@
     return null;
   }
 
-  const SCHED_DEFAULTS = { kras: '04:30' };
-
-  function initSchedule(key, cron) {
-    // CSS 클래스로 숨겨진 raw 입력을 inline style로도 명시해야
-    // toggleRaw/submit 핸들러의 style.display 체크가 정상 동작함
-    document.getElementById(key + '_raw').style.display = 'none';
-
-    const time = cronToTime(cron);
-    if (time) {
-      document.getElementById(key + '_time').value = time;
-      document.getElementById(key + '_cron_display').textContent = cron || '-';
-      document.getElementById(key + '_schedule').value = cron;
-    } else if (cron) {
-      // 단순 daily 아님 → 고급 모드로 초기화
-      showRaw(key, cron);
-    } else {
-      // 저장된 cron 없음 → 기본 시간 표시 (빈 폼 저장 방지)
-      const defTime = SCHED_DEFAULTS[key] || '04:30';
-      const defCron = timeToCron(defTime);
-      document.getElementById(key + '_time').value = defTime;
-      document.getElementById(key + '_cron_display').textContent = defCron;
-      document.getElementById(key + '_schedule').value = defCron;
-    }
+  /* ── 스케줄 모드 감지 ──────────────────────────────────────── */
+  function detectSchedMode(value) {
+    if (!value || value === '-' || value.trim() === '') return 'off';
+    if (value.trim().toLowerCase().startsWith('@every')) return 'interval';
+    if (cronToTime(value)) return 'daily';
+    return 'cron';
   }
 
-  function updateCron(key) {
-    const t = document.getElementById(key + '_time').value;
-    const cron = timeToCron(t);
-    document.getElementById(key + '_cron_display').textContent = cron;
-    document.getElementById(key + '_schedule').value = cron;
-  }
-
-  /* ── 고급 모드 토글 ────────────────────────────────────────── */
-  function showRaw(key, value) {
-    document.getElementById(key + '_time').parentElement.querySelector('.sched-wrap').style.display;
-    document.getElementById(key + '_time').style.display = 'none';
-    document.getElementById(key + '_cron_display').style.display = 'none';
-    document.getElementById(key + '_raw').style.display = 'block';
-    document.getElementById(key + '_raw').value = value || document.getElementById(key + '_schedule').value;
-    document.querySelectorAll('#' + key + '_time').forEach(e => e.previousElementSibling && (e.previousElementSibling.style.display='none'));
-  }
-
-  function toggleRaw(key) {
-    const rawEl   = document.getElementById(key + '_raw');
-    const timeEl  = document.getElementById(key + '_time');
-    const cronEl  = document.getElementById(key + '_cron_display');
-    const isRaw   = rawEl.style.display !== 'none';
-
-    if (isRaw) {
-      // 고급 → 시간 picker
-      const time = cronToTime(rawEl.value);
-      if (!time) { alert('매일 1회 실행 cron 만 시간 선택으로 전환 가능합니다.\n예: 0 30 4 * * *'); return; }
-      rawEl.style.display = 'none';
-      timeEl.style.display = '';
-      cronEl.style.display = '';
-      timeEl.value = time;
-      updateCron(key);
-      // 레이블 앞뒤 span 복원
-      setDailySpansVisible(key, true);
-    } else {
-      rawEl.style.display = 'block';
-      timeEl.style.display = 'none';
-      cronEl.style.display = 'none';
-      setDailySpansVisible(key, false);
-      rawEl.value = document.getElementById(key + '_schedule').value;
-    }
-  }
-
-  function setDailySpansVisible(key, visible) {
-    const wrap = document.getElementById(key + '_time').closest('.sched-wrap');
-    if (!wrap) return;
-    wrap.querySelectorAll('span').forEach(s => {
-      if (s.classList.contains('sched-cron') || s.classList.contains('sched-toggle')) return;
-      s.style.display = visible ? '' : 'none';
+  /* ── 모드 전환 ─────────────────────────────────────────────── */
+  function setSchedMode(key, mode) {
+    ['daily', 'interval', 'cron', 'off'].forEach(m => {
+      document.getElementById(`${key}-mode-${m}`).classList.toggle('active', m === mode);
+      document.getElementById(`${key}-panel-${m}`).style.display = m === mode ? '' : 'none';
     });
+    syncHidden(key, mode);
   }
 
-  /* ── 폼 제출 전 cron 값 확정 ───────────────────────────────── */
+  function syncHidden(key, mode) {
+    const hidden = document.getElementById(`${key}_schedule`);
+    if (mode === 'off') {
+      hidden.value = '-';
+    } else if (mode === 'daily') {
+      const t = document.getElementById(`${key}_time`).value || '04:30';
+      hidden.value = timeToCron(t);
+      document.getElementById(`${key}_cron_display`).textContent = hidden.value;
+    } else if (mode === 'interval') {
+      const h = parseInt(document.getElementById(`${key}_iv_h`).value) || 0;
+      const m = parseInt(document.getElementById(`${key}_iv_m`).value) || 0;
+      let expr = '@every';
+      if (h > 0) expr += ` ${h}h`;
+      if (m > 0) expr += ` ${m}m`;
+      if (h === 0 && m === 0) { hidden.value = '-'; return; }
+      hidden.value = expr.trim();
+      document.getElementById(`${key}_iv_display`).textContent = hidden.value;
+    } else if (mode === 'cron') {
+      hidden.value = (document.getElementById(`${key}_raw`).value || '').trim();
+    }
+  }
+
+  /* ── 각 패널 입력 이벤트 핸들러 ───────────────────────────── */
+  function updateDailyCron(key) { syncHidden(key, 'daily'); }
+  function updateInterval(key)  { syncHidden(key, 'interval'); }
+  function updateRaw(key)       { syncHidden(key, 'cron'); }
+
+  /* ── 초기화 ─────────────────────────────────────────────────── */
+  function initSchedule(key, value) {
+    const mode = detectSchedMode(value);
+
+    if (mode === 'daily') {
+      const time = cronToTime(value);
+      document.getElementById(`${key}_time`).value = time;
+    } else if (mode === 'interval') {
+      const match = value.match(/@every\s+(?:(\d+)h)?\s*(?:(\d+)m)?/i);
+      if (match) {
+        document.getElementById(`${key}_iv_h`).value = match[1] || 0;
+        document.getElementById(`${key}_iv_m`).value = match[2] || 0;
+      }
+    } else if (mode === 'cron') {
+      document.getElementById(`${key}_raw`).value = value;
+    }
+
+    setSchedMode(key, mode);
+  }
+
+  /* ── 폼 제출 전 값 확정 ────────────────────────────────────── */
   document.getElementById('settings-form').addEventListener('submit', function() {
     ['kras'].forEach(key => {
-      const rawEl  = document.getElementById(key + '_raw');
-      const timeEl = document.getElementById(key + '_time');
-      const hidden = document.getElementById(key + '_schedule');
-      if (rawEl.style.display !== 'none') {
-        hidden.value = rawEl.value.trim();
-      } else {
-        hidden.value = timeToCron(timeEl.value);
-      }
+      const mode = ['daily','interval','cron','off']
+        .find(m => document.getElementById(`${key}-mode-${m}`)?.classList.contains('active')) || 'off';
+      syncHidden(key, mode);
     });
   });
 
@@ -465,11 +493,6 @@
 
   document.addEventListener('DOMContentLoaded', function() {
     initSchedule('kras', initKrasCron);
-
-    document.getElementById('kras_time').addEventListener('change', () => updateCron('kras'));
-    document.getElementById('kras_raw').addEventListener('input', function() {
-      document.getElementById('kras_schedule').value = this.value;
-    });
   });
 </script>
 </th:block>

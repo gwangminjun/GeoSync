@@ -1,0 +1,7 @@
+{
+  "service": "GetFeature",
+  "connSysId": "HOH4-N9PX-73Y6-B393",
+  "orgCode": "46870",
+  "layerName": "USEZONE:LSMD_CONT_UQ112",
+  "srsName": "EPSG:5174"
+}

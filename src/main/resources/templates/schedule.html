@@ -55,7 +55,7 @@
 
     <div class="meta-grid">
       <div class="meta-row">
-        <div class="meta-label">Cron 표현식</div>
+        <div class="meta-label" th:text="${krasInterval} ? '인터벌' : 'Cron 표현식'">스케줄</div>
         <div th:if="${krasCron != null and !#strings.isEmpty(krasCron) and krasCron != '-'}"
              class="meta-value accent" th:text="${krasCron}"></div>
         <div th:unless="${krasCron != null and !#strings.isEmpty(krasCron) and krasCron != '-'}"
@@ -157,10 +157,65 @@
     </div>
   </div>
 
+  <!-- 실행 이력 카드 -->
+  <div class="card">
+    <div class="card-title">실행 이력</div>
+
+    <div th:if="${#lists.isEmpty(executionLogs)}"
+         style="font-size:13px;color:#4a5260;padding:10px 0;">
+      아직 실행 기록이 없습니다. 스케줄 실행 또는 수동 적재 후 이력이 표시됩니다.
+    </div>
+
+    <div th:unless="${#lists.isEmpty(executionLogs)}" style="overflow-x:auto;">
+      <table class="map-table">
+        <thead>
+          <tr>
+            <th style="width:140px;">시작 시각</th>
+            <th style="width:70px;">구분</th>
+            <th style="width:70px;">트리거</th>
+            <th style="width:60px;">상태</th>
+            <th style="width:60px;text-align:right;">소요(초)</th>
+            <th style="width:70px;text-align:right;">성공</th>
+            <th style="width:70px;text-align:right;">오류</th>
+            <th>오류 메시지</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr th:each="r : ${executionLogs}">
+            <td class="src-name"
+                th:text="${r['started_at'] != null ? #temporals.format(r['started_at'].toLocalDateTime(), 'yyyy-MM-dd HH:mm:ss') : ''}"></td>
+            <td style="color:#c8cdd4;" th:text="${r['type']}"></td>
+            <td>
+              <span th:if="${r['triggered'] == 'SCHEDULE'}"
+                    style="padding:2px 7px;border-radius:5px;font-size:11px;background:#0e2535;color:#3db8dd;">스케줄</span>
+              <span th:unless="${r['triggered'] == 'SCHEDULE'}"
+                    style="padding:2px 7px;border-radius:5px;font-size:11px;background:#1e242c;color:#9aa2ad;">수동</span>
+            </td>
+            <td>
+              <span th:if="${r['status'] == 'SUCCESS'}" class="status-success">완료</span>
+              <span th:if="${r['status'] == 'FAILED'}"  class="status-failed">실패</span>
+              <span th:if="${r['status'] == 'RUNNING'}" class="status-running">실행중</span>
+            </td>
+            <td style="text-align:right;color:#c8cdd4;font-family:'JetBrains Mono',monospace;"
+                th:text="${r['duration_s'] != null ? r['duration_s'] : '-'}"></td>
+            <td style="text-align:right;color:#4cba7f;font-family:'JetBrains Mono',monospace;"
+                th:text="${#numbers.formatInteger(r['rows_ok'] ?: 0, 0, 'COMMA')}"></td>
+            <td style="text-align:right;font-family:'JetBrains Mono',monospace;"
+                th:style="${(r['rows_err'] ?: 0) > 0} ? 'text-align:right;color:#e05c5c;font-family:monospace;' : 'text-align:right;color:#4a5260;font-family:monospace;'"
+                th:text="${r['rows_err'] ?: 0}"></td>
+            <td style="font-size:12px;color:#69707b;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"
+                th:text="${r['error_msg'] ?: ''}"></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
   <!-- 안내 -->
   <div style="padding:15px 20px;background:#171b21;border:1px solid #232a34;border-radius:10px;font-size:13px;color:#69707b;line-height:1.7;">
-    Cron 표현식 변경은
-    <a th:href="@{/settings}" style="color:#3dddd4;">설정</a> 페이지에서 수정 후 저장하면 즉시 반영됩니다.
+    스케줄 변경은 <a th:href="@{/settings}" style="color:#3dddd4;">설정</a> 페이지에서 수정 후 저장하면 즉시 반영됩니다.
+    인터벌 형식 예시: <span style="font-family:monospace;color:#9aa2ad;">@every 6h</span> (6시간마다),
+    <span style="font-family:monospace;color:#9aa2ad;">@every 30m</span> (30분마다)
   </div>
 </main>
 

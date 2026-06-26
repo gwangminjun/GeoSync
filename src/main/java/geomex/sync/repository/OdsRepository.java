@@ -51,6 +51,7 @@ public class OdsRepository {
     }
 
     @Transactional
+    @Deprecated
     public int replaceAll(SyncTableDef def, String orgCode, int targetEpsg,
                           List<Map<String, Object>> rows) {
         return replaceAllTo(jdbc, def, orgCode, targetEpsg, rows);
@@ -129,14 +130,23 @@ public class OdsRepository {
     public int replaceAllTo(JdbcTemplate targetJdbc, SyncTableDef def, String orgCode,
                             int sourceEpsg, int storageEpsg, List<Map<String, Object>> rows,
                             String schemaOverride, String progressType, boolean tableAlreadyCreated) {
-        String targetTableName = tableNameService.resolve(def.tgtTableName, schemaOverride);
+        return replaceAllTo(new InsertRequest(targetJdbc, def, orgCode, sourceEpsg, storageEpsg,
+                rows, schemaOverride, progressType, tableAlreadyCreated));
+    }
+
+    private int replaceAllTo(InsertRequest request) {
+        JdbcTemplate targetJdbc = request.targetJdbc();
+        SyncTableDef def = request.def();
+        String orgCode = request.orgCode();
+        List<Map<String, Object>> rows = request.rows();
+        String targetTableName = tableNameService.resolve(def.tgtTableName, request.schemaOverride());
         String sqlTableName = qualifiedTableName(targetTableName);
         String databaseName = currentDatabase(targetJdbc);
         log.info("[{}] database={} org_cd={} save start (rows={})",
                 targetTableName, databaseName, orgCode, rows.size());
 
-        if (!tableAlreadyCreated) {
-            ensureTableExists(targetJdbc, targetTableName, sqlTableName, def, storageEpsg);
+        if (!request.tableAlreadyCreated()) {
+            ensureTableExists(targetJdbc, targetTableName, sqlTableName, def, request.storageEpsg());
             log.info("[{}] database={} table verified", targetTableName, databaseName);
         }
         Set<String> targetColumns = tableColumns(targetJdbc, targetTableName);
@@ -156,7 +166,8 @@ public class OdsRepository {
 
         if (rows.isEmpty()) return 0;
 
-        InsertPlan insertPlan = buildInsertPlan(def, sqlTableName, sourceEpsg, storageEpsg, targetColumns);
+        InsertPlan insertPlan = buildInsertPlan(def, sqlTableName,
+                request.sourceEpsg(), request.storageEpsg(), targetColumns);
 
         List<Object[]> allParams = new ArrayList<>(rows.size());
         for (Map<String, Object> row : rows) {
@@ -166,7 +177,7 @@ public class OdsRepository {
         int count = 0;
         int failCount = 0;
         Exception firstFailure = null;
-        updateInsertProgress(progressType, targetTableName, databaseName, 0, rows.size());
+        updateInsertProgress(request.progressType(), targetTableName, databaseName, 0, rows.size());
 
         for (int start = 0; start < allParams.size(); start += BATCH_SIZE) {
             int end = Math.min(start + BATCH_SIZE, allParams.size());
@@ -180,10 +191,10 @@ public class OdsRepository {
                 if (firstFailure == null) firstFailure = e;
                 log.warn("[{}] batch INSERT failed (rows {}-{}): {}", targetTableName, start, end, e.getMessage());
             }
-            updateInsertProgress(progressType, targetTableName, databaseName, count + failCount, rows.size());
+            updateInsertProgress(request.progressType(), targetTableName, databaseName, count + failCount, rows.size());
         }
 
-        updateInsertProgress(progressType, targetTableName, databaseName, count, rows.size());
+        updateInsertProgress(request.progressType(), targetTableName, databaseName, count, rows.size());
         if (failCount > 0) {
             throw new IllegalStateException("INSERT failed for " + targetTableName
                     + " on database " + databaseName + " (success=" + count
@@ -323,7 +334,7 @@ public class OdsRepository {
         List<InsertParam> params = new ArrayList<>();
 
         for (ColumnDef col : cols) {
-            String targetName = resolveInsertColumn(col, targetColumns);
+            String targetName = resolveInsertColumn(def, col, targetColumns);
             if (targetName == null) continue;
             if (!colList.isEmpty()) {
                 colList.append(", ");
@@ -352,7 +363,7 @@ public class OdsRepository {
                 params);
     }
 
-    private String resolveInsertColumn(ColumnDef col, Set<String> targetColumns) {
+    private String resolveInsertColumn(SyncTableDef def, ColumnDef col, Set<String> targetColumns) {
         if (targetColumns == null || targetColumns.contains(col.tgtName.toLowerCase())) {
             return col.tgtName;
         }
@@ -363,6 +374,7 @@ public class OdsRepository {
         if (alias != null && targetColumns.contains(alias)) {
             return alias;
         }
+        log.warn("[{}] 컬럼 '{}' 대상 테이블에 없음 — INSERT에서 스킵", def.tgtTableName, col.tgtName);
         return null;
     }
 
@@ -389,6 +401,11 @@ public class OdsRepository {
                 schema,
                 baseName));
     }
+
+    private record InsertRequest(JdbcTemplate targetJdbc, SyncTableDef def, String orgCode,
+                                 int sourceEpsg, int storageEpsg, List<Map<String, Object>> rows,
+                                 String schemaOverride, String progressType,
+                                 boolean tableAlreadyCreated) {}
 
     private record InsertPlan(String sql, List<InsertParam> params) {}
 

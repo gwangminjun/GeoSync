@@ -1,8 +1,8 @@
 package geomex.sync.web;
 
 import geomex.sync.service.KrasCatalogStatusService;
+import geomex.sync.service.RuntimeSettingsService;
 import geomex.sync.service.SyncStatusService;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -12,19 +12,20 @@ public class DashboardController {
 
     private final SyncStatusService statusService;
     private final KrasCatalogStatusService catalogStatusService;
+    private final RuntimeSettingsService settings;
 
-    @Value("${sync.org-code:46870}")
-    private String orgCode;
-
-    public DashboardController(SyncStatusService statusService, KrasCatalogStatusService catalogStatusService) {
+    public DashboardController(SyncStatusService statusService,
+                               KrasCatalogStatusService catalogStatusService,
+                               RuntimeSettingsService settings) {
         this.statusService = statusService;
         this.catalogStatusService = catalogStatusService;
+        this.settings = settings;
     }
 
     @GetMapping("/")
     public String dashboard(Model model) {
         model.addAttribute("currentPage", "dashboard");
-        model.addAttribute("orgCode", orgCode);
+        model.addAttribute("orgCode", settings.orgCode());
         model.addAttribute("krasRunning", statusService.isRunning("KRAS"));
         model.addAttribute("krasCollectRunning", statusService.isRunning("KRAS_COLLECT"));
         model.addAttribute("krasLoadRunning", statusService.isRunning("KRAS_LOAD"));

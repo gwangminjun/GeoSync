@@ -38,7 +38,7 @@ public class KrasCatalogStatusService {
     private final RuntimeSettingsService settings;
     private final Map<String, CachedDbStatus> dbStatusCache = new ConcurrentHashMap<>();
 
-    @Value("${kras.catalog:./46870_DATA_CATALOG.md}")
+    @Value("${kras.catalog:}")
     private String catalogPath;
 
     public KrasCatalogStatusService(SyncStatusService statusService, TargetDbService targetDbService,
@@ -65,6 +65,8 @@ public class KrasCatalogStatusService {
     }
 
     private CatalogFileStatus usezoneSummaryStatus(Map<String, FileGroup> groups, LocalDateTime lastSuccess) {
+        List<CatalogLayer> layers = readCatalogLayers();
+        int expectedCount = layers.size();
         int complete = 0;
         int files = 0;
         LocalDateTime latest = null;
@@ -78,14 +80,14 @@ public class KrasCatalogStatusService {
         }
 
         DbStatus db = dbStatus("lt_c_uzone", true);
-        boolean fileLoaded = complete >= 47;
+        boolean fileLoaded = expectedCount > 0 && complete >= expectedCount;
         return new CatalogFileStatus(
                 "KRAS 수신 원본 요약",
                 "KRAS 수신 원본",
                 "lt_c_uzone",
                 "lsmd_cont_u*.{shp,dbf,shx}",
                 "레이어별 shp/dbf/shx",
-                47,
+                expectedCount,
                 complete,
                 files,
                 latest,
@@ -95,40 +97,8 @@ public class KrasCatalogStatusService {
                 db.rowCount,
                 db.message,
                 db.targetLabels,
-                "46870_DATA_CATALOG 기준 47개 용도지역지구 레이어"
+                catalogPath().getFileName() + " 기준 " + expectedCount + "개 용도지역지구 레이어"
         );
-    }
-
-    private List<CatalogFileStatus> usezoneLayerStatuses(Map<String, FileGroup> groups, LocalDateTime lastSuccess) {
-        DbStatus db = dbStatus("lt_c_uzone", true);
-        List<CatalogLayer> layers = readCatalogLayers();
-        List<CatalogFileStatus> statuses = new ArrayList<>();
-        for (CatalogLayer layer : layers) {
-            FileGroup group = groups.get(layer.fileName);
-            int complete = group != null && group.extensions.containsAll(SHP_SET) ? 1 : 0;
-            int files = group != null ? group.fileCount : 0;
-            LocalDateTime latest = group != null ? group.latestModified : null;
-            boolean fileLoaded = complete == 1;
-            statuses.add(new CatalogFileStatus(
-                    layer.category,
-                    layer.code + " " + layer.description,
-                    "lt_c_uzone",
-                    layer.fileName + ".{shp,dbf,shx}",
-                    "shp, dbf, shx",
-                    1,
-                    complete,
-                    files,
-                    latest,
-                    fileLoaded,
-                    isSynced(latest, lastSuccess),
-                    db.loaded,
-                    db.rowCount,
-                    db.message,
-                    db.targetLabels,
-                    layer.fileName
-            ));
-        }
-        return statuses;
     }
 
     private CatalogFileStatus exactStatus(Map<String, FileGroup> groups, String category, String name, String target,
@@ -149,25 +119,8 @@ public class KrasCatalogStatusService {
                 db.targetLabels, note);
     }
 
-    private CatalogFileStatus legacyStatus(Map<String, FileGroup> groups, String category, String name, String target,
-                                           String pattern, Set<String> requiredExtensions,
-                                           LocalDateTime lastSuccess, String note, boolean filterByOrgCode) {
-        String baseName = baseNameFromPattern(pattern);
-        FileGroup group = groups.get(baseName);
-        int complete = group != null && group.extensions.containsAll(requiredExtensions) ? 1 : 0;
-        int files = group != null ? group.fileCount : 0;
-        LocalDateTime latest = group != null ? group.latestModified : null;
-
-        DbStatus db = dbStatus(target, filterByOrgCode);
-        boolean fileLoaded = complete > 0;
-        return new CatalogFileStatus(category, name, target, pattern,
-                String.join(", ", requiredExtensions), 1, complete, files,
-                latest, fileLoaded, isSynced(latest, lastSuccess), db.loaded, db.rowCount, db.message,
-                db.targetLabels, note);
-    }
-
     private List<CatalogLayer> readCatalogLayers() {
-        Path path = Path.of(catalogPath).normalize();
+        Path path = catalogPath();
         if (!Files.isRegularFile(path)) return fallbackLayers();
 
         List<CatalogLayer> layers = new ArrayList<>();
@@ -193,6 +146,13 @@ public class KrasCatalogStatusService {
             return fallbackLayers();
         }
         return layers.isEmpty() ? fallbackLayers() : layers;
+    }
+
+    private Path catalogPath() {
+        if (catalogPath != null && !catalogPath.isBlank()) {
+            return Path.of(catalogPath).normalize();
+        }
+        return Path.of("./" + settings.orgCode() + "_DATA_CATALOG.md").normalize();
     }
 
     private String cleanCell(String cell) {
@@ -349,7 +309,7 @@ public class KrasCatalogStatusService {
     }
 
     private boolean isSynced(LocalDateTime latestModified, LocalDateTime lastSuccess) {
-        return latestModified != null && lastSuccess != null && !latestModified.isBefore(lastSuccess);
+        return latestModified != null && lastSuccess != null && !lastSuccess.isBefore(latestModified);
     }
 
     private LocalDateTime max(LocalDateTime a, LocalDateTime b) {

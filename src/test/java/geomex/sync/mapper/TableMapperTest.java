@@ -13,7 +13,7 @@ class TableMapperTest {
 
     @Test
     void loadsKrasBaseTables() {
-        List<SyncTableDef> tables = mapper.load("../GEOMEX-SYNC-HOME/conf/kras/base-tables.xml");
+        List<SyncTableDef> tables = mapper.load("conf/kras/base-tables.xml");
 
         assertThat(tables).isNotEmpty();
         SyncTableDef cbnd = tables.stream()
@@ -26,7 +26,7 @@ class TableMapperTest {
 
     @Test
     void buildUpsertSqlContainsOnConflict() {
-        List<SyncTableDef> tables = mapper.load("../GEOMEX-SYNC-HOME/conf/kras/base-tables.xml");
+        List<SyncTableDef> tables = mapper.load("conf/kras/base-tables.xml");
         SyncTableDef cbnd = tables.stream()
                 .filter(t -> t.tgtTableName.equals("ods.lp_pa_cbnd"))
                 .findFirst().orElseThrow();

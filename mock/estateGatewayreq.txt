@@ -1,0 +1,6 @@
+http://110.20.1.12:8385/conn/estateGateway
+
+conn_svc_id : KRAS000037
+conn_sys_id : HOH4-N9PX-73Y6-B393
+adm_sect_cd : 46870
+adm_sec_cd : 46870

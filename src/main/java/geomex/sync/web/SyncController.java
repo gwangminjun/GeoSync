@@ -38,7 +38,7 @@ public class SyncController {
     @GetMapping("/status")
     @ResponseBody
     public Map<String, Object> syncStatus() {
-        var types = List.of("KRAS_LOAD");
+        var types = List.of("KRAS", "KRAS_COLLECT", "KRAS_LOAD");
         Map<String, Object> result = new java.util.LinkedHashMap<>();
         for (String type : types) {
             boolean isRunning = statusService.isRunning(type);

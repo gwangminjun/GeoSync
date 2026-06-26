@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import geomex.sync.scheduler.DynamicScheduleManager;
 import geomex.sync.service.RuntimeSettingsService;
+import geomex.sync.service.TargetDbService;
 import org.apache.hc.client5.http.classic.methods.HttpPost;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
 import org.apache.hc.client5.http.impl.classic.HttpClients;
@@ -32,14 +33,11 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
-import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 @Controller
 @RequestMapping("/settings")
@@ -49,10 +47,13 @@ public class SettingsController {
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final RuntimeSettingsService settings;
     private final DynamicScheduleManager scheduleManager;
+    private final TargetDbService targetDbService;
 
-    public SettingsController(RuntimeSettingsService settings, DynamicScheduleManager scheduleManager) {
+    public SettingsController(RuntimeSettingsService settings, DynamicScheduleManager scheduleManager,
+                              TargetDbService targetDbService) {
         this.settings = settings;
         this.scheduleManager = scheduleManager;
+        this.targetDbService = targetDbService;
     }
 
     @Value("${spring.config.location:conf/application.yml}")
@@ -60,9 +61,6 @@ public class SettingsController {
 
     @Value("${kras.chk-pnu:4687025625111190010}")
     private String defaultChkPnu;
-
-    @Value("${sync.org-code:46870}")
-    private String orgCode;
 
     // ── GET /settings ────────────────────────────────────────────────────────
 
@@ -83,10 +81,11 @@ public class SettingsController {
                 values.put("kras_conn_sys_id", yamlValue(kras, "conn-sys-id",""));
                 values.put("kras_chk_pnu",     yamlValue(kras, "chk-pnu",   ""));
                 values.put("kras_work_dir",    yamlValue(kras, "work-dir",   ""));
+                values.put("kras_shp_charset", yamlValue(kras, "shp-charset","MS949"));
                 values.put("kras_schedule",    yamlValue(kras, "schedule",   ""));
                 values.put("ods_schema",       yamlValue(ods,  "schema",     "ods"));
                 Map<String, Object> sync = childMap(root, "sync");
-                values.put("sync_org_code",    yamlValue(sync, "org-code",   orgCode));
+                values.put("sync_org_code",    yamlValue(sync, "org-code",   settings.orgCode()));
 
                 if (values.get("kras_chk_pnu").isEmpty()) {
                     values.put("kras_chk_pnu", defaultChkPnu);
@@ -98,7 +97,8 @@ public class SettingsController {
             }
         }
         values.putIfAbsent("ods_schema", "ods");
-        values.putIfAbsent("sync_org_code", orgCode);
+        values.putIfAbsent("kras_shp_charset", "MS949");
+        values.putIfAbsent("sync_org_code", settings.orgCode());
 
         model.addAttribute("currentPage", "settings");
         model.addAttribute("configPath", configFile.toAbsolutePath().toString());
@@ -233,6 +233,7 @@ public class SettingsController {
             Files.createDirectories(configFile.getParent());
             Files.writeString(configFile, buildYaml(params), StandardCharsets.UTF_8);
             settings.reload();
+            targetDbService.evictStaleTargets();
             scheduleManager.reloadSchedules();
             log.info("설정 저장: {}", configFile.toAbsolutePath());
             ra.addFlashAttribute("success", "설정을 저장했습니다. 변경 사항은 재시작 없이 바로 적용됩니다.");
@@ -336,34 +337,19 @@ public class SettingsController {
 
     private long countRows(Connection conn, String schema, String table, boolean onlyOrg) throws Exception {
         String sql = "SELECT COUNT(*) FROM " + quoteIdent(schema) + "." + quoteIdent(table)
-                + (onlyOrg ? " WHERE org_cd = '" + settings.orgCode().replace("'", "''") + "'" : "");
-        try (Statement st = conn.createStatement();
-             ResultSet rs = st.executeQuery(sql)) {
-            return rs.next() ? rs.getLong(1) : 0;
+                + (onlyOrg ? " WHERE org_cd = ?" : "");
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            if (onlyOrg) {
+                ps.setString(1, settings.orgCode());
+            }
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() ? rs.getLong(1) : 0;
+            }
         }
     }
 
     private String quoteIdent(String value) {
         return "\"" + value.replace("\"", "\"\"") + "\"";
-    }
-
-    private String extractYamlValue(String content, String key, String section) {
-        int sectionIdx = content.indexOf("\n" + section + ":");
-        if (sectionIdx < 0) sectionIdx = content.indexOf(section + ":");
-        String searchIn = sectionIdx >= 0 ? content.substring(sectionIdx) : content;
-        int nextSection = searchIn.indexOf("\n\n");
-        if (nextSection > 0) searchIn = searchIn.substring(0, nextSection);
-        Pattern p = Pattern.compile("(?m)^\\s+" + Pattern.quote(key) + ":\\s*(.+)$");
-        Matcher m = p.matcher(searchIn);
-        if (!m.find()) return "";
-        String raw = m.group(1).trim();
-        if (raw.length() >= 2) {
-            char f = raw.charAt(0), l = raw.charAt(raw.length() - 1);
-            if ((f == '"' && l == '"') || (f == '\'' && l == '\'')) {
-                raw = raw.substring(1, raw.length() - 1);
-            }
-        }
-        return raw;
     }
 
     private String buildYaml(Map<String, String> p) {
@@ -390,6 +376,7 @@ public class SettingsController {
           .append("  conn-sys-id: ").append(yaml(p.get("kras_conn_sys_id"))).append("\n")
           .append("  chk-pnu: ").append(yaml(p.get("kras_chk_pnu"))).append("\n")
           .append("  work-dir: ").append(yaml(safe(p.get("kras_work_dir")).isEmpty() ? "./workspace/kras" : p.get("kras_work_dir"))).append("\n")
+          .append("  shp-charset: ").append(yaml(safe(p.get("kras_shp_charset")).isEmpty() ? "MS949" : p.get("kras_shp_charset"))).append("\n")
           .append("  schedule: ").append(yaml(krasSched.isEmpty() ? "0 30 4 * * *" : krasSched)).append("\n\n")
           .append("ods:\n")
           .append("  schema: ").append(yaml(safe(p.get("ods_schema")).isEmpty() ? "ods" : p.get("ods_schema"))).append("\n\n")

@@ -98,6 +98,22 @@ public class TargetDbService implements DisposableBean {
         return new ActiveTarget(name, url, cached.jdbc());
     }
 
+    public void evictStaleTargets() {
+        List<String> activeKeys = settings.targets().stream()
+                .filter(TargetDb::isEnabled)
+                .map(t -> t.jdbcUrl() + "\n" + t.getUsername() + "\n"
+                        + (t.getPassword() != null ? t.getPassword() : ""))
+                .toList();
+        targetCache.entrySet().removeIf(e -> {
+            if (!activeKeys.contains(e.getKey())) {
+                e.getValue().dataSource().close();
+                log.info("[TargetDbService] stale DataSource closed");
+                return true;
+            }
+            return false;
+        });
+    }
+
     private List<ActiveTarget> fallbackTargets() {
         return List.of(new ActiveTarget("default DB", primaryUrl, primaryJdbc));
     }

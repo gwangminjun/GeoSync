@@ -2,6 +2,7 @@ package geomex.sync.service;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import geomex.sync.config.KrasGpkiProperties;
+import java.util.Map;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -33,6 +34,12 @@ public class KrasGpkiService {
     public void addAuthentication(ObjectNode body) {
         if (isEnabled()) {
             body.put("gpki_id", properties.getId());
+        }
+    }
+
+    public void addAuthentication(Map<String, String> params) {
+        if (isEnabled()) {
+            params.put("gpki_id", properties.getId());
         }
     }
 
@@ -79,7 +86,8 @@ public class KrasGpkiService {
     }
 
     public String decodeResponse(String responseText) {
-        if (!isEnabled() || !properties.isDecryptResponse() || looksLikeJson(responseText)) {
+        if (!isEnabled() || !properties.isDecryptResponse()
+                || looksLikeJson(responseText) || looksLikeXml(responseText)) {
             return responseText;
         }
         try {
@@ -117,11 +125,15 @@ public class KrasGpkiService {
     }
 
     private boolean looksLikeJson(String text) {
-        if (text == null) {
-            return false;
-        }
+        if (text == null) return false;
         String trimmed = text.trim();
         return trimmed.startsWith("{") || trimmed.startsWith("[");
+    }
+
+    private boolean looksLikeXml(String text) {
+        if (text == null) return false;
+        String trimmed = text.trim();
+        return trimmed.startsWith("<");
     }
 
     private void requireText(String value, String key) {

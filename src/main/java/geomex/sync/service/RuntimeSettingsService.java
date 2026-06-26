@@ -22,6 +22,9 @@ public class RuntimeSettingsService {
     @Value("${kras.url:http://110.20.1.12:8385/conn/estateGateway}")
     private String defaultKrasUrl;
 
+    @Value("${kras.conn-svc-id:KRAS000037}")
+    private String defaultKrasConnSvcId;
+
     @Value("${kras.conn-sys-id:}")
     private String defaultKrasConnSysId;
 
@@ -33,6 +36,9 @@ public class RuntimeSettingsService {
 
     @Value("${kras.work-dir:./workspace/kras}")
     private String defaultKrasWorkDir;
+
+    @Value("${kras.shp-charset:MS949}")
+    private String defaultKrasShpCharset;
 
     @Value("${kras.schedule:0 30 4 * * *}")
     private String defaultKrasSchedule;
@@ -56,6 +62,10 @@ public class RuntimeSettingsService {
         return str(child("kras").get("url"), defaultKrasUrl);
     }
 
+    public String krasConnSvcId() {
+        return str(child("kras").get("conn-svc-id"), defaultKrasConnSvcId);
+    }
+
     public String krasConnSysId() {
         return str(child("kras").get("conn-sys-id"), defaultKrasConnSysId);
     }
@@ -77,6 +87,10 @@ public class RuntimeSettingsService {
             if (dir.endsWith("\\" + org)) return dir.substring(0, dir.length() - org.length() - 1);
         }
         return dir;
+    }
+
+    public String krasShpCharset() {
+        return str(child("kras").get("shp-charset"), defaultKrasShpCharset);
     }
 
     public String krasSchedule() {
@@ -129,7 +143,7 @@ public class RuntimeSettingsService {
         return Collections.emptyMap();
     }
 
-    private Snapshot snapshot() {
+    private synchronized Snapshot snapshot() {
         Path path = resolveConfigPath();
         long modified = modifiedTime(path);
         Snapshot current = snapshot;

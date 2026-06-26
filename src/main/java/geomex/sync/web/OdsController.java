@@ -1,8 +1,8 @@
 package geomex.sync.web;
 
+import geomex.sync.service.RuntimeSettingsService;
 import geomex.sync.service.SyncStatusService;
 import geomex.sync.service.TargetDbService;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -23,19 +23,19 @@ public class OdsController {
 
     private final TargetDbService targetDbService;
     private final SyncStatusService statusService;
+    private final RuntimeSettingsService settings;
 
-    @Value("${sync.org-code:46870}")
-    private String orgCode;
-
-    public OdsController(TargetDbService targetDbService, SyncStatusService statusService) {
+    public OdsController(TargetDbService targetDbService, SyncStatusService statusService,
+                         RuntimeSettingsService settings) {
         this.targetDbService = targetDbService;
         this.statusService = statusService;
+        this.settings = settings;
     }
 
     @GetMapping
     public String odsPage(Model model) {
         model.addAttribute("currentPage", "ods");
-        model.addAttribute("orgCode", orgCode);
+        model.addAttribute("orgCode", settings.orgCode());
         model.addAttribute("krasRunning", statusService.isRunning("KRAS"));
         model.addAttribute("targets", targetDbService.getConfiguredTargets());
         return "ods";
