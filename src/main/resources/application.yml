@@ -32,6 +32,10 @@ kras:
     jiga-txt: false
     land-txt: false
 
+koreps:
+  url: ${KOREPS_URL:http://10.188.226.221:8385/conn/estateGateway}
+  conn-sys-id: ${KOREPS_CONN_SYS_ID:VUHK-MFG4-XUME-M9AO}
+
 ods:
   schema: ${ODS_SCHEMA:ods}
   schedule: ${ODS_SCHEDULE:0 30 5 * * *}

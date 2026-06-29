@@ -193,6 +193,26 @@ public class KrasApiClient implements DisposableBean {
     }
 
     // ──────────────────────────────────────────────────────────────────
+    // 단건 조회 (KRAS000002 ~ KRAS000103)
+    // ──────────────────────────────────────────────────────────────────
+
+    /**
+     * PNU 기반 단건 조회: conn_svc_id + pnu [+ extraParams] → raw XML bytes.
+     *
+     * @param connSvcId  서비스 코드 (예: KRAS000002)
+     * @param pnu        필지번호
+     * @param extraParams 추가 파라미터 (bno, map_width 등, null 가능)
+     */
+    public byte[] query(String connSvcId, String pnu, Map<String, String> extraParams) throws Exception {
+        Map<String, String> params = baseParams(connSvcId);
+        params.put("pnu", pnu != null ? pnu : "");
+        if (extraParams != null) params.putAll(extraParams);
+        gpkiService.addAuthentication(params);
+        log.debug("[KRAS] query svc={} pnu={}", connSvcId, pnu);
+        return postRaw(params);
+    }
+
+    // ──────────────────────────────────────────────────────────────────
     // TXT 다운로드 (KRAS000039 / KRAS000040)
     // ──────────────────────────────────────────────────────────────────
 

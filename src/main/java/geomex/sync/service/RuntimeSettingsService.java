@@ -49,6 +49,12 @@ public class RuntimeSettingsService {
     @Value("${kras.file-download.output-dir:}")
     private String defaultFileDownloadOutputDir;
 
+    @Value("${koreps.url:http://10.188.226.221:8385/conn/estateGateway}")
+    private String defaultKorepsUrl;
+
+    @Value("${koreps.conn-sys-id:VUHK-MFG4-XUME-M9AO}")
+    private String defaultKorepsConnSysId;
+
     @Value("${ods.schema:ods}")
     private String defaultOdsSchema;
 
@@ -118,6 +124,14 @@ public class RuntimeSettingsService {
 
     public String fileDownloadSchedule() {
         return str(fileDownloadChild().get("schedule"), defaultFileDownloadSchedule);
+    }
+
+    public String korepsUrl() {
+        return str(child("koreps").get("url"), defaultKorepsUrl);
+    }
+
+    public String korepsConnSysId() {
+        return str(child("koreps").get("conn-sys-id"), defaultKorepsConnSysId);
     }
 
     public String fileDownloadOutputDir() {
