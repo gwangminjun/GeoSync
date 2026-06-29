@@ -11,7 +11,18 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.w3c.dom.Document;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
 
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.transform.OutputKeys;
+import javax.xml.transform.Transformer;
+import javax.xml.transform.TransformerFactory;
+import javax.xml.transform.dom.DOMSource;
+import javax.xml.transform.stream.StreamResult;
+import java.io.ByteArrayInputStream;
+import java.io.StringWriter;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -71,6 +82,35 @@ public class KrasConnController {
         this.korepsApiClient = korepsApiClient;
     }
 
+    @GetMapping(value = "/{path}/body", produces = MediaType.APPLICATION_XML_VALUE)
+    public ResponseEntity<String> connQueryBody(
+            @PathVariable String path,
+            @RequestParam(required = false, defaultValue = "") String pnu,
+            @RequestParam(required = false, defaultValue = "") String bno,
+            @RequestParam(required = false) String map_width,
+            @RequestParam(required = false) String map_height,
+            @RequestParam(required = false) String legend_width,
+            @RequestParam(required = false) String legend_height,
+            @RequestParam(required = false) String scale) {
+
+        log.info("[ConnAPI/body] {} pnu={} bno={}", path, pnu, bno);
+
+        try {
+            Map<String, String> extra = buildExtra(path, bno, map_width, map_height,
+                    legend_width, legend_height, scale);
+            byte[] xml = callGateway(path, pnu, extra);
+            String bodyXml = extractBodyXml(xml);
+            return ResponseEntity.ok()
+                    .contentType(new MediaType("application", "xml", StandardCharsets.UTF_8))
+                    .body(bodyXml);
+        } catch (Exception e) {
+            log.error("[ConnAPI/body] {} 조회 실패: {}", path, e.getMessage());
+            return ResponseEntity.internalServerError()
+                    .contentType(new MediaType("application", "xml", StandardCharsets.UTF_8))
+                    .body(errorXml(path, e.getMessage()));
+        }
+    }
+
     @GetMapping(value = "/{path}", produces = MediaType.APPLICATION_XML_VALUE)
     public ResponseEntity<String> connQuery(
             @PathVariable String path,
@@ -127,6 +167,24 @@ public class KrasConnController {
             if (scale       != null) extra.put("scale",        scale);
         }
         return extra;
+    }
+
+    static String extractBodyXml(byte[] rawXml) throws Exception {
+        DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
+        dbf.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+        Document doc = dbf.newDocumentBuilder()
+                .parse(new ByteArrayInputStream(rawXml));
+        NodeList bodies = doc.getElementsByTagName("BODY");
+        if (bodies.getLength() == 0) {
+            return new String(rawXml, StandardCharsets.UTF_8);
+        }
+        Node body = bodies.item(0);
+        StringWriter writer = new StringWriter();
+        Transformer t = TransformerFactory.newInstance().newTransformer();
+        t.setOutputProperty(OutputKeys.OMIT_XML_DECLARATION, "yes");
+        t.setOutputProperty(OutputKeys.ENCODING, "UTF-8");
+        t.transform(new DOMSource(body), new StreamResult(writer));
+        return "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" + writer.toString();
     }
 
     private static String errorXml(String path, String message) {

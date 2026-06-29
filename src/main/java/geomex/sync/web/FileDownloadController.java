@@ -1,6 +1,7 @@
 package geomex.sync.web;
 
 import geomex.sync.service.KrasFileDownloadService;
+import geomex.sync.service.KrasTxtLoaderService;
 import geomex.sync.service.RuntimeSettingsService;
 import geomex.sync.service.SyncStatusService;
 import org.springframework.http.ResponseEntity;
@@ -8,6 +9,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -18,13 +20,16 @@ import java.util.Map;
 public class FileDownloadController {
 
     private final KrasFileDownloadService downloadService;
+    private final KrasTxtLoaderService txtLoaderService;
     private final RuntimeSettingsService settings;
     private final SyncStatusService statusService;
 
     public FileDownloadController(KrasFileDownloadService downloadService,
+                                   KrasTxtLoaderService txtLoaderService,
                                    RuntimeSettingsService settings,
                                    SyncStatusService statusService) {
         this.downloadService = downloadService;
+        this.txtLoaderService = txtLoaderService;
         this.settings = settings;
         this.statusService = statusService;
     }
@@ -61,6 +66,44 @@ public class FileDownloadController {
 
         downloadService.startDownload(outputDir.trim(), cbndShp, usezoneShp, jigaTxt, landTxt);
         return ResponseEntity.ok(Map.of("started", true));
+    }
+
+    /** 공시지가 TXT → anvm_jiga DB 적재. src=api(직접), src=file(outputDir/kras_jiga.txt) */
+    @PostMapping("/load-db-jiga")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> loadDbJiga(
+            @RequestParam(defaultValue = "api") String src,
+            @RequestParam(required = false) String outputDir) {
+        try {
+            int rows;
+            if ("file".equals(src) && outputDir != null && !outputDir.isBlank()) {
+                rows = txtLoaderService.loadJigaFromFile(Path.of(outputDir.trim(), "kras_jiga.txt"));
+            } else {
+                rows = txtLoaderService.loadJigaTxt();
+            }
+            return ResponseEntity.ok(Map.of("success", true, "rows", rows));
+        } catch (Exception e) {
+            return ResponseEntity.ok(Map.of("success", false, "error", e.getMessage()));
+        }
+    }
+
+    /** 토지대장 TXT → land_frst_ledg DB 적재. src=api(직접), src=file(outputDir/kras_land.txt) */
+    @PostMapping("/load-db-land")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> loadDbLand(
+            @RequestParam(defaultValue = "api") String src,
+            @RequestParam(required = false) String outputDir) {
+        try {
+            int rows;
+            if ("file".equals(src) && outputDir != null && !outputDir.isBlank()) {
+                rows = txtLoaderService.loadLandFromFile(Path.of(outputDir.trim(), "kras_land.txt"));
+            } else {
+                rows = txtLoaderService.loadLandTxt();
+            }
+            return ResponseEntity.ok(Map.of("success", true, "rows", rows));
+        } catch (Exception e) {
+            return ResponseEntity.ok(Map.of("success", false, "error", e.getMessage()));
+        }
     }
 
     @GetMapping("/status")

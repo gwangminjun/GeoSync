@@ -75,6 +75,20 @@ public class KrasApiClient implements DisposableBean {
             result.put("success", "00".equals(res.path("resultCode").asText("")));
             result.put("orgCode", settings.orgCode());
             result.put("url", settings.krasUrl());
+
+            // Phase 4: KRAS000011 PNU 존재 확인 (chk-pnu 설정 시)
+            String chkPnu = settings.krasChkPnu();
+            if (chkPnu != null && !chkPnu.isBlank()) {
+                try {
+                    byte[] pnuResult = checkPnu(chkPnu);
+                    String pnuXml = new String(pnuResult, StandardCharsets.UTF_8);
+                    result.put("pnuCheckOk", pnuXml.contains("0000"));
+                    result.put("pnuCheckPnu", chkPnu);
+                } catch (Exception ex) {
+                    result.put("pnuCheckOk", false);
+                    result.put("pnuCheckError", ex.getMessage());
+                }
+            }
         } catch (Exception e) {
             result.put("success", false);
             result.put("error", e.getMessage());
@@ -195,6 +209,14 @@ public class KrasApiClient implements DisposableBean {
     // ──────────────────────────────────────────────────────────────────
     // 단건 조회 (KRAS000002 ~ KRAS000103)
     // ──────────────────────────────────────────────────────────────────
+
+    /**
+     * KRAS000011 PNU 존재 여부 확인.
+     * testConnection()에서 레이어 목록(KRAS000037) 외 추가 검증에 사용.
+     */
+    public byte[] checkPnu(String pnu) throws Exception {
+        return query("KRAS000011", pnu, null);
+    }
 
     /**
      * PNU 기반 단건 조회: conn_svc_id + pnu [+ extraParams] → raw XML bytes.
