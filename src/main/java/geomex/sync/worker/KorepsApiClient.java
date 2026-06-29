@@ -2,15 +2,18 @@ package geomex.sync.worker;
 
 import geomex.sync.service.RuntimeSettingsService;
 import org.apache.hc.client5.http.classic.methods.HttpPost;
+import org.apache.hc.client5.http.config.RequestConfig;
 import org.apache.hc.client5.http.entity.UrlEncodedFormEntity;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
 import org.apache.hc.client5.http.impl.classic.HttpClients;
 import org.apache.hc.core5.http.NameValuePair;
 import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.apache.hc.core5.http.message.BasicNameValuePair;
+import org.apache.hc.core5.util.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.DisposableBean;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.w3c.dom.Document;
 import org.w3c.dom.NodeList;
@@ -39,10 +42,19 @@ public class KorepsApiClient implements DisposableBean {
     private static final Logger log = LoggerFactory.getLogger(KorepsApiClient.class);
 
     private final RuntimeSettingsService settings;
-    private final CloseableHttpClient httpClient = HttpClients.createDefault();
+    private final CloseableHttpClient httpClient;
 
-    public KorepsApiClient(RuntimeSettingsService settings) {
+    public KorepsApiClient(RuntimeSettingsService settings,
+                           @Value("${kras.api-timeout-seconds:30}") int apiTimeoutSeconds) {
         this.settings = settings;
+        RequestConfig config = RequestConfig.custom()
+                .setConnectTimeout(Timeout.ofSeconds(apiTimeoutSeconds))
+                .setResponseTimeout(Timeout.ofSeconds(apiTimeoutSeconds))
+                .build();
+        this.httpClient = HttpClients.custom()
+                .setDefaultRequestConfig(config)
+                .build();
+        log.info("[KOREPS] HttpClient 타임아웃: {}s", apiTimeoutSeconds);
     }
 
     /**
