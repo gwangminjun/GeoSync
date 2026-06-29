@@ -12,7 +12,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.DisposableBean;
 import org.springframework.stereotype.Component;
+import org.w3c.dom.Document;
+import org.w3c.dom.NodeList;
 
+import javax.xml.parsers.DocumentBuilderFactory;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -39,6 +43,42 @@ public class KorepsApiClient implements DisposableBean {
 
     public KorepsApiClient(RuntimeSettingsService settings) {
         this.settings = settings;
+    }
+
+    /**
+     * KOREPS 연결 상태 확인. KOREPS00011 + chkPnu 로 게이트웨이 응답 검증.
+     * 응답 XML의 CODE 요소가 0000이면 success=true, 네트워크 오류면 false.
+     */
+    public Map<String, Object> testConnection(String chkPnu) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("url", settings.korepsUrl());
+        result.put("orgCode", settings.orgCode());
+        try {
+            byte[] data = query("KOREPS00011", chkPnu != null ? chkPnu : "", null);
+            String text = new String(data, StandardCharsets.UTF_8);
+            String code = parseCode(data);
+            boolean ok = "0000".equals(code) || (code == null && text.startsWith("<?xml"));
+            result.put("success", ok);
+            result.put("resultCode", code != null ? (ok ? "00" : code) : "");
+            result.put("resultMsg", ok ? "연결 성공" : "응답 코드: " + code);
+        } catch (Exception e) {
+            result.put("success", false);
+            result.put("error", e.getMessage());
+        }
+        return result;
+    }
+
+    private String parseCode(byte[] data) {
+        try {
+            DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
+            dbf.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+            Document doc = dbf.newDocumentBuilder()
+                    .parse(new ByteArrayInputStream(data));
+            NodeList nl = doc.getElementsByTagName("CODE");
+            return nl.getLength() > 0 ? nl.item(0).getTextContent() : null;
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     /**

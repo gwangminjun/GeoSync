@@ -69,6 +69,20 @@
 
   </div>
 
+  <!-- estateGateway 연결 상태 -->
+  <div style="margin-bottom:26px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+      <div style="font-size:14px;font-weight:700;color:#f3f5f7;">estateGateway 연결 상태</div>
+      <button type="button" onclick="refreshGatewayStatus()" id="gwRefreshBtn"
+              style="padding:5px 12px;border-radius:6px;border:1px solid #2e3640;background:#1e242c;color:#9aa2ad;font-size:12px;font-family:inherit;cursor:pointer;">
+        새로고침
+      </button>
+    </div>
+    <div id="gatewayStatusArea">
+      <div style="color:#69707b;font-size:13px;padding:10px 0;">확인 중...</div>
+    </div>
+  </div>
+
   <!-- DB 준비 상태 -->
   <div style="margin-bottom:26px;">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
@@ -948,6 +962,86 @@
       return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     }
 
+    // ── estateGateway 연결 상태 ──────────────────────────────────────
+
+    function refreshGatewayStatus() {
+      var area = document.getElementById('gatewayStatusArea');
+      var btn  = document.getElementById('gwRefreshBtn');
+      area.innerHTML = '<div style="color:#69707b;font-size:13px;padding:10px 0;">확인 중...</div>';
+      btn.disabled = true;
+
+      fetch('/api/gateway-status')
+        .then(function(r) { return r.json(); })
+        .then(function(data) { renderGatewayStatus(data); })
+        .catch(function(e) {
+          area.innerHTML = '<div style="color:#e88a82;font-size:13px;">조회 실패: ' + escapeHtml(String(e)) + '</div>';
+        })
+        .finally(function() { btn.disabled = false; });
+    }
+
+    function renderGatewayStatus(data) {
+      var area = document.getElementById('gatewayStatusArea');
+      var html = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">';
+      html += renderGatewayCard('KRAS estateGateway', data.kras || {});
+      html += renderGatewayCard('KOREPS estateGateway', data.koreps || {});
+      html += '</div>';
+      area.innerHTML = html;
+    }
+
+    function renderGatewayCard(name, s) {
+      var ok = s.success === true;
+      var borderColor   = ok ? '#1e3a28' : '#3a2a28';
+      var dotColor      = ok ? '#5fc98a' : '#e88a82';
+      var badgeBg       = ok ? '#15291f' : '#2a1a1a';
+      var badgeColor    = ok ? '#5fc98a' : '#e88a82';
+      var badgeText     = ok ? '정상' : '연결 실패';
+      var dotGlow       = ok ? 'box-shadow:0 0 7px ' + dotColor + ';' : '';
+
+      var html = '<div style="background:#1a1f26;border:1px solid ' + borderColor + ';border-radius:11px;padding:18px;">';
+
+      // 헤더
+      html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:13px;">'
+        + '<div style="display:flex;align-items:center;gap:9px;">'
+          + '<div style="width:10px;height:10px;border-radius:50%;background:' + dotColor + ';flex-shrink:0;' + dotGlow + '"></div>'
+          + '<span style="font-size:13.5px;font-weight:700;color:#e7eaee;">' + escapeHtml(name) + '</span>'
+        + '</div>'
+        + '<span style="padding:3px 9px;border-radius:6px;font-size:11px;font-weight:600;background:' + badgeBg + ';color:' + badgeColor + ';">' + badgeText + '</span>'
+      + '</div>';
+
+      // URL
+      html += '<div style="font-size:11.5px;color:#5b626d;font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-bottom:8px;" title="' + escapeHtml(s.url || '') + '">'
+        + escapeHtml(s.url || '—')
+      + '</div>';
+
+      // 기관코드
+      if (s.orgCode) {
+        html += '<div style="font-size:11.5px;color:#69707b;margin-bottom:5px;">기관코드: <span style="color:#9aa2ad;">' + escapeHtml(s.orgCode) + '</span></div>';
+      }
+
+      // 성공 시: resultCode / resultMsg
+      if (ok) {
+        if (s.resultCode) {
+          html += '<div style="font-size:11.5px;color:#5fc98a;">응답코드: ' + escapeHtml(s.resultCode) + '</div>';
+        }
+        // PNU 이중 체크 결과
+        if (s.pnuCheckOk !== undefined) {
+          var pnuOk = s.pnuCheckOk === true;
+          html += '<div style="font-size:11px;color:' + (pnuOk ? '#5fc98a' : '#d9b066') + ';margin-top:4px;">'
+            + 'PNU 확인: ' + (pnuOk ? '정상' : '불일치')
+            + (s.pnuCheckPnu ? ' <span style="color:#5b626d;">(' + escapeHtml(s.pnuCheckPnu) + ')</span>' : '')
+          + '</div>';
+        }
+      }
+
+      // 실패 시: error
+      if (!ok && s.error) {
+        html += '<div style="font-size:11.5px;color:#e88a82;margin-top:5px;word-break:break-all;">' + escapeHtml(s.error) + '</div>';
+      }
+
+      html += '</div>';
+      return html;
+    }
+
     // ── DB 준비 상태 ─────────────────────────────────────────────────
 
     var TABLE_LABELS = {
@@ -1277,6 +1371,9 @@
         }
       });
       if (anyRunning) startPolling();
+
+      // estateGateway 연결 상태 자동 조회
+      refreshGatewayStatus();
 
       // DB 준비 상태 자동 조회
       refreshDbStatus();
