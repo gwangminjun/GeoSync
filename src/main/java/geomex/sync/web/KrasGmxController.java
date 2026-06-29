@@ -214,7 +214,7 @@ public class KrasGmxController implements DisposableBean {
 
     private ResponseEntity<String> gmxSingle(String svc, String path, String pnu,
                                               Map<String, String> extra) {
-        if (!isValidPnu(pnu)) return err(svc, "PNU 형식 오류: 19자리 숫자여야 합니다");
+        if (!isValidPnu(pnu)) return badRequest(svc, "PNU 형식 오류: 19자리 숫자여야 합니다");
         try {
             byte[] xml = callGateway(path, pnu, extra);
             Map<String, byte[]> result = new LinkedHashMap<>();
@@ -229,7 +229,7 @@ public class KrasGmxController implements DisposableBean {
     @SafeVarargs
     private ResponseEntity<String> gmxMulti(String svc, String pnu,
             Map.Entry<String, Map<String, String>>... pathEntries) {
-        if (!isValidPnu(pnu)) return err(svc, "PNU 형식 오류: 19자리 숫자여야 합니다");
+        if (!isValidPnu(pnu)) return badRequest(svc, "PNU 형식 오류: 19자리 숫자여야 합니다");
 
         Map<String, CompletableFuture<byte[]>> futures = new LinkedHashMap<>();
         for (var pe : pathEntries) {
@@ -328,6 +328,14 @@ public class KrasGmxController implements DisposableBean {
     private ResponseEntity<String> err(String svc, String message) {
         String safe = message == null ? "unknown" : message.replace("<", "&lt;").replace(">", "&gt;");
         return ResponseEntity.internalServerError()
+                .contentType(new MediaType("application", "xml", StandardCharsets.UTF_8))
+                .body("<?xml version=\"1.0\" encoding=\"UTF-8\"?><error><svc>" + svc
+                        + "</svc><message>" + safe + "</message></error>");
+    }
+
+    private ResponseEntity<String> badRequest(String svc, String message) {
+        String safe = message == null ? "unknown" : message.replace("<", "&lt;").replace(">", "&gt;");
+        return ResponseEntity.badRequest()
                 .contentType(new MediaType("application", "xml", StandardCharsets.UTF_8))
                 .body("<?xml version=\"1.0\" encoding=\"UTF-8\"?><error><svc>" + svc
                         + "</svc><message>" + safe + "</message></error>");
