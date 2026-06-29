@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import geomex.sync.service.KrasGpkiService;
 import geomex.sync.service.RuntimeSettingsService;
+import geomex.sync.util.XmlUtil;
 import org.apache.hc.client5.http.classic.methods.HttpPost;
 import org.apache.hc.client5.http.config.RequestConfig;
 import org.apache.hc.client5.http.entity.UrlEncodedFormEntity;
@@ -24,8 +25,6 @@ import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
 
-import javax.xml.parsers.DocumentBuilderFactory;
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -58,20 +57,31 @@ public class KrasApiClient implements DisposableBean {
     private final KrasGpkiService gpkiService;
     private final RuntimeSettingsService settings;
     private final ObjectMapper objectMapper = new ObjectMapper();
+    /** 단건 조회용 (api-timeout-seconds) */
     private final CloseableHttpClient httpClient;
+    /** SHP/TXT 파일 다운로드용 (timeout-seconds, 응답 크기가 크므로 별도 타임아웃) */
+    private final CloseableHttpClient fileHttpClient;
 
     public KrasApiClient(KrasGpkiService gpkiService, RuntimeSettingsService settings,
-                         @Value("${kras.api-timeout-seconds:30}") int apiTimeoutSeconds) {
+                         @Value("${kras.api-timeout-seconds:30}") int apiTimeoutSeconds,
+                         @Value("${kras.timeout-seconds:300}") int fileTimeoutSeconds) {
         this.gpkiService = gpkiService;
         this.settings = settings;
-        RequestConfig config = RequestConfig.custom()
+        RequestConfig apiConfig = RequestConfig.custom()
                 .setConnectTimeout(Timeout.ofSeconds(apiTimeoutSeconds))
                 .setResponseTimeout(Timeout.ofSeconds(apiTimeoutSeconds))
                 .build();
         this.httpClient = HttpClients.custom()
-                .setDefaultRequestConfig(config)
+                .setDefaultRequestConfig(apiConfig)
                 .build();
-        log.info("[KRAS] HttpClient 타임아웃: {}s", apiTimeoutSeconds);
+        RequestConfig fileConfig = RequestConfig.custom()
+                .setConnectTimeout(Timeout.ofSeconds(30))
+                .setResponseTimeout(Timeout.ofSeconds(fileTimeoutSeconds))
+                .build();
+        this.fileHttpClient = HttpClients.custom()
+                .setDefaultRequestConfig(fileConfig)
+                .build();
+        log.info("[KRAS] HttpClient 타임아웃: 단건={}s, 파일={}s", apiTimeoutSeconds, fileTimeoutSeconds);
     }
 
     // ──────────────────────────────────────────────────────────────────
@@ -280,21 +290,18 @@ public class KrasApiClient implements DisposableBean {
         return params;
     }
 
-    /** Form POST → XML Document 파싱 */
+    /** Form POST → XML Document 파싱 (단건 조회 HttpClient 사용) */
     private Document postXml(Map<String, String> params) throws Exception {
         byte[] data = postRaw(params);
         String text = gpkiService.decodeResponse(new String(data, StandardCharsets.UTF_8));
         log.debug("[KRAS] XML 응답 ({}chars): {}", text.length(),
                 text.length() > 300 ? text.substring(0, 300) + "..." : text);
-        return DocumentBuilderFactory.newInstance()
-                .newDocumentBuilder()
-                .parse(new ByteArrayInputStream(text.getBytes(StandardCharsets.UTF_8)));
+        return XmlUtil.parse(text.getBytes(StandardCharsets.UTF_8));
     }
 
-    /** Form POST → 바이너리 응답 */
+    /** Form POST → 바이너리 응답 (파일 다운로드 HttpClient 사용) */
     private byte[] postBinary(Map<String, String> params) throws Exception {
-        byte[] data = postRaw(params);
-        // 오류 응답은 XML 텍스트로 반환됨
+        byte[] data = postRawWith(fileHttpClient, params);
         if (data.length > 0 && data[0] == (byte) '<') {
             String errorText = new String(data, StandardCharsets.UTF_8);
             throw new IOException("KRAS 오류 응답: " +
@@ -303,15 +310,18 @@ public class KrasApiClient implements DisposableBean {
         return data;
     }
 
-    /** 실제 HTTP POST 실행 → raw bytes */
+    /** 단건 조회용 HTTP POST → raw bytes */
     private byte[] postRaw(Map<String, String> params) throws Exception {
+        return postRawWith(httpClient, params);
+    }
+
+    /** 지정 HttpClient로 Form POST 실행 → raw bytes */
+    private byte[] postRawWith(CloseableHttpClient client, Map<String, String> params) throws Exception {
         List<NameValuePair> pairs = new ArrayList<>();
         params.forEach((k, v) -> pairs.add(new BasicNameValuePair(k, v != null ? v : "")));
-
         HttpPost request = new HttpPost(settings.krasUrl());
         request.setEntity(new UrlEncodedFormEntity(pairs, StandardCharsets.UTF_8));
-
-        return httpClient.execute(request, response ->
+        return client.execute(request, response ->
                 EntityUtils.toByteArray(response.getEntity()));
     }
 
@@ -330,5 +340,6 @@ public class KrasApiClient implements DisposableBean {
     @Override
     public void destroy() throws IOException {
         httpClient.close();
+        fileHttpClient.close();
     }
 }

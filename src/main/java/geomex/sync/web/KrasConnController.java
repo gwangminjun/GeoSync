@@ -1,78 +1,38 @@
 package geomex.sync.web;
 
+import geomex.sync.util.XmlUtil;
 import geomex.sync.worker.KorepsApiClient;
 import geomex.sync.worker.KrasApiClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import org.w3c.dom.Document;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 
-import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.transform.OutputKeys;
 import javax.xml.transform.Transformer;
 import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
-import java.io.ByteArrayInputStream;
 import java.io.StringWriter;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.Set;
 
 /**
  * kras 웹앱(/conn/*) 대체 컨트롤러.
  *
  * YG-Space가 기존에 http://110.20.1.199:9080/kras/conn/{path}?pnu=... 로 호출하던
  * 엔드포인트를 geomex-sync가 대신 제공한다.
- * estateGateway XML 응답을 그대로 pass-through 반환한다.
  */
 @RestController
 @RequestMapping("/conn")
 public class KrasConnController {
 
     private static final Logger log = LoggerFactory.getLogger(KrasConnController.class);
-
-    // ── KRAS 경로 → conn_svc_id 매핑 ────────────────────────────────
-    private static final Map<String, String> KRAS_CODES = Map.ofEntries(
-        Map.entry("land_info",              "KRAS000002"),
-        Map.entry("shr_ymb",               "KRAS000003"),
-        Map.entry("land_mov_hist",          "KRAS000006"),
-        Map.entry("own_rgt_hist",           "KRAS000007"),
-        Map.entry("bldg_hds_info",          "KRAS000014"),
-        Map.entry("cbldg_hds_info",         "KRAS000015"),
-        Map.entry("cbldg_dfhs_info",        "KRAS000016"),
-        Map.entry("bldg_ledg_gen_hds_info", "KRAS000017"),
-        Map.entry("land_use_plan_attr",     "KRAS000025"),
-        Map.entry("land_use_plan_info",     "KRAS000026"),
-        Map.entry("use_zone",               "KRAS000027"),
-        Map.entry("land_bldg_check",        "KRAS000101"),
-        Map.entry("bldg_dong_info",         "KRAS000102"),
-        Map.entry("bldg_ho_info",           "KRAS000103")
-    );
-
-    // ── KOREPS 경로 → conn_svc_id 매핑 ──────────────────────────────
-    private static final Map<String, String> KOREPS_CODES = Map.of(
-        "land_jiga",    "KOREPS00011",
-        "house_info",   "KOREPS00033",
-        "fin_dec_jiga", "KOREPS00034",
-        "read_dec_jiga","KOREPS00035",
-        "land_attr",    "KOREPS00047"
-    );
-
-    // bno 파라미터가 의미 있는 건축물 관련 경로
-    private static final Set<String> BNO_PATHS = Set.of(
-        "bldg_dong_info", "bldg_hds_info", "bldg_ho_info",
-        "bldg_ledg_gen_hds_info", "cbldg_hds_info", "cbldg_dfhs_info", "house_info"
-    );
 
     private final KrasApiClient krasApiClient;
     private final KorepsApiClient korepsApiClient;
@@ -93,21 +53,16 @@ public class KrasConnController {
             @RequestParam(required = false) String legend_height,
             @RequestParam(required = false) String scale) {
 
+        if (!isValidPnu(pnu)) {
+            return badRequest(errorXml(path, "PNU 형식 오류: 19자리 숫자여야 합니다"));
+        }
         log.info("[ConnAPI/body] {} pnu={} bno={}", path, pnu, bno);
-
         try {
-            Map<String, String> extra = buildExtra(path, bno, map_width, map_height,
-                    legend_width, legend_height, scale);
-            byte[] xml = callGateway(path, pnu, extra);
-            String bodyXml = extractBodyXml(xml);
-            return ResponseEntity.ok()
-                    .contentType(new MediaType("application", "xml", StandardCharsets.UTF_8))
-                    .body(bodyXml);
+            byte[] xml = fetchXml(path, pnu, bno, map_width, map_height, legend_width, legend_height, scale);
+            return xmlOk(extractBodyXml(xml));
         } catch (Exception e) {
             log.error("[ConnAPI/body] {} 조회 실패: {}", path, e.getMessage());
-            return ResponseEntity.internalServerError()
-                    .contentType(new MediaType("application", "xml", StandardCharsets.UTF_8))
-                    .body(errorXml(path, e.getMessage()));
+            return xmlErr(errorXml(path, e.getMessage()));
         }
     }
 
@@ -122,33 +77,28 @@ public class KrasConnController {
             @RequestParam(required = false) String legend_height,
             @RequestParam(required = false) String scale) {
 
+        if (!isValidPnu(pnu)) {
+            return badRequest(errorXml(path, "PNU 형식 오류: 19자리 숫자여야 합니다"));
+        }
         log.info("[ConnAPI] {} pnu={} bno={}", path, pnu, bno);
-
         try {
-            Map<String, String> extra = buildExtra(path, bno, map_width, map_height,
-                    legend_width, legend_height, scale);
-            byte[] xml = callGateway(path, pnu, extra);
-            String body = new String(xml, StandardCharsets.UTF_8);
-            return ResponseEntity.ok()
-                    .contentType(new MediaType("application", "xml", StandardCharsets.UTF_8))
-                    .body(body);
+            byte[] xml = fetchXml(path, pnu, bno, map_width, map_height, legend_width, legend_height, scale);
+            return xmlOk(new String(xml, StandardCharsets.UTF_8));
         } catch (Exception e) {
             log.error("[ConnAPI] {} 조회 실패: {}", path, e.getMessage());
-            return ResponseEntity.internalServerError()
-                    .contentType(new MediaType("application", "xml", StandardCharsets.UTF_8))
-                    .body(errorXml(path, e.getMessage()));
+            return xmlErr(errorXml(path, e.getMessage()));
         }
     }
 
-    private byte[] callGateway(String path, String pnu, Map<String, String> extra) throws Exception {
-        String krasSvc = KRAS_CODES.get(path);
-        if (krasSvc != null) {
-            return krasApiClient.query(krasSvc, pnu, extra);
-        }
-        String korepsSvc = KOREPS_CODES.get(path);
-        if (korepsSvc != null) {
-            return korepsApiClient.query(korepsSvc, pnu, extra);
-        }
+    private byte[] fetchXml(String path, String pnu, String bno,
+            String mapWidth, String mapHeight,
+            String legendWidth, String legendHeight, String scale) throws Exception {
+        Map<String, String> extra = buildExtra(path, bno, mapWidth, mapHeight,
+                legendWidth, legendHeight, scale);
+        String krasSvc = GatewayPaths.KRAS.get(path);
+        if (krasSvc != null) return krasApiClient.query(krasSvc, pnu, extra);
+        String korepsSvc = GatewayPaths.KOREPS.get(path);
+        if (korepsSvc != null) return korepsApiClient.query(korepsSvc, pnu, extra);
         throw new IllegalArgumentException("지원하지 않는 경로: " + path);
     }
 
@@ -156,24 +106,21 @@ public class KrasConnController {
             String mapWidth, String mapHeight,
             String legendWidth, String legendHeight, String scale) {
         Map<String, String> extra = new LinkedHashMap<>();
-        if (BNO_PATHS.contains(path) && bno != null && !bno.isBlank()) {
+        if (GatewayPaths.BNO_PATHS.contains(path) && bno != null && !bno.isBlank()) {
             extra.put("bno", bno);
         }
         if ("land_use_plan_info".equals(path)) {
-            if (mapWidth    != null) extra.put("map_width",    mapWidth);
-            if (mapHeight   != null) extra.put("map_height",   mapHeight);
-            if (legendWidth != null) extra.put("legend_width", legendWidth);
-            if (legendHeight!= null) extra.put("legend_height",legendHeight);
-            if (scale       != null) extra.put("scale",        scale);
+            if (mapWidth     != null) extra.put("map_width",     mapWidth);
+            if (mapHeight    != null) extra.put("map_height",    mapHeight);
+            if (legendWidth  != null) extra.put("legend_width",  legendWidth);
+            if (legendHeight != null) extra.put("legend_height", legendHeight);
+            if (scale        != null) extra.put("scale",         scale);
         }
         return extra;
     }
 
     static String extractBodyXml(byte[] rawXml) throws Exception {
-        DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
-        dbf.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
-        Document doc = dbf.newDocumentBuilder()
-                .parse(new ByteArrayInputStream(rawXml));
+        Document doc = XmlUtil.parse(rawXml);
         NodeList bodies = doc.getElementsByTagName("BODY");
         if (bodies.getLength() == 0) {
             return new String(rawXml, StandardCharsets.UTF_8);
@@ -185,6 +132,28 @@ public class KrasConnController {
         t.setOutputProperty(OutputKeys.ENCODING, "UTF-8");
         t.transform(new DOMSource(body), new StreamResult(writer));
         return "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" + writer.toString();
+    }
+
+    private static boolean isValidPnu(String pnu) {
+        return pnu == null || pnu.isBlank() || pnu.matches("\\d{19}");
+    }
+
+    private ResponseEntity<String> xmlOk(String body) {
+        return ResponseEntity.ok()
+                .contentType(new MediaType("application", "xml", StandardCharsets.UTF_8))
+                .body(body);
+    }
+
+    private ResponseEntity<String> xmlErr(String body) {
+        return ResponseEntity.internalServerError()
+                .contentType(new MediaType("application", "xml", StandardCharsets.UTF_8))
+                .body(body);
+    }
+
+    private ResponseEntity<String> badRequest(String body) {
+        return ResponseEntity.badRequest()
+                .contentType(new MediaType("application", "xml", StandardCharsets.UTF_8))
+                .body(body);
     }
 
     private static String errorXml(String path, String message) {

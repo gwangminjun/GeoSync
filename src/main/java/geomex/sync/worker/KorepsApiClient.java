@@ -1,6 +1,7 @@
 package geomex.sync.worker;
 
 import geomex.sync.service.RuntimeSettingsService;
+import geomex.sync.util.XmlUtil;
 import org.apache.hc.client5.http.classic.methods.HttpPost;
 import org.apache.hc.client5.http.config.RequestConfig;
 import org.apache.hc.client5.http.entity.UrlEncodedFormEntity;
@@ -18,8 +19,6 @@ import org.springframework.stereotype.Component;
 import org.w3c.dom.Document;
 import org.w3c.dom.NodeList;
 
-import javax.xml.parsers.DocumentBuilderFactory;
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -82,10 +81,7 @@ public class KorepsApiClient implements DisposableBean {
 
     private String parseCode(byte[] data) {
         try {
-            DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
-            dbf.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
-            Document doc = dbf.newDocumentBuilder()
-                    .parse(new ByteArrayInputStream(data));
+            Document doc = XmlUtil.parse(data);
             NodeList nl = doc.getElementsByTagName("CODE");
             return nl.getLength() > 0 ? nl.item(0).getTextContent() : null;
         } catch (Exception e) {

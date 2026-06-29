@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.ResponseBody;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 
 @Controller
 public class DashboardController {
@@ -49,14 +50,18 @@ public class DashboardController {
         return "dashboard";
     }
 
-    /** KRAS / KOREPS estateGateway 연결 상태 확인 */
+    /** KRAS / KOREPS estateGateway 연결 상태 확인 — 두 게이트웨이 병렬 조회 */
     @GetMapping("/api/gateway-status")
     @ResponseBody
     public Map<String, Object> gatewayStatus() {
         String chkPnu = settings.krasChkPnu();
+        CompletableFuture<Map<String, Object>> krasFuture =
+                CompletableFuture.supplyAsync(krasApiClient::testConnection);
+        CompletableFuture<Map<String, Object>> korepsFuture =
+                CompletableFuture.supplyAsync(() -> korepsApiClient.testConnection(chkPnu));
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("kras",   krasApiClient.testConnection());
-        result.put("koreps", korepsApiClient.testConnection(chkPnu));
+        result.put("kras",   krasFuture.join());
+        result.put("koreps", korepsFuture.join());
         return result;
     }
 }

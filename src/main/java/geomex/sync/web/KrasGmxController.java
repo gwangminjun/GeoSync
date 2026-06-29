@@ -1,31 +1,31 @@
 package geomex.sync.web;
 
+import geomex.sync.util.XmlUtil;
 import geomex.sync.worker.KorepsApiClient;
 import geomex.sync.worker.KrasApiClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.DisposableBean;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
+import org.springframework.web.bind.annotation.*;
 import org.w3c.dom.Document;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 
-import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.transform.OutputKeys;
 import javax.xml.transform.Transformer;
 import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
-import java.io.ByteArrayInputStream;
 import java.io.StringWriter;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -36,41 +36,35 @@ import java.util.concurrent.TimeUnit;
  */
 @RestController
 @RequestMapping("/svc")
-public class KrasGmxController {
+public class KrasGmxController implements DisposableBean {
 
     private static final Logger log = LoggerFactory.getLogger(KrasGmxController.class);
 
-    private static final Map<String, String> KRAS_CODES = Map.ofEntries(
-        Map.entry("land_info",              "KRAS000002"),
-        Map.entry("shr_ymb",               "KRAS000003"),
-        Map.entry("land_mov_hist",          "KRAS000006"),
-        Map.entry("own_rgt_hist",           "KRAS000007"),
-        Map.entry("bldg_hds_info",          "KRAS000014"),
-        Map.entry("cbldg_hds_info",         "KRAS000015"),
-        Map.entry("cbldg_dfhs_info",        "KRAS000016"),
-        Map.entry("bldg_ledg_gen_hds_info", "KRAS000017"),
-        Map.entry("land_use_plan_attr",     "KRAS000025"),
-        Map.entry("land_use_plan_info",     "KRAS000026"),
-        Map.entry("use_zone",               "KRAS000027"),
-        Map.entry("land_bldg_check",        "KRAS000101"),
-        Map.entry("bldg_dong_info",         "KRAS000102"),
-        Map.entry("bldg_ho_info",           "KRAS000103")
-    );
-
-    private static final Map<String, String> KOREPS_CODES = Map.of(
-        "land_jiga",     "KOREPS00011",
-        "house_info",    "KOREPS00033",
-        "fin_dec_jiga",  "KOREPS00034",
-        "read_dec_jiga", "KOREPS00035",
-        "land_attr",     "KOREPS00047"
-    );
-
     private final KrasApiClient krasApiClient;
     private final KorepsApiClient korepsApiClient;
+    private final int apiTimeoutSeconds;
+    private final Executor gmxExecutor;
 
-    public KrasGmxController(KrasApiClient krasApiClient, KorepsApiClient korepsApiClient) {
+    public KrasGmxController(KrasApiClient krasApiClient, KorepsApiClient korepsApiClient,
+                              @Value("${kras.api-timeout-seconds:30}") int apiTimeoutSeconds) {
         this.krasApiClient = krasApiClient;
         this.korepsApiClient = korepsApiClient;
+        this.apiTimeoutSeconds = apiTimeoutSeconds;
+
+        ThreadPoolTaskExecutor exec = new ThreadPoolTaskExecutor();
+        exec.setCorePoolSize(5);
+        exec.setMaxPoolSize(20);
+        exec.setQueueCapacity(100);
+        exec.setThreadNamePrefix("gmx-async-");
+        exec.initialize();
+        this.gmxExecutor = exec;
+    }
+
+    @Override
+    public void destroy() {
+        if (gmxExecutor instanceof ThreadPoolTaskExecutor exec) {
+            exec.shutdown();
+        }
     }
 
     // ── 1:1 단건 매핑 ────────────────────────────────────────────────────
@@ -124,8 +118,7 @@ public class KrasGmxController {
     public ResponseEntity<String> getHouseInfo(
             @RequestParam String pnu,
             @RequestParam(required = false) String bno) {
-        Map<String, String> extra = bnoExtra(bno);
-        return gmxSingle("GetHouseInfo", "house_info", pnu, extra);
+        return gmxSingle("GetHouseInfo", "house_info", pnu, bnoExtra(bno));
     }
 
     @GetMapping(value = "/GetJeonyubldg", produces = MediaType.APPLICATION_XML_VALUE)
@@ -221,6 +214,7 @@ public class KrasGmxController {
 
     private ResponseEntity<String> gmxSingle(String svc, String path, String pnu,
                                               Map<String, String> extra) {
+        if (!isValidPnu(pnu)) return err(svc, "PNU 형식 오류: 19자리 숫자여야 합니다");
         try {
             byte[] xml = callGateway(path, pnu, extra);
             Map<String, byte[]> result = new LinkedHashMap<>();
@@ -235,7 +229,8 @@ public class KrasGmxController {
     @SafeVarargs
     private ResponseEntity<String> gmxMulti(String svc, String pnu,
             Map.Entry<String, Map<String, String>>... pathEntries) {
-        // 병렬 비동기 호출
+        if (!isValidPnu(pnu)) return err(svc, "PNU 형식 오류: 19자리 숫자여야 합니다");
+
         Map<String, CompletableFuture<byte[]>> futures = new LinkedHashMap<>();
         for (var pe : pathEntries) {
             String p = pe.getKey();
@@ -247,12 +242,12 @@ public class KrasGmxController {
                     log.warn("[GmxAPI] {} 비동기 실패: {}", p, e.getMessage());
                     return errorBytes(p, e.getMessage());
                 }
-            }));
+            }, gmxExecutor));
         }
         try {
             Map<String, byte[]> results = new LinkedHashMap<>();
             for (var fe : futures.entrySet()) {
-                results.put(fe.getKey(), fe.getValue().get(30, TimeUnit.SECONDS));
+                results.put(fe.getKey(), fe.getValue().get(apiTimeoutSeconds, TimeUnit.SECONDS));
             }
             return ok(buildGmxXml(svc, results));
         } catch (Exception e) {
@@ -262,9 +257,9 @@ public class KrasGmxController {
     }
 
     private byte[] callGateway(String path, String pnu, Map<String, String> extra) throws Exception {
-        String krasSvc = KRAS_CODES.get(path);
+        String krasSvc = GatewayPaths.KRAS.get(path);
         if (krasSvc != null) return krasApiClient.query(krasSvc, pnu, extra);
-        String korepsSvc = KOREPS_CODES.get(path);
+        String korepsSvc = GatewayPaths.KOREPS.get(path);
         if (korepsSvc != null) return korepsApiClient.query(korepsSvc, pnu, extra);
         throw new IllegalArgumentException("지원하지 않는 경로: " + path);
     }
@@ -286,10 +281,7 @@ public class KrasGmxController {
     static String extractBodyInner(byte[] rawXml) {
         if (rawXml == null || rawXml.length == 0) return "";
         try {
-            DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
-            dbf.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
-            Document doc = dbf.newDocumentBuilder()
-                    .parse(new ByteArrayInputStream(rawXml));
+            Document doc = XmlUtil.parse(rawXml);
             NodeList bodies = doc.getElementsByTagName("BODY");
             if (bodies.getLength() == 0) {
                 return new String(rawXml, StandardCharsets.UTF_8);
@@ -306,6 +298,10 @@ public class KrasGmxController {
         } catch (Exception e) {
             return new String(rawXml, StandardCharsets.UTF_8);
         }
+    }
+
+    private static boolean isValidPnu(String pnu) {
+        return pnu == null || pnu.isBlank() || pnu.matches("\\d{19}");
     }
 
     private static Map<String, String> bnoExtra(String bno) {

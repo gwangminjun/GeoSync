@@ -5,6 +5,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.nio.charset.Charset;
@@ -51,12 +52,14 @@ public class KrasTxtLoaderService {
     // ── 공시지가 (KRAS000039 → anvm_jiga) ──────────────────────────────
 
     /** API에서 직접 다운로드 후 적재 */
+    @Transactional
     public int loadJigaTxt() throws Exception {
         byte[] data = krasApiClient.downloadJigaTxt();
         return loadJigaFromBytes(data);
     }
 
     /** 기존 파일에서 적재 */
+    @Transactional
     public int loadJigaFromFile(Path filePath) throws Exception {
         byte[] data = Files.readAllBytes(filePath);
         return loadJigaFromBytes(data);
@@ -98,12 +101,14 @@ public class KrasTxtLoaderService {
     // ── 토지대장 (KRAS000040 → land_frst_ledg) ─────────────────────────
 
     /** API에서 직접 다운로드 후 적재 */
+    @Transactional
     public int loadLandTxt() throws Exception {
         byte[] data = krasApiClient.downloadLandTxt();
         return loadLandFromBytes(data);
     }
 
     /** 기존 파일에서 적재 */
+    @Transactional
     public int loadLandFromFile(Path filePath) throws Exception {
         byte[] data = Files.readAllBytes(filePath);
         return loadLandFromBytes(data);
