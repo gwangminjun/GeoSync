@@ -83,6 +83,13 @@ public class SettingsController {
                 values.put("kras_work_dir",    yamlValue(kras, "work-dir",   ""));
                 values.put("kras_shp_charset", yamlValue(kras, "shp-charset","MS949"));
                 values.put("kras_schedule",    yamlValue(kras, "schedule",   ""));
+                Map<String, Object> fileDl = childMap(kras, "file-download");
+                values.put("fd_schedule",    yamlValue(fileDl, "schedule",    ""));
+                values.put("fd_output_dir",  yamlValue(fileDl, "output-dir",  ""));
+                values.put("fd_cbnd_shp",    yamlValue(fileDl, "cbnd-shp",    "true"));
+                values.put("fd_usezone_shp", yamlValue(fileDl, "usezone-shp", "true"));
+                values.put("fd_jiga_txt",    yamlValue(fileDl, "jiga-txt",    "false"));
+                values.put("fd_land_txt",    yamlValue(fileDl, "land-txt",    "false"));
                 values.put("ods_schema",       yamlValue(ods,  "schema",     "ods"));
                 Map<String, Object> sync = childMap(root, "sync");
                 values.put("sync_org_code",    yamlValue(sync, "org-code",   settings.orgCode()));
@@ -377,7 +384,14 @@ public class SettingsController {
           .append("  chk-pnu: ").append(yaml(p.get("kras_chk_pnu"))).append("\n")
           .append("  work-dir: ").append(yaml(safe(p.get("kras_work_dir")).isEmpty() ? "./workspace/kras" : p.get("kras_work_dir"))).append("\n")
           .append("  shp-charset: ").append(yaml(safe(p.get("kras_shp_charset")).isEmpty() ? "MS949" : p.get("kras_shp_charset"))).append("\n")
-          .append("  schedule: ").append(yaml(krasSched.isEmpty() ? "0 30 4 * * *" : krasSched)).append("\n\n")
+          .append("  schedule: ").append(yaml(krasSched.isEmpty() ? "0 30 4 * * *" : krasSched)).append("\n")
+          .append("  file-download:\n")
+          .append("    schedule: ").append(yaml(safe(p.get("fd_schedule")))).append("\n")
+          .append("    output-dir: ").append(yaml(safe(p.get("fd_output_dir")))).append("\n")
+          .append("    cbnd-shp: ").append(p.get("fd_cbnd_shp") != null ? "true" : "false").append("\n")
+          .append("    usezone-shp: ").append(p.get("fd_usezone_shp") != null ? "true" : "false").append("\n")
+          .append("    jiga-txt: ").append(p.get("fd_jiga_txt") != null ? "true" : "false").append("\n")
+          .append("    land-txt: ").append(p.get("fd_land_txt") != null ? "true" : "false").append("\n\n")
           .append("ods:\n")
           .append("  schema: ").append(yaml(safe(p.get("ods_schema")).isEmpty() ? "ods" : p.get("ods_schema"))).append("\n\n")
           .append("sync:\n")

@@ -60,6 +60,18 @@ public class ScheduleController {
                 .orElse(null);
         model.addAttribute("krasLast", krasLast);
 
+        String fdCron = scheduleManager.getFileDownloadCron();
+        model.addAttribute("fdCron", fdCron);
+        model.addAttribute("fdActive", scheduleManager.isFileDownloadActive());
+        model.addAttribute("fdInterval", scheduleManager.isFileDownloadInterval());
+        LocalDateTime fdNext = scheduleManager.getNextRunTime(fdCron);
+        model.addAttribute("fdNext", fdNext);
+        model.addAttribute("fdOutputDir", settings.fileDownloadOutputDir());
+        model.addAttribute("fdCbndShp", settings.fileDownloadCbndShp());
+        model.addAttribute("fdUsezoneShp", settings.fileDownloadUsezoneShp());
+        model.addAttribute("fdJigaTxt", settings.fileDownloadJigaTxt());
+        model.addAttribute("fdLandTxt", settings.fileDownloadLandTxt());
+
         // manifest + table 정의 → 적재 대상 목록
         ManifestInfo manifest = fileReader.readManifestInfo();
         model.addAttribute("manifestCollectedAt", manifest.collectedAt());

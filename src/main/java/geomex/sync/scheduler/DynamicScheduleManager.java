@@ -32,12 +32,13 @@ public class DynamicScheduleManager {
     private final RuntimeSettingsService settings;
 
     private ScheduledFuture<?> krasTask;
+    private ScheduledFuture<?> fileDownloadTask;
 
     public DynamicScheduleManager(SyncScheduler syncScheduler, RuntimeSettingsService settings) {
         this.syncScheduler = syncScheduler;
         this.settings = settings;
         this.taskScheduler = new ThreadPoolTaskScheduler();
-        this.taskScheduler.setPoolSize(2);
+        this.taskScheduler.setPoolSize(3);
         this.taskScheduler.setThreadNamePrefix("dyn-scheduler-");
         this.taskScheduler.initialize();
     }
@@ -69,6 +70,32 @@ public class DynamicScheduleManager {
         } else {
             log.info("[Scheduler] KRAS 스케줄 비활성 (schedule='{}')", schedule);
         }
+
+        cancelTask("FILE_DL", fileDownloadTask);
+        fileDownloadTask = null;
+
+        String fdSchedule = settings.fileDownloadSchedule();
+        if (fdSchedule != null && !fdSchedule.isBlank() && !"-".equals(fdSchedule.trim())) {
+            if (isInterval(fdSchedule)) {
+                try {
+                    Duration interval = parseInterval(fdSchedule);
+                    PeriodicTrigger trigger = new PeriodicTrigger(interval);
+                    trigger.setFixedRate(false);
+                    trigger.setInitialDelay(interval);
+                    fileDownloadTask = taskScheduler.schedule(syncScheduler::runKrasFileDownload, trigger);
+                    log.info("[Scheduler] 파일 내려받기 인터벌 스케줄 등록: {} ({}분마다)", fdSchedule, interval.toMinutes());
+                } catch (Exception e) {
+                    log.warn("[Scheduler] 파일 내려받기 인터벌 파싱 실패 '{}': {}", fdSchedule, e.getMessage());
+                }
+            } else if (isValid(fdSchedule)) {
+                fileDownloadTask = taskScheduler.schedule(syncScheduler::runKrasFileDownload, new CronTrigger(fdSchedule));
+                log.info("[Scheduler] 파일 내려받기 cron 스케줄 등록: {}", fdSchedule);
+            } else {
+                log.info("[Scheduler] 파일 내려받기 스케줄 비활성 (schedule='{}')", fdSchedule);
+            }
+        } else {
+            log.info("[Scheduler] 파일 내려받기 스케줄 비활성 (schedule='{}')", fdSchedule);
+        }
     }
 
     public String getKrasCron() {
@@ -82,6 +109,18 @@ public class DynamicScheduleManager {
 
     public boolean isKrasActive() {
         return krasTask != null && !krasTask.isDone();
+    }
+
+    public String getFileDownloadCron() {
+        return settings.fileDownloadSchedule();
+    }
+
+    public boolean isFileDownloadInterval() {
+        return isInterval(settings.fileDownloadSchedule());
+    }
+
+    public boolean isFileDownloadActive() {
+        return fileDownloadTask != null && !fileDownloadTask.isDone();
     }
 
     public LocalDateTime getNextRunTime(String schedule) {

@@ -1,5 +1,6 @@
 package geomex.sync.scheduler;
 
+import geomex.sync.service.KrasFileDownloadService;
 import geomex.sync.service.RuntimeSettingsService;
 import geomex.sync.worker.KrasWorker;
 import org.slf4j.Logger;
@@ -18,14 +19,17 @@ public class SyncScheduler {
 
     private final KrasWorker krasWorker;
     private final RuntimeSettingsService settings;
+    private final KrasFileDownloadService fileDownloadService;
 
     private final AtomicBoolean krasRunning = new AtomicBoolean(false);
     private final AtomicBoolean krasCollectRunning = new AtomicBoolean(false);
     private final AtomicBoolean krasLoadRunning = new AtomicBoolean(false);
 
-    public SyncScheduler(KrasWorker krasWorker, RuntimeSettingsService settings) {
+    public SyncScheduler(KrasWorker krasWorker, RuntimeSettingsService settings,
+                         KrasFileDownloadService fileDownloadService) {
         this.krasWorker = krasWorker;
         this.settings = settings;
+        this.fileDownloadService = fileDownloadService;
     }
 
     @Deprecated
@@ -170,5 +174,22 @@ public class SyncScheduler {
     public void triggerKrasDirectLoadAsync(List<Integer> targetIndices, Map<Integer, String> schemaMap,
                                            java.util.Set<String> tableFilter) {
         runKrasDirectLoad(targetIndices, schemaMap, tableFilter);
+    }
+
+    public void runKrasFileDownload() {
+        if (fileDownloadService.isRunning()) {
+            log.warn("[FILE_DL] 파일 내려받기 이미 진행 중 — 스킵");
+            return;
+        }
+        String outputDir = settings.fileDownloadOutputDir();
+        if (outputDir == null || outputDir.isBlank()) {
+            outputDir = settings.krasWorkDir() + "/" + settings.orgCode();
+        }
+        log.info("[FILE_DL] 스케줄 파일 내려받기 시작 outputDir={}", outputDir);
+        fileDownloadService.startDownload(outputDir,
+                settings.fileDownloadCbndShp(),
+                settings.fileDownloadUsezoneShp(),
+                settings.fileDownloadJigaTxt(),
+                settings.fileDownloadLandTxt());
     }
 }

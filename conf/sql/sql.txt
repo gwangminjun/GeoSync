@@ -1,0 +1,2909 @@
+// ±‚¡ÿ
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_ud210
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UD210'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_ud210 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_ud210 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_um810
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UM810'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_um810 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_um810 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_ud201
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UD201'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_ud201 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_ud201 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_uj601
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UJ601'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_uj601 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_uj601 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_ui702
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UI702'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_ui702 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_ui702 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_ul401
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UL401'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_ul401 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_ul401 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_uo000
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UO000'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_uo000 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_uo000 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_un101
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UN101'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_un101 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_un101 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_un401
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UN401'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_un401 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_un401 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_uf501
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UF501'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_uf501 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_uf501 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_um732
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UM732'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_um732 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_um732 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_uj101
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UJ101'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_uj101 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_uj101 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_uh701
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UH701'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_uh701 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_uh701 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_um901
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UM901'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_um901 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_um901 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_ub930
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UB930'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_ub930 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_ub930 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_ui801
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UI801'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_ui801 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_ui801 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_ub801
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UB801'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_ub801 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_ub801 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_uh501
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UH501'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_uh501 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_uh501 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_uh601
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UH601'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_uh601 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_uh601 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_um801
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UM801'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_um801 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_um801 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_uh402
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UH402'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_uh402 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_uh402 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_up301
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UP301'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_up301 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_up301 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_ub821
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UB821'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_ub821 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_ub821 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_uh000
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UH000'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_uh000 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_uh000 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_ub831
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UB831'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_ub831 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_ub831 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_uq102
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UQ102'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_uq102 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_uq102 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_ub841
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UB841'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_ub841 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_ub841 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_ub601
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UB601'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_ub601 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_ub601 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_ub611
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UB611'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_ub611 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_ub611 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_ua000
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UA000'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_ua000 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_ua000 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_ui502
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UI502'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_ui502 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_ui502 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_uo601
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UO601'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_uo601 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_uo601 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_ub701
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UB701'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_ub701 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_ub701 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_ui201
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UI201'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_ui201 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_ui201 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_uq161
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UQ161'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_uq161 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_uq161 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_ud610
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UD610'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_ud610 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_ud610 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_uq121
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UQ121'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_uq121 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_uq121 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_uq162
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UQ162'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_uq162 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_uq162 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_uq164
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UQ164'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_uq164 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_uq164 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_uq141
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UQ141'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_uq141 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_uq141 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_uq168
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UQ168'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_uq168 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_uq168 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_uq131
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UQ131'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_uq131 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_uq131 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_uq151
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UQ151'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_uq151 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_uq151 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_uq111
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UQ111'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_uq111 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_uq111 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_uq101
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UQ101'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_uq101 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_uq101 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_uq122
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UQ122'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_uq122 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_uq122 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_uq165
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UQ165'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_uq165 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_uq165 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_uq124
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UQ124'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_uq124 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_uq124 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_uq127
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UQ127'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_uq127 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_uq127 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_uq114
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UQ114'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_uq114 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_uq114 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_up401
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UP401'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_up401 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_up401 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_um301
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UM301'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_um301 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_um301 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_ub331
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UB331'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_ub331 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_ub331 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_ue000
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UE000'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_ue000 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_ue000 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_ui101
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UI101'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_ui101 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_ui101 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_ud000
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UD000'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_ud000 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_ud000 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_ud602
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UD602'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_ud602 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_ud602 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_uo301
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UO301'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_uo301 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_uo301 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_uf121
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UF121'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_uf121 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_uf121 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_uf101
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UF101'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_uf101 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_uf101 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_uf132
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UF132'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_uf132 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_uf132 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_uf111
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UF111'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_uf111 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_uf111 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_uf151
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UF151'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_uf151 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_uf151 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_uf141
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UF141'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_uf141 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_uf141 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_uh101
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UH101'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_uh101 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_uh101 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_uh212
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UH212'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_uh212 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_uh212 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_uf811
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UF811'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_uf811 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_uf811 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_uf801
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UF801'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_uf801 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_uf801 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_ud501
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UD501'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_ud501 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_ud501 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_um910
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UM910'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_um910 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_um910 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_uj301
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UJ301'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_uj301 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_uj301 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_ug401
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UG401'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_ug401 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_ug401 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_ug101
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UG101'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_ug101 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_ug101 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_ue102
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UE102'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_ue102 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_ue102 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_ua101
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UA101'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_ua101 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_ua101 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_uf602
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UF602'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_uf602 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_uf602 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_um101
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UM101'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_um101 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_um101 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_um211
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UM211'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_um211 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_um211 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_up501
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UP501'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_up501 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_up501 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_ul201
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UL201'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_ul201 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_ul201 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_uf201
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UF201'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_uf201 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_uf201 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_ud601
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UD601'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_ud601 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_ud601 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_ub201
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UB201'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_ub201 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_ub201 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_ub501
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UB501'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_ub501 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_ub501 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_ub210
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UB210'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_ub210 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_ub210 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_uo210
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UO210'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_uo210 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_uo210 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_ud301
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UD301'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_ud301 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_ud301 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_um501
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UM501'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_um501 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_um501 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_um740
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UM740'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_um740 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_um740 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_uj201
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UJ201'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_uj201 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_uj201 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_uo101
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UO101'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_uo101 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_uo101 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_ui701
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UI701'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_ui701 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_ui701 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_ui501
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UI501'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_ui501 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_ui501 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_uo701
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UO701'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_uo701 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_uo701 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_uq125
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UQ125'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_uq125 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_uq125 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_uq130
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UQ130'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_uq130 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_uq130 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_uo401
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UO401'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_uo401 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_uo401 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_uh111
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UH111'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_uh111 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_uh111 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_uf131
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UF131'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_uf131 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_uf131 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_uh211
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UH211'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_uh211 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_uh211 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_ue501
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UE501'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_ue501 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_ue501 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_ul501
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UL501'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_ul501 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_ul501 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_ud801
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UD801'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_ud801 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_ud801 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_um311
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UM311'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_um311 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_um311 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_uf701
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UF701'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_uf701 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_uf701 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_ug000
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UG000'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_ug000 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_ug000 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_ui401
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UI401'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_ui401 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_ui401 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_ub920
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UB920'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_ub920 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_ub920 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_ul000
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UL000'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_ul000 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_ul000 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_ud302
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UD302'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_ud302 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_ud302 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_ug301
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UG301'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_ug301 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_ug301 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_uh201
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UH201'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_uh201 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_uh201 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_ui000
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UI000'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_ui000 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_ui000 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_un000
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UN000'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_un000 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_un000 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_un201
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UN201'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_un201 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_un201 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_um731
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UM731'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_um731 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_um731 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_uh301
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UH301'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_uh301 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_uh301 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_ul101
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UL101'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_ul101 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_ul101 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_ue201
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UE201'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_ue201 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_ue201 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_ue601
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UE601'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_ue601 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_ue601 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_uf601
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UF601'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_uf601 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_uf601 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_ub910
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UB910'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_ub910 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_ub910 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_ui901
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UI901'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_ui901 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_ui901 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_ud902
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UD902'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_ud902 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_ud902 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_ub220
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UB220'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_ub220 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_ub220 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_up101
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UP101'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_up101 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_up101 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_uk102
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UK102'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_uk102 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_uk102 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_uk101
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UK101'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_uk101 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_uk101 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_uo811
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UO811'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_uo811 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_uo811 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_uo801
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UO801'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_uo801 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_uo801 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_uh511
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UH511'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_uh511 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_uh511 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_ub000
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UB000'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_ub000 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_ub000 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_ub101
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UB101'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_ub101 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_ub101 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_ub401
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UB401'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_ub401 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_ub401 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_ud620
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UD620'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_ud620 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_ud620 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_uo201
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UO201'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_uo201 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_uo201 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_um720
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UM720'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_um720 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_um720 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_um601
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UM601'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_um601 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_um601 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_ug201
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UG201'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_ug201 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_ug201 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_uj000
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UJ000'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_uj000 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_uj000 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_ui601
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UI601'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_ui601 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_ui601 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_um770
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UM770'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_um770 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_um770 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_um750
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UM750'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_um750 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_um750 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_ui903
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UI903'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_ui903 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_ui903 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_um733
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UM733'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_um733 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_um733 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_uh401
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UH401'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_uh401 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_uh401 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_uo510
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UO510'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_uo510 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_uo510 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_up302
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UP302'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_up302 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_up302 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_ub901
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UB901'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_ub901 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_ub901 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_up000
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UP000'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_up000 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_up000 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_up601
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UP601'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_up601 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_up601 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_uk000
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UK000'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_uk000 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_uk000 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_ul301
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UL301'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_ul301 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_ul301 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_ui301
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UI301'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_ui301 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_ui301 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_ui310
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UI310'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_ui310 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_ui310 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_ue401
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UE401'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_ue401 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_ue401 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_um401
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UM401'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_um401 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_um401 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_ud401
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UD401'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_ud401 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_ud401 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_ud701
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UD701'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_ud701 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_ud701 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_un301
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UN301'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_un301 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_un301 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_um920
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UM920'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_um920 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_um920 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_ul601
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UL601'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_ul601 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_ul601 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_ub811
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UB811'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_ub811 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_ub811 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_um000
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UM000'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_um000 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_um000 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_ui902
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UI902'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_ui902 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_ui902 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_uq129
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UQ129'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_uq129 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_uq129 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_uq123
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UQ123'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_uq123 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_uq123 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_uq112
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UQ112'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_uq112 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_uq112 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_uq115
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UQ115'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_uq115 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_uq115 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_uq113
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UQ113'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_uq113 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_uq113 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_uq166
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UQ166'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_uq166 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_uq166 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_uq126
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UQ126'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_uq126 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_uq126 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_uq163
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UQ163'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_uq163 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_uq163 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_uq128
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UQ128'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_uq128 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_uq128 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_uq167
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UQ167'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_uq167 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_uq167 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_un501
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UN501'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_un501 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_un501 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_ue301
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UE301'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_ue301 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_ue301 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_ue101
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UE101'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_ue101 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_ue101 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_ud901
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UD901'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_ud901 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_ud901 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_ud603
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UD603'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_ud603 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_ud603 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_uf901
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UF901'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_uf901 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_uf901 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_uf301
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UF301'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_uf301 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_uf301 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_uf000
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UF000'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_uf000 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_uf000 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_um710
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UM710'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_um710 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_um710 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_um760
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UM760'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_um760 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_um760 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_um221
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UM221'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_um221 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_um221 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_uj401
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UJ401'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_uj401 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_uj401 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_um102
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UM102'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_um102 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_um102 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_up201
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UP201'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_up201 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_up201 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_um212
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UM212'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_um212 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_um212 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_uo501
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UO501'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_uo501 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_uo501 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_uj501
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UJ501'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_uj501 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_uj501 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_uf401
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UF401'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_uf401 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_uf401 TO postgres;
+
+
+CREATE OR REPLACE VIEW public.v_lt_c_uzone_um730
+AS SELECT lt_c_uzone.geom AS _geometry,
+    lt_c_uzone.mnum,
+    lt_c_uzone.remark,
+    lt_c_uzone.alias,
+    lt_c_uzone.org_cd
+   FROM public.lt_c_uzone
+  WHERE lt_c_uzone.layer_code::text = 'UM730'::text;
+
+-- Permissions
+
+ALTER TABLE public.v_lt_c_uzone_um730 OWNER TO postgres;
+GRANT ALL ON TABLE public.v_lt_c_uzone_um730 TO postgres;

@@ -24,6 +24,13 @@ kras:
   timeout-seconds: 300
   work-dir: ${KRAS_WORK_DIR:./workspace/kras}
   shp-charset: ${KRAS_SHP_CHARSET:MS949}
+  file-download:
+    schedule: ${KRAS_FILE_DOWNLOAD_SCHEDULE:}
+    output-dir: ${KRAS_FILE_DOWNLOAD_DIR:}
+    cbnd-shp: true
+    usezone-shp: true
+    jiga-txt: false
+    land-txt: false
 
 ods:
   schema: ${ODS_SCHEMA:ods}

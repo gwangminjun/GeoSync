@@ -43,6 +43,12 @@ public class RuntimeSettingsService {
     @Value("${kras.schedule:0 30 4 * * *}")
     private String defaultKrasSchedule;
 
+    @Value("${kras.file-download.schedule:}")
+    private String defaultFileDownloadSchedule;
+
+    @Value("${kras.file-download.output-dir:}")
+    private String defaultFileDownloadOutputDir;
+
     @Value("${ods.schema:ods}")
     private String defaultOdsSchema;
 
@@ -98,6 +104,41 @@ public class RuntimeSettingsService {
         // → 빈 경우 항상 하드코딩 fallback 사용
         String v = str(child("kras").get("schedule"), defaultKrasSchedule);
         return v.isBlank() ? "0 30 4 * * *" : v;
+    }
+
+    private Map<String, Object> fileDownloadChild() {
+        Object raw = child("kras").get("file-download");
+        if (raw instanceof Map<?, ?> map) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> cast = (Map<String, Object>) map;
+            return cast;
+        }
+        return Collections.emptyMap();
+    }
+
+    public String fileDownloadSchedule() {
+        return str(fileDownloadChild().get("schedule"), defaultFileDownloadSchedule);
+    }
+
+    public String fileDownloadOutputDir() {
+        String v = str(fileDownloadChild().get("output-dir"), defaultFileDownloadOutputDir);
+        return v == null ? "" : v;
+    }
+
+    public boolean fileDownloadCbndShp() {
+        return boolValue(fileDownloadChild().get("cbnd-shp"), true);
+    }
+
+    public boolean fileDownloadUsezoneShp() {
+        return boolValue(fileDownloadChild().get("usezone-shp"), true);
+    }
+
+    public boolean fileDownloadJigaTxt() {
+        return boolValue(fileDownloadChild().get("jiga-txt"), false);
+    }
+
+    public boolean fileDownloadLandTxt() {
+        return boolValue(fileDownloadChild().get("land-txt"), false);
     }
 
     public String odsSchema() {

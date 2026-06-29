@@ -83,6 +83,57 @@
     </div>
   </div>
 
+  <!-- 파일 내려받기 스케줄 카드 -->
+  <div class="card">
+    <div class="card-title">
+      파일 내려받기 스케줄
+      <span th:if="${fdActive}" class="badge badge-on">
+        <span style="width:6px;height:6px;border-radius:99px;background:#0e9b94;display:inline-block;"></span>활성
+      </span>
+      <span th:unless="${fdActive}" class="badge badge-off">
+        <span style="width:6px;height:6px;border-radius:99px;background:#4a5260;display:inline-block;"></span>비활성
+      </span>
+    </div>
+
+    <div class="meta-grid">
+      <div class="meta-row">
+        <div class="meta-label" th:text="${fdInterval} ? '인터벌' : 'Cron 표현식'">스케줄</div>
+        <div th:if="${fdCron != null and !#strings.isEmpty(fdCron) and fdCron != '-'}"
+             class="meta-value accent" th:text="${fdCron}"></div>
+        <div th:unless="${fdCron != null and !#strings.isEmpty(fdCron) and fdCron != '-'}"
+             class="meta-value muted">미설정</div>
+      </div>
+      <div class="meta-row">
+        <div class="meta-label">다음 실행 예정</div>
+        <div th:if="${fdNext != null}" class="meta-value accent"
+             th:text="${#temporals.format(fdNext, 'yyyy-MM-dd HH:mm:ss')}"></div>
+        <div th:unless="${fdNext != null}" class="meta-value muted">—</div>
+      </div>
+      <div class="meta-row">
+        <div class="meta-label">저장 경로</div>
+        <div th:if="${fdOutputDir != null and !#strings.isEmpty(fdOutputDir)}"
+             class="meta-value" th:text="${fdOutputDir}"></div>
+        <div th:unless="${fdOutputDir != null and !#strings.isEmpty(fdOutputDir)}"
+             class="meta-value muted">기본값 (작업디렉토리/{기관코드})</div>
+      </div>
+      <div class="meta-row">
+        <div class="meta-label">다운로드 항목</div>
+        <div class="meta-value" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+          <span th:if="${fdCbndShp}"
+                style="padding:2px 7px;border-radius:5px;font-size:11px;background:#0e2535;color:#3db8dd;">연속지적도 SHP</span>
+          <span th:if="${fdUsezoneShp}"
+                style="padding:2px 7px;border-radius:5px;font-size:11px;background:#1a2c1a;color:#5fc98a;">용도지역 SHP</span>
+          <span th:if="${fdJigaTxt}"
+                style="padding:2px 7px;border-radius:5px;font-size:11px;background:#2a1f10;color:#c8943a;">공시지가 TXT</span>
+          <span th:if="${fdLandTxt}"
+                style="padding:2px 7px;border-radius:5px;font-size:11px;background:#1e1535;color:#9370cc;">토지대장 TXT</span>
+          <span th:if="${!fdCbndShp and !fdUsezoneShp and !fdJigaTxt and !fdLandTxt}"
+                class="meta-value muted">선택 없음</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- 적재 대상 DB 카드 -->
   <div class="card">
     <div class="card-title">적재 대상 데이터베이스</div>

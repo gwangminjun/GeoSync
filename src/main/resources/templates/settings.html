@@ -242,6 +242,99 @@
 
     </div>
 
+    <!-- ── 파일 내려받기 스케줄 ── -->
+    <div style="display:flex;flex-direction:column;gap:14px;">
+      <div class="gs-section">파일 내려받기 스케줄</div>
+
+      <!-- 저장 경로 + 다운로드 항목 -->
+      <div style="display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap;">
+        <div style="flex:1;min-width:280px;">
+          <label class="gs-label">저장 경로</label>
+          <input class="gs-input mono" type="text" name="fd_output_dir" id="fd_output_dir"
+                 th:value="${values['fd_output_dir']}" placeholder="비워두면 작업 디렉토리/{기관코드} 사용">
+          <div style="font-size:11px;color:#5b626d;margin-top:4px;">비워두면 SHP 파일 작업 디렉토리/{기관코드} 에 저장됩니다.</div>
+        </div>
+        <div style="flex-shrink:0;">
+          <label class="gs-label">다운로드 항목</label>
+          <div style="display:flex;flex-direction:column;gap:7px;margin-top:2px;">
+            <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#c8cdd4;cursor:pointer;">
+              <input type="checkbox" name="fd_cbnd_shp"
+                     th:checked="${values['fd_cbnd_shp'] == 'true'}"
+                     style="width:15px;height:15px;accent-color:#0e9b94;">
+              연속지적도 SHP
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#c8cdd4;cursor:pointer;">
+              <input type="checkbox" name="fd_usezone_shp"
+                     th:checked="${values['fd_usezone_shp'] == 'true'}"
+                     style="width:15px;height:15px;accent-color:#0e9b94;">
+              용도지역지구 SHP
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#c8cdd4;cursor:pointer;">
+              <input type="checkbox" name="fd_jiga_txt"
+                     th:checked="${values['fd_jiga_txt'] == 'true'}"
+                     style="width:15px;height:15px;accent-color:#0e9b94;">
+              공시지가 TXT
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#c8cdd4;cursor:pointer;">
+              <input type="checkbox" name="fd_land_txt"
+                     th:checked="${values['fd_land_txt'] == 'true'}"
+                     style="width:15px;height:15px;accent-color:#0e9b94;">
+              토지대장 TXT
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <!-- 스케줄 표현식 -->
+      <div>
+        <label class="gs-label">실행 스케줄</label>
+
+        <div style="display:flex;gap:0;border:1px solid #2e3640;border-radius:8px;overflow:hidden;width:fit-content;margin-bottom:14px;">
+          <button type="button" class="sched-mode-btn" id="fd-mode-daily"    onclick="setSchedMode('fd','daily')">매일 실행</button>
+          <button type="button" class="sched-mode-btn" id="fd-mode-interval" onclick="setSchedMode('fd','interval')">인터벌 반복</button>
+          <button type="button" class="sched-mode-btn" id="fd-mode-cron"     onclick="setSchedMode('fd','cron')">Cron 직접 입력</button>
+          <button type="button" class="sched-mode-btn" id="fd-mode-off"      onclick="setSchedMode('fd','off')">비활성</button>
+        </div>
+
+        <div id="fd-panel-daily">
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+            <span style="font-size:13px;color:#9aa2ad;">매일</span>
+            <input type="time" class="gs-input" id="fd_time" style="width:130px;"
+                   oninput="updateDailyCron('fd')">
+            <span style="font-size:13px;color:#9aa2ad;">에 실행</span>
+            <span class="sched-val-pill" id="fd_cron_display"></span>
+          </div>
+        </div>
+
+        <div id="fd-panel-interval" style="display:none;">
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+            <input type="number" class="gs-input" id="fd_iv_h" min="0" max="99" value="6"
+                   style="width:72px;text-align:right;" oninput="updateInterval('fd')">
+            <span style="font-size:13px;color:#9aa2ad;">시간</span>
+            <input type="number" class="gs-input" id="fd_iv_m" min="0" max="59" value="0"
+                   style="width:72px;text-align:right;" oninput="updateInterval('fd')">
+            <span style="font-size:13px;color:#9aa2ad;">분마다 반복</span>
+            <span class="sched-val-pill on" id="fd_iv_display">@every 6h</span>
+          </div>
+          <div style="font-size:11.5px;color:#5b626d;margin-top:6px;">서버 시작 후 첫 실행, 이후 완료 시점부터 지정한 간격으로 재실행됩니다.</div>
+        </div>
+
+        <div id="fd-panel-cron" style="display:none;">
+          <input type="text" class="gs-input mono" id="fd_raw" style="max-width:280px;"
+                 placeholder="0 0 3 * * *" oninput="updateRaw('fd')">
+          <div style="font-size:11.5px;color:#5b626d;margin-top:6px;">
+            6개 필드 (초 분 시 일 월 요일) &nbsp;|&nbsp; 예: <code style="color:#9aa2ad;">0 0 3 * * *</code> = 매일 03:00 &nbsp;|&nbsp; <code style="color:#9aa2ad;">-</code> = 비활성화
+          </div>
+        </div>
+
+        <div id="fd-panel-off" style="display:none;">
+          <div style="font-size:13px;color:#5b626d;padding:6px 0;">파일 내려받기 스케줄이 비활성화됩니다. 파일 내려받기 페이지에서 수동으로만 실행할 수 있습니다.</div>
+        </div>
+
+        <input type="hidden" name="fd_schedule" id="fd_schedule">
+      </div>
+    </div>
+
     <!-- 저장 버튼 -->
     <div style="display:flex;gap:10px;padding-top:4px;">
       <button type="submit" class="btn-teal">저장</button>
@@ -259,6 +352,7 @@
   /* ── 초기값 (Thymeleaf 주입) ───────────────────────────────── */
   let rowCount   = [[${#lists.size(targets)}]];
   const initKrasCron = [[${values['kras_schedule']}]] || '';
+  const initFdCron   = [[${values['fd_schedule']}]]   || '';
 
   /* ── cron ↔ time 변환 ─────────────────────────────────────── */
   function timeToCron(t) {
@@ -344,7 +438,7 @@
 
   /* ── 폼 제출 전 값 확정 ────────────────────────────────────── */
   document.getElementById('settings-form').addEventListener('submit', function() {
-    ['kras'].forEach(key => {
+    ['kras', 'fd'].forEach(key => {
       const mode = ['daily','interval','cron','off']
         .find(m => document.getElementById(`${key}-mode-${m}`)?.classList.contains('active')) || 'off';
       syncHidden(key, mode);
@@ -493,6 +587,7 @@
 
   document.addEventListener('DOMContentLoaded', function() {
     initSchedule('kras', initKrasCron);
+    initSchedule('fd',   initFdCron);
   });
 </script>
 </th:block>
