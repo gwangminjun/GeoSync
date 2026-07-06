@@ -7,8 +7,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.DisposableBean;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.event.EventListener;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.w3c.dom.Document;
 import org.w3c.dom.NodeList;
@@ -42,11 +44,14 @@ public class ConnRequestLogService implements DisposableBean {
     private final TargetDbService targetDbService;
     private final RuntimeSettingsService settings;
     private final ExecutorService writer;
+    private final int retentionDays;
     private volatile boolean ready = false;
 
-    public ConnRequestLogService(TargetDbService targetDbService, RuntimeSettingsService settings) {
+    public ConnRequestLogService(TargetDbService targetDbService, RuntimeSettingsService settings,
+                                 @Value("${conn-log.retention-days:90}") int retentionDays) {
         this.targetDbService = targetDbService;
         this.settings = settings;
+        this.retentionDays = retentionDays;
         this.writer = Executors.newSingleThreadExecutor(r -> {
             Thread t = new Thread(r, "conn-req-log");
             t.setDaemon(true);
@@ -125,6 +130,24 @@ public class ConnRequestLogService implements DisposableBean {
                 log.warn("[ConnLog] 기록 실패: {}", e.getMessage());
             }
         });
+    }
+
+    /** 보존기간(conn-log.retention-days, 기본 90일) 지난 로그를 매일 새벽 정리 */
+    @Scheduled(cron = "0 40 3 * * *")
+    public void purgeOldLogs() {
+        if (!ready || retentionDays <= 0) return;
+        JdbcTemplate jdbc = jdbc();
+        if (jdbc == null) return;
+        try {
+            int deleted = jdbc.update(
+                    "DELETE FROM " + logTable() +
+                    " WHERE requested_at < NOW() - make_interval(days => ?)", retentionDays);
+            if (deleted > 0) {
+                log.info("[ConnLog] {}일 경과 로그 {}건 정리", retentionDays, deleted);
+            }
+        } catch (Exception e) {
+            log.warn("[ConnLog] 로그 정리 실패: {}", e.getMessage());
+        }
     }
 
     public boolean tableExists() {

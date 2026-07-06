@@ -43,6 +43,10 @@ mock:
   gateway:
     enabled: ${MOCK_GATEWAY:false}
 
+# /conn·/svc 요청 로그 보존기간 (0 이하면 정리 안 함)
+conn-log:
+  retention-days: ${CONN_LOG_RETENTION_DAYS:90}
+
 ods:
   schema: ${ODS_SCHEMA:ods}
   schedule: ${ODS_SCHEDULE:0 30 5 * * *}
