@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}" lang="ko">
+<head><title>API 통계</title>
+<style>
+  .cs-card { background:#0e1116;border:1px solid #232830;border-radius:11px;padding:16px 18px; }
+  .cs-num  { font-size:24px;font-weight:700;font-variant-numeric:tabular-nums; }
+  .cs-lbl  { font-size:12px;color:#69707b;margin-top:2px; }
+  .cs-tbl  { width:100%;border-collapse:collapse;font-size:12.5px; }
+  .cs-tbl th { text-align:left;color:#69707b;font-weight:600;font-size:11.5px;padding:7px 10px;border-bottom:1px solid #232830;white-space:nowrap; }
+  .cs-tbl td { padding:7px 10px;border-bottom:1px solid #1a1f26;color:#aab1bb;font-variant-numeric:tabular-nums;white-space:nowrap; }
+  .cs-tbl tr:last-child td { border-bottom:none; }
+  .cs-badge { display:inline-block;padding:2px 8px;border-radius:99px;font-size:10.5px;font-weight:600; }
+  .cs-per   { padding:7px 14px;border-radius:8px;font-size:13px;font-weight:600;border:1px solid #232830;background:#171b21;color:#8a919c;cursor:pointer; }
+  .cs-per.on{ background:rgba(14,155,148,0.16);color:#66c4be;border-color:rgba(14,155,148,0.4); }
+  .cs-sec   { font-size:14px;font-weight:700;color:#e7eaee;margin-bottom:10px; }
+</style>
+</head>
+<body>
+<main layout:fragment="content">
+
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+    <div>
+      <div style="font-size:19px;font-weight:700;color:#f3f5f7;letter-spacing:-0.01em;">API 요청 통계</div>
+      <div style="font-size:12px;color:#69707b;margin-top:3px;">외부 프로그램의 /conn/*, /svc/* 요청 로그 · 30초마다 갱신</div>
+    </div>
+    <div style="display:flex;gap:6px;">
+      <button class="cs-per" data-period="today" onclick="setPeriod('today')">오늘</button>
+      <button class="cs-per on" data-period="7d" onclick="setPeriod('7d')">7일</button>
+      <button class="cs-per" data-period="30d" onclick="setPeriod('30d')">30일</button>
+    </div>
+  </div>
+
+  <div th:unless="${tableReady}"
+       style="background:#2a2117;border:1px solid #4a3a1e;border-radius:11px;padding:14px 18px;font-size:13px;color:#d9b066;margin-bottom:16px;">
+    로그 테이블이 아직 없습니다. 타겟 DB 연결 후 애플리케이션이 시작되면 자동 생성되며, 첫 요청부터 기록됩니다.
+  </div>
+
+  <!-- 요약 카드 -->
+  <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:22px;">
+    <div class="cs-card"><div class="cs-num" id="s-total" style="color:#f3f5f7;">-</div><div class="cs-lbl">총 요청</div></div>
+    <div class="cs-card"><div class="cs-num" id="s-success" style="color:#5fc98a;">-</div><div class="cs-lbl">성공</div></div>
+    <div class="cs-card"><div class="cs-num" id="s-gwerr" style="color:#d9b066;">-</div><div class="cs-lbl">게이트웨이 오류</div></div>
+    <div class="cs-card"><div class="cs-num" id="s-failed" style="color:#e88a82;">-</div><div class="cs-lbl">실패</div></div>
+    <div class="cs-card"><div class="cs-num" id="s-badreq" style="color:#9aa2ad;">-</div><div class="cs-lbl">요청 오류</div></div>
+    <div class="cs-card"><div class="cs-num" id="s-avgms" style="color:#66c4be;">-</div><div class="cs-lbl">평균 응답(ms)</div></div>
+  </div>
+
+  <!-- 일자별 추이 -->
+  <div class="cs-card" style="margin-bottom:22px;">
+    <div class="cs-sec">일자별 요청 추이</div>
+    <div id="day-chart" style="display:flex;align-items:flex-end;gap:6px;height:120px;padding-top:6px;"></div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:3fr 2fr;gap:12px;margin-bottom:22px;">
+    <!-- 서비스별 -->
+    <div class="cs-card">
+      <div class="cs-sec">서비스별 요청</div>
+      <div style="max-height:320px;overflow:auto;">
+        <table class="cs-tbl">
+          <thead><tr><th>구분</th><th>경로</th><th>서비스코드</th><th style="text-align:right;">요청</th><th style="text-align:right;">성공</th><th style="text-align:right;">오류</th><th style="text-align:right;">평균 ms</th></tr></thead>
+          <tbody id="tb-path"><tr><td colspan="7" style="color:#5b626d;">데이터 없음</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+    <!-- 호출 IP별 -->
+    <div class="cs-card">
+      <div class="cs-sec">호출 프로그램(IP)별 <span style="font-weight:400;color:#69707b;">상위 10</span></div>
+      <div style="max-height:320px;overflow:auto;">
+        <table class="cs-tbl">
+          <thead><tr><th>IP</th><th style="text-align:right;">요청</th><th style="text-align:right;">오류</th><th>마지막 요청</th></tr></thead>
+          <tbody id="tb-client"><tr><td colspan="4" style="color:#5b626d;">데이터 없음</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- 최근 요청 -->
+  <div class="cs-card">
+    <div class="cs-sec">최근 요청 <span style="font-weight:400;color:#69707b;">50건</span></div>
+    <div style="max-height:420px;overflow:auto;">
+      <table class="cs-tbl">
+        <thead><tr><th>시각</th><th>구분</th><th>경로</th><th>PNU</th><th>IP</th><th>상태</th><th>GW코드</th><th style="text-align:right;">ms</th><th>오류</th></tr></thead>
+        <tbody id="tb-recent"><tr><td colspan="9" style="color:#5b626d;">데이터 없음</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+</main>
+
+<th:block layout:fragment="scripts">
+<script th:inline="none">
+  const ST_STYLE = {
+    SUCCESS:  'background:#12291c;color:#5fc98a;',
+    GW_ERROR: 'background:#2a2117;color:#d9b066;',
+    FAILED:   'background:#2b1917;color:#e88a82;',
+    BAD_REQ:  'background:#1e242c;color:#9aa2ad;'
+  };
+  const ST_LABEL = { SUCCESS:'성공', GW_ERROR:'GW오류', FAILED:'실패', BAD_REQ:'요청오류' };
+  let period = '7d';
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+  function num(v) { return v == null ? '-' : Number(v).toLocaleString(); }
+  function badge(st) {
+    return `<span class="cs-badge" style="${ST_STYLE[st] || ST_STYLE.BAD_REQ}">${ST_LABEL[st] || esc(st)}</span>`;
+  }
+
+  function setPeriod(p) {
+    period = p;
+    document.querySelectorAll('.cs-per').forEach(b =>
+      b.classList.toggle('on', b.dataset.period === p));
+    loadStats();
+  }
+
+  function renderSummary(s) {
+    document.getElementById('s-total').textContent   = num(s.total);
+    document.getElementById('s-success').textContent = num(s.success);
+    document.getElementById('s-gwerr').textContent   = num(s.gw_error);
+    document.getElementById('s-failed').textContent  = num(s.failed);
+    document.getElementById('s-badreq').textContent  = num(s.bad_req);
+    document.getElementById('s-avgms').textContent   = num(s.avg_ms);
+  }
+
+  function renderDayChart(days) {
+    const box = document.getElementById('day-chart');
+    if (!days || !days.length) {
+      box.innerHTML = '<div style="font-size:12px;color:#5b626d;">데이터 없음</div>';
+      return;
+    }
+    const max = Math.max(...days.map(d => Number(d.total)), 1);
+    box.innerHTML = days.map(d => {
+      const total = Number(d.total), errors = Number(d.errors);
+      const h = Math.max(4, Math.round(total / max * 90));
+      const eh = total > 0 ? Math.round(h * errors / total) : 0;
+      return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;min-width:0;" title="${d.day}: ${total}건 (오류 ${errors})">` +
+        `<div style="font-size:10.5px;color:#9aa2ad;">${total}</div>` +
+        `<div style="width:100%;max-width:42px;height:${h}px;border-radius:4px 4px 0 0;overflow:hidden;display:flex;flex-direction:column;justify-content:flex-end;background:#134e4a;">` +
+          (eh > 0 ? `<div style="height:${eh}px;background:#8a4a3a;"></div>` : '') +
+        `</div>` +
+        `<div style="font-size:10px;color:#5b626d;">${d.day}</div>` +
+      `</div>`;
+    }).join('');
+  }
+
+  function renderPath(rows) {
+    const tb = document.getElementById('tb-path');
+    if (!rows || !rows.length) { tb.innerHTML = '<tr><td colspan="7" style="color:#5b626d;">데이터 없음</td></tr>'; return; }
+    tb.innerHTML = rows.map(r =>
+      `<tr><td>${esc(r.api_type)}</td><td style="color:#e7eaee;">${esc(r.path)}</td><td>${esc(r.conn_svc_id || '-')}</td>` +
+      `<td style="text-align:right;">${num(r.total)}</td>` +
+      `<td style="text-align:right;color:#5fc98a;">${num(r.success)}</td>` +
+      `<td style="text-align:right;color:${(Number(r.gw_error)+Number(r.failed))>0?'#e88a82':'#5b626d'};">${num(Number(r.gw_error)+Number(r.failed))}</td>` +
+      `<td style="text-align:right;">${num(r.avg_ms)}</td></tr>`
+    ).join('');
+  }
+
+  function renderClient(rows) {
+    const tb = document.getElementById('tb-client');
+    if (!rows || !rows.length) { tb.innerHTML = '<tr><td colspan="4" style="color:#5b626d;">데이터 없음</td></tr>'; return; }
+    tb.innerHTML = rows.map(r =>
+      `<tr><td style="color:#e7eaee;">${esc(r.client_ip || '-')}</td>` +
+      `<td style="text-align:right;">${num(r.total)}</td>` +
+      `<td style="text-align:right;color:${Number(r.errors)>0?'#e88a82':'#5b626d'};">${num(r.errors)}</td>` +
+      `<td style="color:#69707b;">${esc(String(r.last_at || '').replace('T',' ').substring(0,19))}</td></tr>`
+    ).join('');
+  }
+
+  function renderRecent(rows) {
+    const tb = document.getElementById('tb-recent');
+    if (!rows || !rows.length) { tb.innerHTML = '<tr><td colspan="9" style="color:#5b626d;">데이터 없음</td></tr>'; return; }
+    tb.innerHTML = rows.map(r =>
+      `<tr><td style="color:#69707b;">${esc(r.requested_at)}</td>` +
+      `<td>${esc(r.api_type)}</td>` +
+      `<td style="color:#e7eaee;">${esc(r.path)}</td>` +
+      `<td>${esc(r.pnu || '-')}</td>` +
+      `<td>${esc(r.client_ip || '-')}</td>` +
+      `<td>${badge(r.status)}</td>` +
+      `<td>${esc(r.gw_code || '-')}</td>` +
+      `<td style="text-align:right;">${num(r.duration_ms)}</td>` +
+      `<td style="max-width:260px;overflow:hidden;text-overflow:ellipsis;color:#8a6a5a;" title="${esc(r.error_msg || '')}">${esc(r.error_msg || '')}</td></tr>`
+    ).join('');
+  }
+
+  function loadStats() {
+    fetch('/conn-stats/data?period=' + period)
+      .then(r => r.json())
+      .then(d => {
+        renderSummary(d.summary || {});
+        renderDayChart(d.byDay);
+        renderPath(d.byPath);
+        renderClient(d.byClient);
+      })
+      .catch(() => {});
+    fetch('/conn-stats/recent?limit=50')
+      .then(r => r.json())
+      .then(renderRecent)
+      .catch(() => {});
+  }
+
+  loadStats();
+  setInterval(loadStats, 30000);
+</script>
+</th:block>
+</body>
+</html>

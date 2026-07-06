@@ -47,12 +47,18 @@
       <a th:href="@{/}"
          th:style="${currentPage == 'dashboard'} ? 'padding:8px 14px;border-radius:8px;font-weight:600;color:#66c4be;background:rgba(14,155,148,0.16);' : 'padding:8px 14px;border-radius:8px;font-weight:500;color:#8a919c;'">
         대시보드</a>
+      <a th:href="@{/api-test}"
+         th:style="${currentPage == 'api-test'} ? 'padding:8px 14px;border-radius:8px;font-weight:600;color:#66c4be;background:rgba(14,155,148,0.16);' : 'padding:8px 14px;border-radius:8px;font-weight:500;color:#8a919c;'">
+        API 테스트</a>
+      <a th:href="@{/conn-stats}"
+         th:style="${currentPage == 'conn-stats'} ? 'padding:8px 14px;border-radius:8px;font-weight:600;color:#66c4be;background:rgba(14,155,148,0.16);' : 'padding:8px 14px;border-radius:8px;font-weight:500;color:#8a919c;'">
+        API 통계</a>
       <a th:href="@{/logs}"
          th:style="${currentPage == 'logs'} ? 'padding:8px 14px;border-radius:8px;font-weight:600;color:#66c4be;background:rgba(14,155,148,0.16);' : 'padding:8px 14px;border-radius:8px;font-weight:500;color:#8a919c;'">
         로그</a>
       <a th:href="@{/ods}"
          th:style="${currentPage == 'ods'} ? 'padding:8px 14px;border-radius:8px;font-weight:600;color:#66c4be;background:rgba(14,155,148,0.16);' : 'padding:8px 14px;border-radius:8px;font-weight:500;color:#8a919c;'">
-        ODS</a>
+        데이터베이스</a>
       <a th:href="@{/schedule}"
          th:style="${currentPage == 'schedule'} ? 'padding:8px 14px;border-radius:8px;font-weight:600;color:#66c4be;background:rgba(14,155,148,0.16);' : 'padding:8px 14px;border-radius:8px;font-weight:500;color:#8a919c;'">
         스케줄</a>
