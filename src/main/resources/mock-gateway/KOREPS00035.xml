@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<RESPONSE>
+    <HEADER>
+        <CODE>0000</CODE>
+        <MESSAGE>SUCCESS(MOCK)</MESSAGE>
+    </HEADER>
+    <BODY>
+        <READ_DECSN_JIGA>
+            <LAND_LOC_ADDR>전라남도 장흥군 장흥읍 예양리 {{BOBN}}-{{BUBN}}</LAND_LOC_ADDR>
+            <SEQNO>1</SEQNO>
+            <JIMOK>08</JIMOK>
+            <PAREA>452.0</PAREA>
+            <PY_JIGA>121000</PY_JIGA>
+            <READ_JIGA>127500</READ_JIGA>
+            <DECN_JIGA>128000</DECN_JIGA>
+            <CALD_STDMT>01</CALD_STDMT>
+        </READ_DECSN_JIGA>
+    </BODY>
+</RESPONSE>

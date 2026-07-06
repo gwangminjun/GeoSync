@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<RESPONSE>
+    <HEADER>
+        <CODE>0000</CODE>
+        <MESSAGE>SUCCESS(MOCK)</MESSAGE>
+    </HEADER>
+    <BODY>
+        <LAND_MOV_HIST_SET>
+            <LAND_MOV_HIST>
+                <LAND_HIST_ODRNO>1</LAND_HIST_ODRNO>
+                <LAND_MOV_HIST_ODRNO>1</LAND_MOV_HIST_ODRNO>
+                <JIMOK>08</JIMOK>
+                <JIMOK_NM>대</JIMOK_NM>
+                <PAREA>452.0</PAREA>
+                <LAND_MOV_RSN_CD>10</LAND_MOV_RSN_CD>
+                <LAND_MOV_RSN_CD_NM>신규등록</LAND_MOV_RSN_CD_NM>
+                <DYMD>20200103</DYMD>
+                <JIBUN>{{BOBN}}-{{BUBN}}</JIBUN>
+                <SCALE>1200</SCALE>
+                <SCALE_NM>1/1200</SCALE_NM>
+                <OWNER_NM>홍길동</OWNER_NM>
+                <OWNER_ADDR>전라남도 장흥군 장흥읍 예양리</OWNER_ADDR>
+                <OWN_GBN>01</OWN_GBN>
+                <SHR_CNT>0</SHR_CNT>
+            </LAND_MOV_HIST>
+            <LAND_MOV_HIST>
+                <LAND_HIST_ODRNO>2</LAND_HIST_ODRNO>
+                <LAND_MOV_HIST_ODRNO>2</LAND_MOV_HIST_ODRNO>
+                <JIMOK>05</JIMOK>
+                <JIMOK_NM>임야</JIMOK_NM>
+                <PAREA>452.0</PAREA>
+                <LAND_MOV_RSN_CD>40</LAND_MOV_RSN_CD>
+                <LAND_MOV_RSN_CD_NM>지목변경</LAND_MOV_RSN_CD_NM>
+                <DYMD>20150601</DYMD>
+                <JIBUN>{{BOBN}}-{{BUBN}}</JIBUN>
+                <SCALE>1200</SCALE>
+                <SCALE_NM>1/1200</SCALE_NM>
+                <OWNER_NM>홍길동</OWNER_NM>
+                <OWNER_ADDR>전라남도 장흥군 장흥읍 예양리</OWNER_ADDR>
+                <OWN_GBN>01</OWN_GBN>
+                <SHR_CNT>0</SHR_CNT>
+            </LAND_MOV_HIST>
+        </LAND_MOV_HIST_SET>
+    </BODY>
+</RESPONSE>

@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<RESPONSE>
+    <HEADER>
+        <CODE>0000</CODE>
+        <MESSAGE>SUCCESS(MOCK)</MESSAGE>
+    </HEADER>
+    <BODY>
+        <BLDG_HO_LIST>
+            <BLDG_HO_INFO>
+                <ADM_SECT_CD>{{ADM}}</ADM_SECT_CD>
+                <LAND_LOC_CD>{{LOC}}</LAND_LOC_CD>
+                <LEDG_GBN>{{GBN}}</LEDG_GBN>
+                <BOBN>{{BOBN}}</BOBN>
+                <BUBN>{{BUBN}}</BUBN>
+                <BLDG_KIND_CD>02</BLDG_KIND_CD>
+                <BLDG_GBN_NO>{{BNO}}</BLDG_GBN_NO>
+                <DONG_NM>가</DONG_NM>
+                <FLR_HO_NM>101호</FLR_HO_NM>
+                <BMAP_YN>Y</BMAP_YN>
+                <GAREA>105.1</GAREA>
+            </BLDG_HO_INFO>
+            <BLDG_HO_INFO>
+                <ADM_SECT_CD>{{ADM}}</ADM_SECT_CD>
+                <LAND_LOC_CD>{{LOC}}</LAND_LOC_CD>
+                <LEDG_GBN>{{GBN}}</LEDG_GBN>
+                <BOBN>{{BOBN}}</BOBN>
+                <BUBN>{{BUBN}}</BUBN>
+                <BLDG_KIND_CD>02</BLDG_KIND_CD>
+                <BLDG_GBN_NO>{{BNO}}</BLDG_GBN_NO>
+                <DONG_NM>가</DONG_NM>
+                <FLR_HO_NM>102호</FLR_HO_NM>
+                <BMAP_YN>Y</BMAP_YN>
+                <GAREA>105.1</GAREA>
+            </BLDG_HO_INFO>
+        </BLDG_HO_LIST>
+    </BODY>
+</RESPONSE>

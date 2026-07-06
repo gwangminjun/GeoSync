@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<RESPONSE>
+    <HEADER>
+        <CODE>0000</CODE>
+        <MESSAGE>SUCCESS(MOCK)</MESSAGE>
+    </HEADER>
+    <BODY>
+        <BLDG_DONG_LIST>
+            <BLDG_DONG_INFO>
+                <ADM_SECT_CD>{{ADM}}</ADM_SECT_CD>
+                <LAND_LOC_CD>{{LOC}}</LAND_LOC_CD>
+                <LEDG_GBN>{{GBN}}</LEDG_GBN>
+                <BOBN>{{BOBN}}</BOBN>
+                <BUBN>{{BUBN}}</BUBN>
+                <BLDG_KIND_NM>일반건축물</BLDG_KIND_NM>
+                <BLDG_KIND_CD>01</BLDG_KIND_CD>
+                <BLDG_GBN_NO>1</BLDG_GBN_NO>
+                <BLDG_NM>예양리주택</BLDG_NM>
+                <DONG_NM>1</DONG_NM>
+                <BMAP_YN>Y</BMAP_YN>
+                <GAREA>98.5</GAREA>
+            </BLDG_DONG_INFO>
+            <BLDG_DONG_INFO>
+                <ADM_SECT_CD>{{ADM}}</ADM_SECT_CD>
+                <LAND_LOC_CD>{{LOC}}</LAND_LOC_CD>
+                <LEDG_GBN>{{GBN}}</LEDG_GBN>
+                <BOBN>{{BOBN}}</BOBN>
+                <BUBN>{{BUBN}}</BUBN>
+                <BLDG_KIND_NM>일반건축물</BLDG_KIND_NM>
+                <BLDG_KIND_CD>01</BLDG_KIND_CD>
+                <BLDG_GBN_NO>2</BLDG_GBN_NO>
+                <BLDG_NM>창고</BLDG_NM>
+                <DONG_NM>2</DONG_NM>
+                <BMAP_YN>Y</BMAP_YN>
+                <GAREA>24.0</GAREA>
+            </BLDG_DONG_INFO>
+        </BLDG_DONG_LIST>
+    </BODY>
+</RESPONSE>

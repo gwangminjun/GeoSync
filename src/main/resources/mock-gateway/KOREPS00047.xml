@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<RESPONSE>
+    <HEADER>
+        <CODE>0000</CODE>
+        <MESSAGE>SUCCESS(MOCK)</MESSAGE>
+    </HEADER>
+    <BODY>
+        <LAND_LIST>
+            <LAND>
+                <PANN_YEAR>2026</PANN_YEAR>
+                <LAND_LOC_NM>전라남도 장흥군 장흥읍 예양리</LAND_LOC_NM>
+                <LAND_SEQNO>1</LAND_SEQNO>
+                <PNU>{{PNU}}</PNU>
+                <SGG_CD>{{ADM}}</SGG_CD>
+                <LAND_LOC_CD>{{LOC}}</LAND_LOC_CD>
+                <LEDG_GBN>{{GBN}}</LEDG_GBN>
+                <BOBN>{{BOBN}}</BOBN>
+                <BUBN>{{BUBN}}</BUBN>
+                <STDMT>01</STDMT>
+                <PNILP>128000</PNILP>
+                <JIMOK>08</JIMOK>
+                <JIMOK_NM>대</JIMOK_NM>
+                <PAREA>452.0</PAREA>
+                <SPFC1>UQA100</SPFC1>
+                <SPFC1_AREA>452.0</SPFC1_AREA>
+                <LAND_USE>주거용</LAND_USE>
+                <GEO_HL>저지</GEO_HL>
+                <GEO_FORM>사다리형</GEO_FORM>
+                <ROAD_SIDE>세로(가)</ROAD_SIDE>
+                <PY_JIGA>121000</PY_JIGA>
+                <CALC_JIGA>127500</CALC_JIGA>
+                <OWN_GBN>01</OWN_GBN>
+                <LAND_MOV_YMD>20200103</LAND_MOV_YMD>
+                <LAND_MOV_RSN_CD>10</LAND_MOV_RSN_CD>
+            </LAND>
+        </LAND_LIST>
+    </BODY>
+</RESPONSE>

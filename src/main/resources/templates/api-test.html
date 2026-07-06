@@ -1,0 +1,849 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}" lang="ko">
+<head>
+<title>API 테스트</title>
+<th:block layout:fragment="head">
+<style>
+  /* ── 연결 설정 패널 ── */
+  .conn-panel {
+    background:#1a1f26;border:1px solid #262c35;border-radius:11px;
+    margin-bottom:18px;overflow:hidden;
+  }
+  .conn-panel-header {
+    display:flex;align-items:center;gap:10px;padding:12px 16px;
+    cursor:pointer;user-select:none;
+  }
+  .conn-panel-header:hover { background:#1e242c; }
+  .conn-title { font-size:13px;font-weight:600;color:#c8cdd4;flex:1; }
+  .conn-body { padding:0 16px 14px;border-top:1px solid #232830; }
+  .conn-grid { display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px 20px;margin-top:12px; }
+  .conn-label { font-size:11px;color:#9aa2ad;font-weight:600;margin-bottom:4px;display:block; }
+  .conn-sublabel { font-size:10px;color:#5b626d;margin-bottom:6px; }
+  .conn-input {
+    width:100%;padding:7px 9px;border-radius:6px;border:1px solid #2e3640;
+    background:#14171c;color:#e7eaee;font-size:12px;
+    font-family:'JetBrains Mono',monospace;box-sizing:border-box;
+    transition:border-color .15s;
+  }
+  .conn-input:focus { border-color:#0e9b94;outline:none; }
+  .conn-modified { border-color:#d9b066 !important; }
+  .conn-section-label {
+    font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+    color:#5b626d;margin-top:14px;margin-bottom:6px;display:flex;align-items:center;gap:6px;
+  }
+  .conn-section-label::after { content:'';flex:1;height:1px;background:#1e242c; }
+
+  /* ── API 목록 ── */
+  .api-group-title {
+    font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+    color:#5b626d;padding:14px 0 8px;border-bottom:1px solid #232830;
+    margin-bottom:4px;display:flex;align-items:center;gap:8px;
+  }
+  .api-row {
+    display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:7px;
+    cursor:pointer;transition:background .12s;border:1px solid transparent;
+  }
+  .api-row:hover { background:#1a1f26;border-color:#2e3640; }
+  .api-row.active { background:#0a2b29;border-color:#1a4a44; }
+  .api-badge {
+    font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;
+    font-family:'JetBrains Mono',monospace;white-space:nowrap;flex-shrink:0;
+  }
+  .badge-kras   { background:#1e2a3a;color:#5fa8e8; }
+  .badge-koreps { background:#2a1e3a;color:#b07ff0; }
+  .badge-svc    { background:#1e3a2a;color:#5fc98a; }
+  .badge-multi  { background:#2a2a1e;color:#d9b066; }
+  .api-path {
+    font-family:'JetBrains Mono',monospace;font-size:12px;color:#c8cdd4;
+    flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  }
+  .api-desc { font-size:11.5px;color:#69707b;white-space:nowrap;flex-shrink:0; }
+  .tag-bno  { font-size:10px;padding:1px 5px;border-radius:4px;background:#2a2117;color:#c08a2a;white-space:nowrap;flex-shrink:0; }
+  .tag-map  { font-size:10px;padding:1px 5px;border-radius:4px;background:#1a2a1e;color:#5fc98a;white-space:nowrap;flex-shrink:0; }
+  .tag-body { font-size:10px;padding:1px 5px;border-radius:4px;background:#1e242c;color:#5b626d;white-space:nowrap;flex-shrink:0; }
+
+  /* ── 모달 ── */
+  #modal-overlay {
+    display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);
+    z-index:100;align-items:center;justify-content:center;backdrop-filter:blur(2px);
+  }
+  #modal-overlay.open { display:flex; }
+  #modal {
+    background:#171b21;border:1px solid #2e3640;border-radius:14px;
+    width:min(960px,92vw);height:min(700px,88vh);
+    display:flex;flex-direction:column;overflow:hidden;
+    box-shadow:0 24px 64px rgba(0,0,0,.6);
+  }
+  #m-header {
+    padding:14px 18px;border-bottom:1px solid #232830;
+    background:#14171c;display:flex;align-items:center;gap:10px;flex-shrink:0;
+  }
+  #m-title { font-size:14px;font-weight:600;color:#e7eaee; }
+  #m-desc  { font-size:12px;color:#69707b;margin-top:2px; }
+  #m-close {
+    width:28px;height:28px;border-radius:6px;border:1px solid #2e3640;
+    background:#1e242c;color:#9aa2ad;cursor:pointer;font-size:16px;
+    display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  }
+  #m-close:hover { background:#2e3640;color:#e7eaee; }
+  #m-body { display:flex;flex:1;min-height:0; }
+
+  /* 좌: 파라미터 */
+  #m-params-panel {
+    width:270px;flex-shrink:0;border-right:1px solid #232830;
+    padding:14px;display:flex;flex-direction:column;gap:0;overflow-y:auto;
+  }
+  .p-section {
+    font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;
+    color:#5b626d;padding-bottom:6px;margin-bottom:8px;
+    border-bottom:1px solid #1e242c;
+  }
+  .p-label { font-size:11px;color:#9aa2ad;font-weight:600;margin-bottom:3px;display:block; }
+  .p-sub   { font-size:10.5px;color:#5b626d;margin-bottom:6px; }
+  .p-input {
+    width:100%;padding:7px 9px;border-radius:6px;border:1px solid #2e3640;
+    background:#14171c;color:#e7eaee;font-size:12.5px;
+    font-family:'JetBrains Mono',monospace;box-sizing:border-box;
+    transition:border-color .15s;margin-bottom:10px;
+  }
+  .p-input:focus { border-color:#0e9b94;outline:none; }
+  .p-input.invalid { border-color:#e88a82; }
+
+  /* 연결 정보 표시 (모달 하단) */
+  #m-conn-info {
+    margin-top:auto;padding-top:10px;border-top:1px solid #1e242c;
+    font-size:10.5px;color:#5b626d;line-height:1.7;
+  }
+  .ci-row { display:flex;gap:5px; }
+  .ci-key { color:#3a4149;white-space:nowrap;flex-shrink:0; }
+  .ci-val { font-family:'JetBrains Mono',monospace;color:#5b626d;word-break:break-all; }
+  .ci-modified { color:#c08a2a !important; }
+
+  #m-actions { padding:10px 0; }
+  .btn-run {
+    width:100%;padding:8px;border-radius:7px;border:none;
+    background:#0e9b94;color:#fff;font-weight:600;font-size:13px;
+    font-family:inherit;cursor:pointer;transition:background .13s;
+  }
+  .btn-run:hover { background:#0c8880; }
+  .btn-run:disabled { opacity:.4;cursor:not-allowed; }
+  .btn-body {
+    width:100%;padding:8px;border-radius:7px;border:1px solid #2e3640;
+    background:#1a1f26;color:#5fa8e8;font-weight:600;font-size:13px;
+    font-family:inherit;cursor:pointer;margin-top:6px;
+  }
+  .btn-body:hover { background:#1e2a3a;border-color:#5fa8e8; }
+  .btn-body:disabled { opacity:.4;cursor:not-allowed; }
+  .svc-note {
+    font-size:10.5px;color:#5b626d;margin-top:8px;padding:7px 8px;
+    border-radius:5px;background:#14171c;border:1px solid #1e242c;line-height:1.5;
+  }
+
+  /* 우: 응답 */
+  #m-resp-panel { flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden; }
+  #m-resp-empty {
+    flex:1;display:flex;align-items:center;justify-content:center;
+    flex-direction:column;gap:10px;color:#5b626d;
+  }
+  #m-resp-loading {
+    flex:1;display:flex;align-items:center;justify-content:center;
+    flex-direction:column;gap:12px;color:#69707b;
+  }
+  #m-resp-result { display:flex;flex:1;flex-direction:column;overflow:hidden; }
+  #m-resp-meta {
+    padding:10px 14px;border-bottom:1px solid #1e242c;background:#14171c;flex-shrink:0;
+  }
+  .resp-url-line {
+    font-family:'JetBrains Mono',monospace;font-size:11px;
+    color:#69707b;word-break:break-all;line-height:1.5;margin-bottom:6px;
+  }
+  .resp-url-line .method { color:#5fc98a;font-weight:700;margin-right:6px; }
+  .resp-meta-row { display:flex;align-items:center;gap:8px;flex-wrap:wrap; }
+  .status-badge { font-size:11px;font-weight:700;padding:2px 8px;border-radius:5px;font-family:'JetBrains Mono',monospace; }
+  .s2xx { background:#15291f;color:#5fc98a; }
+  .s4xx { background:#2a2117;color:#d9b066; }
+  .s5xx { background:#2a1a1a;color:#e88a82; }
+  .serr { background:#2a1a1a;color:#e88a82; }
+  .timing { font-size:11px;color:#5b626d;font-family:'JetBrains Mono',monospace; }
+  .btn-sm {
+    font-size:11.5px;padding:3px 10px;border-radius:5px;
+    border:1px solid #2e3640;background:transparent;color:#69707b;cursor:pointer;font-family:inherit;
+  }
+  .btn-sm:hover { border-color:#5fa8e8;color:#7aafe8; }
+  #m-resp-xml-wrap { flex:1;overflow:auto;padding:14px; }
+  .xml-viewer { font-family:'JetBrains Mono',monospace;font-size:11.5px;line-height:1.7;color:#c8cdd4;white-space:pre;margin:0; }
+  .xml-tag  { color:#5fa8e8; }
+  .xml-attr { color:#d9b066; }
+  .xml-val  { color:#f0c07a; }
+  .xml-pi   { color:#69707b; }
+
+  /* URL 미리보기 */
+  #m-url-preview {
+    font-family:'JetBrains Mono',monospace;font-size:10.5px;color:#5b626d;
+    padding:6px 8px;border-radius:5px;background:#14171c;border:1px solid #1e242c;
+    word-break:break-all;line-height:1.5;margin-bottom:10px;
+  }
+  .spinner {
+    width:20px;height:20px;border:2px solid #2e3640;border-top-color:#0e9b94;
+    border-radius:50%;animation:spin .6s linear infinite;
+  }
+  @keyframes spin { to { transform:rotate(360deg); } }
+</style>
+</th:block>
+</head>
+<body>
+<main layout:fragment="content">
+
+<!-- Thymeleaf 주입값 -->
+<input type="hidden" id="sv-pnu"            th:value="${chkPnu}">
+<input type="hidden" id="sv-kras-url"       th:value="${krasUrl}">
+<input type="hidden" id="sv-kras-sys"       th:value="${krasConnSysId}">
+<input type="hidden" id="sv-koreps-url"     th:value="${korepsUrl}">
+<input type="hidden" id="sv-koreps-sys"     th:value="${korepsConnSysId}">
+<input type="hidden" id="sv-org"            th:value="${orgCode}">
+<input type="hidden" id="sv-mock-url"       th:value="${mockGatewayUrl}">
+
+<div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:16px;">
+  <div style="font-size:19px;font-weight:700;color:#f3f5f7;letter-spacing:-0.01em;">API 테스트</div>
+  <div style="font-size:12px;color:#69707b;">API 행을 클릭하면 파라미터를 편집하고 결과를 확인합니다</div>
+</div>
+
+<!-- ══════════ 연결 설정 패널 ══════════ -->
+<div class="conn-panel">
+  <div class="conn-panel-header" onclick="toggleConnPanel()">
+    <span style="font-size:13px;">⚙</span>
+    <span class="conn-title">연결 설정</span>
+    <span id="conn-modified-badge" style="display:none;font-size:10px;padding:2px 7px;border-radius:4px;background:#2a2117;color:#c08a2a;">수정됨</span>
+    <span id="conn-toggle-icon" style="font-size:11px;color:#5b626d;">▼</span>
+  </div>
+  <div id="conn-body" class="conn-body">
+    <div class="conn-grid">
+      <!-- 기관코드 -->
+      <div>
+        <label class="conn-label">기관코드 (adm_sec_cd / adm_sect_cd)</label>
+        <div class="conn-sublabel">KRAS·KOREPS 공용 행정구역코드</div>
+        <input class="conn-input" id="g-org" type="text" placeholder="46870" oninput="onConnChange()">
+      </div>
+      <!-- KRAS -->
+      <div style="grid-column:1/-1;">
+        <div class="conn-section-label"><span class="api-badge badge-kras" style="font-size:10px;">KRAS</span></div>
+      </div>
+      <div>
+        <label class="conn-label">KRAS URL</label>
+        <input class="conn-input" id="g-kras-url" type="text" placeholder="http://..." oninput="onConnChange()">
+      </div>
+      <div>
+        <label class="conn-label">KRAS conn_sys_id</label>
+        <input class="conn-input" id="g-kras-sys" type="text" placeholder="연결 시스템 ID" oninput="onConnChange()">
+      </div>
+      <!-- KOREPS -->
+      <div style="grid-column:1/-1;">
+        <div class="conn-section-label"><span class="api-badge badge-koreps" style="font-size:10px;">KOREPS</span></div>
+      </div>
+      <div>
+        <label class="conn-label">KOREPS URL</label>
+        <input class="conn-input" id="g-koreps-url" type="text" placeholder="http://..." oninput="onConnChange()">
+      </div>
+      <div>
+        <label class="conn-label">KOREPS conn_sys_id</label>
+        <input class="conn-input" id="g-koreps-sys" type="text" placeholder="연결 시스템 ID" oninput="onConnChange()">
+      </div>
+    </div>
+    <div style="margin-top:12px;display:flex;gap:8px;">
+      <button onclick="resetConnSettings()"
+              style="font-size:12px;padding:5px 12px;border-radius:6px;border:1px solid #2e3640;background:transparent;color:#9aa2ad;cursor:pointer;">
+        설정값으로 초기화
+      </button>
+      <button th:if="${mockGatewayEnabled}" onclick="useMockGateway()"
+              style="font-size:12px;padding:5px 12px;border-radius:6px;border:1px solid #3a5a3a;background:#15291f;color:#5fc98a;cursor:pointer;">
+        Mock 게이트웨이 사용
+      </button>
+      <span style="font-size:11.5px;color:#5b626d;align-self:center;">
+        /conn API에 적용 · /svc API는 서버 설정 사용
+      </span>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ API 목록 ══════════ -->
+<div id="api-list" style="display:grid;grid-template-columns:1fr 1fr;gap:0 32px;"></div>
+
+<!-- ══════════ 모달 ══════════ -->
+<div id="modal-overlay" onclick="handleOverlayClick(event)">
+  <div id="modal">
+    <!-- 헤더 -->
+    <div id="m-header">
+      <div id="m-badge" class="api-badge" style="font-size:12px;padding:3px 9px;"></div>
+      <div style="flex:1;min-width:0;">
+        <div id="m-title"></div>
+        <div id="m-desc"></div>
+      </div>
+      <button id="m-close" onclick="closeModal()">✕</button>
+    </div>
+    <!-- 바디 -->
+    <div id="m-body">
+
+      <!-- 좌: 파라미터 패널 -->
+      <div id="m-params-panel">
+        <div class="p-section">데이터 파라미터</div>
+
+        <!-- URL 미리보기 -->
+        <div id="m-url-preview">—</div>
+
+        <!-- 게이트웨이 POST 본문 미리보기 (/conn 전용) -->
+        <div id="m-gw-preview-wrap" style="display:none;">
+          <div style="font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#3a4149;margin-bottom:4px;">gateway POST</div>
+          <div id="m-gw-preview" style="font-family:'JetBrains Mono',monospace;font-size:10.5px;color:#5b626d;padding:6px 8px;border-radius:5px;background:#14171c;border:1px solid #1e242c;word-break:break-all;line-height:1.5;margin-bottom:10px;"></div>
+        </div>
+
+        <label class="p-label">pnu <span style="color:#e88a82;">*</span></label>
+        <div class="p-sub">19자리 필지번호</div>
+        <input class="p-input" id="m-pnu" type="text" maxlength="19"
+               placeholder="4613710300100010000" oninput="onParamChange()">
+
+        <div id="m-bno-row" style="display:none;">
+          <label class="p-label">bno</label>
+          <div class="p-sub">건물번호 (선택)</div>
+          <input class="p-input" id="m-bno" type="text" placeholder="예: 1" oninput="onParamChange()">
+        </div>
+
+        <div id="m-map-rows" style="display:none;">
+          <div class="p-section" style="margin-top:6px;">지도 파라미터</div>
+          <label class="p-label">map_width</label>
+          <input class="p-input" id="m-map-w" type="text" placeholder="600" oninput="onParamChange()">
+          <label class="p-label">map_height</label>
+          <input class="p-input" id="m-map-h" type="text" placeholder="400" oninput="onParamChange()">
+          <label class="p-label">legend_width</label>
+          <input class="p-input" id="m-leg-w" type="text" placeholder="100" oninput="onParamChange()">
+          <label class="p-label">legend_height</label>
+          <input class="p-input" id="m-leg-h" type="text" placeholder="100" oninput="onParamChange()">
+          <label class="p-label">scale</label>
+          <input class="p-input" id="m-scale" type="text" placeholder="1000" oninput="onParamChange()">
+        </div>
+
+        <!-- 실행 버튼 -->
+        <div id="m-actions">
+          <button class="btn-run"  id="m-run"      onclick="executeModal(false)">▶ 실행</button>
+          <button class="btn-body" id="m-body-btn" onclick="executeModal(true)"  style="display:none;">▶ /body 실행</button>
+          <div class="svc-note" id="m-svc-note" style="display:none;">
+            /svc API는 서버에 저장된 연결 정보를 사용합니다.<br>URL·연결ID 변경은 /conn API에서 적용됩니다.
+          </div>
+        </div>
+
+        <!-- 연결 정보 표시 -->
+        <div id="m-conn-info"></div>
+      </div>
+
+      <!-- 우: 응답 패널 -->
+      <div id="m-resp-panel">
+        <div id="m-resp-empty">
+          <div style="font-size:32px;opacity:.3;">◎</div>
+          <div style="font-size:13px;">실행 버튼을 눌러 API를 호출하세요</div>
+        </div>
+        <div id="m-resp-loading" style="display:none;">
+          <div class="spinner"></div>
+          <div style="font-size:12.5px;" id="m-loading-txt"></div>
+        </div>
+        <div id="m-resp-result" style="display:none;">
+          <div id="m-resp-meta">
+            <div class="resp-url-line"><span class="method">GET</span><span id="m-resp-url"></span></div>
+            <div class="resp-meta-row">
+              <span id="m-resp-status" class="status-badge"></span>
+              <span id="m-resp-timing" class="timing"></span>
+              <div style="flex:1;"></div>
+              <button class="btn-sm" onclick="copyXml()">복사</button>
+              <a id="m-resp-link" href="#" target="_blank" class="btn-sm" style="text-decoration:none;">새 탭</a>
+            </div>
+          </div>
+          <div id="m-resp-xml-wrap">
+            <pre class="xml-viewer" id="m-resp-xml"></pre>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- end #m-body -->
+  </div><!-- end #modal -->
+</div><!-- end #modal-overlay -->
+
+</main>
+<th:block layout:fragment="scripts">
+<script th:inline="javascript">
+/* ═══════════════════════════════════════════════════════════
+   서버 기본값
+═══════════════════════════════════════════════════════════ */
+const SV = {
+  pnu:       document.getElementById('sv-pnu').value,
+  krasUrl:   document.getElementById('sv-kras-url').value,
+  krasSys:   document.getElementById('sv-kras-sys').value,
+  korepsUrl: document.getElementById('sv-koreps-url').value,
+  korepsSys: document.getElementById('sv-koreps-sys').value,
+  org:       document.getElementById('sv-org').value,
+};
+
+/* ═══════════════════════════════════════════════════════════
+   API 카탈로그
+═══════════════════════════════════════════════════════════ */
+const APIS = [
+  // /conn KRAS
+  { id:'conn/land_info',              g:'kras',   svc:'KRAS000002',  type:'conn', path:'land_info',              desc:'토지기본정보',      bno:false, map:false, body:true  },
+  { id:'conn/shr_ymb',               g:'kras',   svc:'KRAS000003',  type:'conn', path:'shr_ymb',               desc:'공유지분목록',      bno:false, map:false, body:true  },
+  { id:'conn/land_mov_hist',          g:'kras',   svc:'KRAS000006',  type:'conn', path:'land_mov_hist',          desc:'토지이동이력',      bno:false, map:false, body:true  },
+  { id:'conn/own_rgt_hist',           g:'kras',   svc:'KRAS000007',  type:'conn', path:'own_rgt_hist',           desc:'소유권이력',        bno:false, map:false, body:true  },
+  { id:'conn/bldg_hds_info',          g:'kras',   svc:'KRAS000014',  type:'conn', path:'bldg_hds_info',          desc:'건물동별 세대',     bno:true,  map:false, body:true  },
+  { id:'conn/cbldg_hds_info',         g:'kras',   svc:'KRAS000015',  type:'conn', path:'cbldg_hds_info',         desc:'집합건물 세대',     bno:true,  map:false, body:true  },
+  { id:'conn/cbldg_dfhs_info',        g:'kras',   svc:'KRAS000016',  type:'conn', path:'cbldg_dfhs_info',        desc:'집합건물 전유세대', bno:true,  map:false, body:true  },
+  { id:'conn/bldg_ledg_gen_hds_info', g:'kras',   svc:'KRAS000017',  type:'conn', path:'bldg_ledg_gen_hds_info', desc:'건물대장 세대',     bno:false, map:false, body:true  },
+  { id:'conn/land_use_plan_attr',     g:'kras',   svc:'KRAS000025',  type:'conn', path:'land_use_plan_attr',     desc:'토지이용계획속성',  bno:false, map:false, body:true  },
+  { id:'conn/land_use_plan_info',     g:'kras',   svc:'KRAS000026',  type:'conn', path:'land_use_plan_info',     desc:'토지이용계획+지도', bno:false, map:true,  body:true  },
+  { id:'conn/use_zone',               g:'kras',   svc:'KRAS000027',  type:'conn', path:'use_zone',               desc:'용도지구',          bno:false, map:false, body:true  },
+  { id:'conn/land_bldg_check',        g:'kras',   svc:'KRAS000101',  type:'conn', path:'land_bldg_check',        desc:'토지건물체크',      bno:false, map:false, body:true  },
+  { id:'conn/bldg_dong_info',         g:'kras',   svc:'KRAS000102',  type:'conn', path:'bldg_dong_info',         desc:'건물동 정보',       bno:false, map:false, body:true  },
+  { id:'conn/bldg_ho_info',           g:'kras',   svc:'KRAS000103',  type:'conn', path:'bldg_ho_info',           desc:'건물호(전유)',      bno:true,  map:false, body:true  },
+  // /conn KOREPS
+  { id:'conn/land_jiga',              g:'koreps', svc:'KOREPS00011', type:'conn', path:'land_jiga',              desc:'공시지가',          bno:false, map:false, body:true  },
+  { id:'conn/house_info',             g:'koreps', svc:'KOREPS00033', type:'conn', path:'house_info',             desc:'개별주택가격',      bno:false, map:false, body:true  },
+  { id:'conn/fin_dec_jiga',           g:'koreps', svc:'KOREPS00034', type:'conn', path:'fin_dec_jiga',           desc:'공시결정지가',      bno:false, map:false, body:true  },
+  { id:'conn/read_dec_jiga',          g:'koreps', svc:'KOREPS00035', type:'conn', path:'read_dec_jiga',          desc:'열람결정지가',      bno:false, map:false, body:true  },
+  { id:'conn/land_attr',              g:'koreps', svc:'KOREPS00047', type:'conn', path:'land_attr',              desc:'토지속성',          bno:false, map:false, body:true  },
+  // /svc 단건
+  { id:'svc/GetLandInfo',             g:'svc',    svc:'단건',        type:'svc',  path:'GetLandInfo',            desc:'토지정보',          bno:false, map:false, body:false },
+  { id:'svc/GetJigaInfo',             g:'svc',    svc:'단건',        type:'svc',  path:'GetJigaInfo',            desc:'공시지가',          bno:false, map:false, body:false },
+  { id:'svc/GetShareInfo',            g:'svc',    svc:'단건',        type:'svc',  path:'GetShareInfo',           desc:'공유지분',          bno:false, map:false, body:false },
+  { id:'svc/GetLandHistInfo',         g:'svc',    svc:'단건',        type:'svc',  path:'GetLandHistInfo',        desc:'토지이동이력',      bno:false, map:false, body:false },
+  { id:'svc/GetOwnerHistInfo',        g:'svc',    svc:'단건',        type:'svc',  path:'GetOwnerHistInfo',       desc:'소유권이력',        bno:false, map:false, body:false },
+  { id:'svc/GetUseZoneList',          g:'svc',    svc:'단건',        type:'svc',  path:'GetUseZoneList',         desc:'용도지구목록',      bno:false, map:false, body:false },
+  { id:'svc/LandUsePlanAttr',         g:'svc',    svc:'단건',        type:'svc',  path:'LandUsePlanAttr',        desc:'토지이용계획속성',  bno:false, map:false, body:false },
+  { id:'svc/GetLandBldgChk',          g:'svc',    svc:'단건',        type:'svc',  path:'GetLandBldgChk',         desc:'토지건물체크',      bno:false, map:false, body:false },
+  { id:'svc/GetBldgList',             g:'svc',    svc:'단건',        type:'svc',  path:'GetBldgList',            desc:'건물동목록',        bno:false, map:false, body:false },
+  { id:'svc/GetHouseInfo',            g:'svc',    svc:'단건',        type:'svc',  path:'GetHouseInfo',           desc:'개별주택가격',      bno:false, map:false, body:false },
+  { id:'svc/GetJeonyubldg',           g:'svc',    svc:'단건',        type:'svc',  path:'GetJeonyubldg',          desc:'전유건물',          bno:true,  map:false, body:false },
+  { id:'svc/GetDjyexpos',             g:'svc',    svc:'단건',        type:'svc',  path:'GetDjyexpos',            desc:'집합건물전유세대',  bno:true,  map:false, body:false },
+  // /svc 복합
+  { id:'svc/GetTojiDaejangPrint',     g:'multi',  svc:'복합',        type:'svc',  path:'GetTojiDaejangPrint',    desc:'토지대장출력',      bno:false, map:false, body:false },
+  { id:'svc/GetTojiDaejangPrint2',    g:'multi',  svc:'복합',        type:'svc',  path:'GetTojiDaejangPrint2',   desc:'토지대장출력2',     bno:false, map:false, body:false },
+  { id:'svc/GetLandUsePlanInfo',      g:'multi',  svc:'복합',        type:'svc',  path:'GetLandUsePlanInfo',     desc:'토지이용계획통합',  bno:false, map:true,  body:false },
+  { id:'svc/GetBldgInfo',             g:'multi',  svc:'복합',        type:'svc',  path:'GetBldgInfo',            desc:'건물정보통합',      bno:true,  map:false, body:false },
+  { id:'svc/GetDjyrecaptitle',        g:'multi',  svc:'복합',        type:'svc',  path:'GetDjyrecaptitle',       desc:'집합건물 표제부',   bno:true,  map:false, body:false },
+  { id:'svc/GetDjytitle',             g:'multi',  svc:'복합',        type:'svc',  path:'GetDjytitle',            desc:'집합건물 타이틀',   bno:true,  map:false, body:false },
+];
+
+const GROUP_META = {
+  kras:   { label:'KRAS',     cls:'badge-kras',   title:'/conn — KRAS estateGateway'         },
+  koreps: { label:'KOREPS',   cls:'badge-koreps', title:'/conn — KOREPS estateGateway'        },
+  svc:    { label:'GMX 단건', cls:'badge-svc',    title:'/svc — 단건 GMX API'               },
+  multi:  { label:'GMX 복합', cls:'badge-multi',  title:'/svc — 복합 GMX API (병렬 조합)'   },
+};
+
+/* ═══════════════════════════════════════════════════════════
+   파라미터 상태 (API별 독립)
+═══════════════════════════════════════════════════════════ */
+const paramState = {};
+
+function getState(api) {
+  if (!paramState[api.id]) {
+    paramState[api.id] = { pnu: SV.pnu, bno: '', map_width:'', map_height:'', legend_width:'', legend_height:'', scale:'' };
+  }
+  return paramState[api.id];
+}
+
+function saveState(api) {
+  const s = paramState[api.id];
+  s.pnu = el('m-pnu').value;
+  s.bno = el('m-bno').value;
+  if (api.map) {
+    s.map_width     = el('m-map-w').value;
+    s.map_height    = el('m-map-h').value;
+    s.legend_width  = el('m-leg-w').value;
+    s.legend_height = el('m-leg-h').value;
+    s.scale         = el('m-scale').value;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   연결 설정 패널
+═══════════════════════════════════════════════════════════ */
+let connPanelOpen = true;
+
+function toggleConnPanel() {
+  connPanelOpen = !connPanelOpen;
+  el('conn-body').style.display = connPanelOpen ? '' : 'none';
+  el('conn-toggle-icon').textContent = connPanelOpen ? '▼' : '▶';
+}
+
+function onConnChange() {
+  const modified =
+    el('g-org').value        !== SV.org       ||
+    el('g-kras-url').value   !== SV.krasUrl   ||
+    el('g-kras-sys').value   !== SV.krasSys   ||
+    el('g-koreps-url').value !== SV.korepsUrl ||
+    el('g-koreps-sys').value !== SV.korepsSys;
+
+  el('conn-modified-badge').style.display = modified ? '' : 'none';
+
+  ['g-org','g-kras-url','g-kras-sys','g-koreps-url','g-koreps-sys'].forEach(id => {
+    const input = el(id);
+    const svKey = { 'g-org': SV.org, 'g-kras-url': SV.krasUrl, 'g-kras-sys': SV.krasSys,
+                    'g-koreps-url': SV.korepsUrl, 'g-koreps-sys': SV.korepsSys }[id];
+    input.classList.toggle('conn-modified', input.value !== svKey);
+  });
+
+  if (currentApi) { updateUrlPreview(); renderConnInfo(); }
+}
+
+function resetConnSettings() {
+  el('g-org').value        = SV.org;
+  el('g-kras-url').value   = SV.krasUrl;
+  el('g-kras-sys').value   = SV.krasSys;
+  el('g-koreps-url').value = SV.korepsUrl;
+  el('g-koreps-sys').value = SV.korepsSys;
+  onConnChange();
+}
+
+/* mock.gateway.enabled=true 일 때: KRAS/KOREPS URL을 내장 mock으로 전환 */
+function useMockGateway() {
+  const mockUrl = el('sv-mock-url').value;
+  if (!mockUrl) return;
+  el('g-kras-url').value   = mockUrl;
+  el('g-koreps-url').value = mockUrl;
+  onConnChange();
+}
+
+function connVal(id) { return el(id).value.trim(); }
+
+/* ═══════════════════════════════════════════════════════════
+   URL 빌드
+═══════════════════════════════════════════════════════════ */
+function buildUrl(api, isBody) {
+  const pnu = el('m-pnu').value.trim();
+  const bno = el('m-bno').value.trim();
+
+  if (api.type === 'conn') {
+    const p = new URLSearchParams({ connSvcId: api.svc, pnu });
+    if (bno) p.set('bno', bno);
+    if (api.map) appendMapParams(p);
+    const url = api.g === 'kras' ? connVal('g-kras-url') : connVal('g-koreps-url');
+    const sys = api.g === 'kras' ? connVal('g-kras-sys') : connVal('g-koreps-sys');
+    const org = connVal('g-org');
+    if (url) p.set('gatewayUrl', url);
+    if (sys) p.set('connSysId',  sys);
+    if (org) p.set('orgCode',    org);
+    if (isBody) p.set('bodyOnly', 'true');
+    return `/api-test/call?${p}`;
+  } else {
+    const p = new URLSearchParams({ pnu });
+    if (bno) p.set('bno', bno);
+    if (api.map) appendMapParams(p);
+    return `/svc/${api.path}?${p}`;
+  }
+}
+
+function appendMapParams(p) {
+  const mw = el('m-map-w').value.trim(), mh = el('m-map-h').value.trim();
+  const lw = el('m-leg-w').value.trim(), lh = el('m-leg-h').value.trim();
+  const sc = el('m-scale').value.trim();
+  if (mw) p.set('map_width', mw);
+  if (mh) p.set('map_height', mh);
+  if (lw) p.set('legend_width', lw);
+  if (lh) p.set('legend_height', lh);
+  if (sc) p.set('scale', sc);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   목록 렌더링
+═══════════════════════════════════════════════════════════ */
+function renderList() {
+  const root = el('api-list');
+  const groups = ['kras','koreps','svc','multi'];
+  let left = '', right = '';
+  groups.forEach((g, gi) => {
+    const meta = GROUP_META[g];
+    const list = APIS.filter(a => a.g === g);
+    let h = `<div><div class="api-group-title">
+      <span class="api-badge ${meta.cls}" style="font-size:11px;">${esc(meta.label)}</span>
+      ${esc(meta.title)} <span style="color:#3a4149;">(${list.length})</span>
+    </div>`;
+    list.forEach(api => {
+      h += `<div class="api-row" id="row-${esc(api.id)}" onclick="openModal('${esc(api.id)}')">
+        <span class="api-badge ${meta.cls}">${esc(api.svc)}</span>
+        <span class="api-path">${esc(api.path)}</span>
+        <span class="api-desc">${esc(api.desc)}</span>
+        ${api.bno  ? '<span class="tag-bno">+bno</span>'  : ''}
+        ${api.map  ? '<span class="tag-map">+map</span>'  : ''}
+        ${api.body ? '<span class="tag-body">/body</span>': ''}
+      </div>`;
+    });
+    h += '</div>';
+    if (gi % 2 === 0) left += h; else right += h;
+  });
+  root.innerHTML = `<div>${left}</div><div>${right}</div>`;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   모달 열기/닫기
+═══════════════════════════════════════════════════════════ */
+let currentApi = null;
+
+function openModal(apiId) {
+  const api = APIS.find(a => a.id === apiId);
+  if (!api) return;
+  currentApi = api;
+
+  document.querySelectorAll('.api-row').forEach(r => r.classList.remove('active'));
+  const row = el('row-' + apiId);
+  if (row) row.classList.add('active');
+
+  const meta = GROUP_META[api.g];
+  const badge = el('m-badge');
+  badge.textContent = api.svc;
+  badge.className   = `api-badge ${meta.cls}`;
+  el('m-title').textContent = api.type === 'conn' ? `/conn/${api.path}` : `/svc/${api.path}`;
+  el('m-desc').textContent  = api.desc;
+
+  const s = getState(api);
+  el('m-pnu').value = s.pnu;
+  el('m-bno-row').style.display  = api.bno ? '' : 'none';
+  el('m-bno').value              = s.bno || '';
+  el('m-map-rows').style.display = api.map ? '' : 'none';
+  if (api.map) {
+    el('m-map-w').value = s.map_width     || '';
+    el('m-map-h').value = s.map_height    || '';
+    el('m-leg-w').value = s.legend_width  || '';
+    el('m-leg-h').value = s.legend_height || '';
+    el('m-scale').value = s.scale         || '';
+  }
+
+  el('m-body-btn').style.display = api.body ? '' : 'none';
+  el('m-svc-note').style.display = api.type === 'svc' ? '' : 'none';
+
+  showEmpty();
+  validatePnu();
+  updateUrlPreview();
+  renderConnInfo();
+
+  el('modal-overlay').classList.add('open');
+  setTimeout(() => el('m-pnu').focus(), 60);
+}
+
+function closeModal() {
+  el('modal-overlay').classList.remove('open');
+  document.querySelectorAll('.api-row').forEach(r => r.classList.remove('active'));
+  currentApi = null;
+}
+
+function handleOverlayClick(e) {
+  if (e.target === el('modal-overlay')) closeModal();
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeModal();
+  if (e.key === 'Enter' && el('modal-overlay').classList.contains('open')
+      && document.activeElement?.classList.contains('p-input')) {
+    e.preventDefault();
+    executeModal(false);
+  }
+});
+
+/* ═══════════════════════════════════════════════════════════
+   파라미터 변경
+═══════════════════════════════════════════════════════════ */
+function onParamChange() {
+  if (currentApi) saveState(currentApi);
+  validatePnu();
+  updateUrlPreview();
+}
+
+function validatePnu() {
+  const pnu = el('m-pnu').value.trim();
+  const valid = /^\d{19}$/.test(pnu);
+  el('m-pnu').classList.toggle('invalid', pnu.length > 0 && !valid);
+  const disabled = !valid;
+  el('m-run').disabled = disabled;
+  el('m-body-btn').disabled = disabled;
+}
+
+function updateUrlPreview() {
+  if (!currentApi) return;
+  const pnu = el('m-pnu').value.trim();
+  el('m-url-preview').textContent = pnu ? buildUrl(currentApi, false) : '— pnu를 입력하세요 —';
+  updateGwPreview();
+}
+
+/* 게이트웨이로 실제 POST되는 본문 (기존 싱크 방식: PNU 분해 파라미터) */
+function updateGwPreview() {
+  const api = currentApi;
+  const pnu = el('m-pnu').value.trim();
+  const show = api && api.type === 'conn' && /^\d{19}$/.test(pnu);
+  el('m-gw-preview-wrap').style.display = show ? '' : 'none';
+  if (!show) return;
+
+  const sys = api.g === 'kras' ? connVal('g-kras-sys') : connVal('g-koreps-sys');
+  const org = connVal('g-org') || pnu.substring(0, 5);
+  const parts = [
+    'conn_sys_id=' + sys,
+    'gpki_id=',
+    'conn_svc_id=' + api.svc,
+    'adm_sect_cd=' + org,
+    'land_loc_cd=' + pnu.substring(5, 10),
+    'ledg_gbn='    + pnu.substring(10, 11),
+    'bobn='        + pnu.substring(11, 15),
+    'bubn='        + pnu.substring(15)
+  ];
+  const bno = el('m-bno').value.trim();
+  if (api.bno && bno) parts.push('bldg_gbn_no=' + bno);
+  el('m-gw-preview').textContent = parts.join('&');
+}
+
+function renderConnInfo() {
+  if (!currentApi) return;
+  const isSvc = currentApi.type === 'svc';
+  if (isSvc) { el('m-conn-info').innerHTML = ''; return; }
+
+  const isKras = currentApi.g === 'kras';
+  const urlVal = isKras ? connVal('g-kras-url') : connVal('g-koreps-url');
+  const sysVal = isKras ? connVal('g-kras-sys') : connVal('g-koreps-sys');
+  const orgVal = connVal('g-org');
+  const svUrl  = isKras ? SV.krasUrl : SV.korepsUrl;
+  const svSys  = isKras ? SV.krasSys : SV.korepsSys;
+
+  function row(key, val, changed) {
+    return `<div class="ci-row"><span class="ci-key">${key}</span>
+      <span class="ci-val ${changed ? 'ci-modified' : ''}">${esc(val || '—')}</span></div>`;
+  }
+  el('m-conn-info').innerHTML =
+    `<div style="font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#3a4149;margin-bottom:5px;">적용 연결 설정</div>` +
+    row('URL', urlVal, urlVal !== svUrl) +
+    row('sys', sysVal, sysVal !== svSys) +
+    row('org', orgVal, orgVal !== SV.org);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   API 실행
+═══════════════════════════════════════════════════════════ */
+async function executeModal(isBody) {
+  if (!currentApi) return;
+  const pnu = el('m-pnu').value.trim();
+  if (!/^\d{19}$/.test(pnu)) { el('m-pnu').focus(); return; }
+  saveState(currentApi);
+
+  const url = buildUrl(currentApi, isBody);
+  setLoading(url);
+
+  const t0 = performance.now();
+  try {
+    const res  = await fetch(url, { headers:{ Accept:'application/xml,text/xml,*/*' } });
+    const ms   = Math.round(performance.now() - t0);
+    const body = await res.text();
+    showResult(url, res.status, ms, body);
+  } catch (err) {
+    showError(url, Math.round(performance.now() - t0), String(err));
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   응답 패널 전환
+═══════════════════════════════════════════════════════════ */
+function showEmpty() {
+  el('m-resp-empty').style.display  = 'flex';
+  el('m-resp-loading').style.display = 'none';
+  el('m-resp-result').style.display  = 'none';
+}
+function setLoading(url) {
+  el('m-resp-empty').style.display  = 'none';
+  el('m-resp-loading').style.display = 'flex';
+  el('m-resp-result').style.display  = 'none';
+  el('m-loading-txt').textContent    = url;
+}
+function showResult(url, status, ms, body) {
+  el('m-resp-empty').style.display  = 'none';
+  el('m-resp-loading').style.display = 'none';
+  el('m-resp-result').style.display  = 'flex';
+  const badge = el('m-resp-status');
+  badge.textContent = status + (STATUS_TEXT[status] ? ' ' + STATUS_TEXT[status] : '');
+  badge.className   = 'status-badge ' + (status < 300 ? 's2xx' : status < 500 ? 's4xx' : 's5xx');
+  el('m-resp-timing').textContent = ms + 'ms';
+  el('m-resp-url').textContent    = url;
+  el('m-resp-link').href          = url;
+  el('m-resp-xml').innerHTML      = highlightXml(prettyXml(body));
+}
+function showError(url, ms, msg) {
+  el('m-resp-empty').style.display  = 'none';
+  el('m-resp-loading').style.display = 'none';
+  el('m-resp-result').style.display  = 'flex';
+  const badge = el('m-resp-status');
+  badge.textContent = 'ERROR'; badge.className = 'status-badge serr';
+  el('m-resp-timing').textContent = ms + 'ms';
+  el('m-resp-url').textContent    = url;
+  el('m-resp-link').href          = url;
+  el('m-resp-xml').innerHTML      = esc(msg);
+}
+const STATUS_TEXT = { 200:'OK', 400:'Bad Request', 404:'Not Found', 500:'Internal Server Error' };
+
+/* ═══════════════════════════════════════════════════════════
+   XML 처리
+═══════════════════════════════════════════════════════════ */
+function prettyXml(xml) {
+  try {
+    const doc = new DOMParser().parseFromString(xml.trim(), 'application/xml');
+    if (doc.querySelector('parsererror')) return xml;
+    return serializeNode(doc, 0).trim();
+  } catch (_) { return xml; }
+}
+function serializeNode(node, depth) {
+  const ind = '  '.repeat(depth);
+  if (node.nodeType === Node.TEXT_NODE) { const t = node.textContent.trim(); return t ? ind + t : ''; }
+  if (node.nodeType === Node.PROCESSING_INSTRUCTION_NODE) return `${ind}<?${node.target} ${node.data}?>`;
+  if (node.nodeType === Node.DOCUMENT_NODE)
+    return Array.from(node.childNodes).map(c => serializeNode(c, depth)).filter(s=>s).join('\n');
+  if (node.nodeType !== Node.ELEMENT_NODE) return '';
+  const tag = node.tagName;
+  const attrStr = Array.from(node.attributes).map(a => ` ${a.name}="${a.value}"`).join('');
+  const kids = Array.from(node.childNodes).filter(n =>
+    n.nodeType === Node.ELEMENT_NODE || (n.nodeType === Node.TEXT_NODE && n.textContent.trim()));
+  if (!kids.length) { const t = node.textContent.trim(); return t ? `${ind}<${tag}${attrStr}>${t}</${tag}>` : `${ind}<${tag}${attrStr}/>`; }
+  if (kids.length === 1 && kids[0].nodeType === Node.TEXT_NODE)
+    return `${ind}<${tag}${attrStr}>${kids[0].textContent.trim()}</${tag}>`;
+  const inner = kids.map(c => serializeNode(c, depth+1)).filter(s=>s).join('\n');
+  return `${ind}<${tag}${attrStr}>\n${inner}\n${ind}</${tag}>`;
+}
+function highlightXml(str) {
+  const e = esc(str);
+  return e
+    .replace(/(&lt;\?[^&]*?\?&gt;)/g, '<span class="xml-pi">$1</span>')
+    .replace(/(&lt;\/)([\w:.-]+)(&gt;)/g, '<span class="xml-tag">$1$2$3</span>')
+    .replace(/(&lt;)([\w:.-]+)((?:\s(?:[^&]|&amp;|&quot;|&#[0-9]+;)*)?)(\/?&gt;)/g,
+      (_, lt, name, attrs, gt) => {
+        const ha = attrs.replace(/([\w:.-]+)(=&quot;)([^&]*)(&quot;)/g,
+          '<span class="xml-attr">$1</span>$2<span class="xml-val">$3</span>$4');
+        return `<span class="xml-tag">${lt}${name}</span>${ha}<span class="xml-tag">${gt}</span>`;
+      });
+}
+
+/* ═══════════════════════════════════════════════════════════
+   유틸
+═══════════════════════════════════════════════════════════ */
+function esc(s) {
+  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function el(id) { return document.getElementById(id); }
+function copyXml() {
+  navigator.clipboard.writeText(el('m-resp-xml').textContent).then(() => {
+    const btn = document.querySelector('#m-resp-meta .btn-sm');
+    const orig = btn.textContent;
+    btn.textContent = '✓ 복사됨';
+    setTimeout(() => btn.textContent = orig, 1500);
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════
+   초기화
+═══════════════════════════════════════════════════════════ */
+document.addEventListener('DOMContentLoaded', () => {
+  renderList();
+  resetConnSettings();  // 서버 기본값으로 입력 필드 채우기
+});
+</script>
+</th:block>
+</body>
+</html>

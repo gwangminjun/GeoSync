@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<RESPONSE>
+    <HEADER>
+        <CODE>0000</CODE>
+        <MESSAGE>SUCCESS(MOCK)</MESSAGE>
+    </HEADER>
+    <BODY>
+        <BLDG_LEDG_GEN_HDS_INFO>
+            <BLDG_GBN_NO>{{BNO}}</BLDG_GBN_NO>
+            <ADM_SECT_CD>{{ADM}}</ADM_SECT_CD>
+            <LAND_LOC_CD>{{LOC}}</LAND_LOC_CD>
+            <LEDG_GBN>{{GBN}}</LEDG_GBN>
+            <BOBN>{{BOBN}}</BOBN>
+            <BUBN>{{BUBN}}</BUBN>
+            <BLDG_NM>예양연립</BLDG_NM>
+            <LAND_CNT>1</LAND_CNT>
+            <LEGA_YN>Y</LEGA_YN>
+            <VIO_BLDG_YN>N</VIO_BLDG_YN>
+            <LAREA>452.0</LAREA>
+            <BAREA>210.4</BAREA>
+            <BLR>46.55</BLR>
+            <GAREA>630.8</GAREA>
+            <FSI>139.5</FSI>
+            <FSI_CALC_GAREA>630.8</FSI_CALC_GAREA>
+            <MAIN_USE_NM>연립주택</MAIN_USE_NM>
+            <TOT_FMLY_CNT>0</TOT_FMLY_CNT>
+            <TOT_HEHD_CNT>0</TOT_HEHD_CNT>
+            <TOT_HO_CNT>6</TOT_HO_CNT>
+            <TOT_MAIN_BLDG_CNT>1</TOT_MAIN_BLDG_CNT>
+            <SUB_BLDG_CNT>0</SUB_BLDG_CNT>
+            <TOT_PARK_CNT>6</TOT_PARK_CNT>
+            <PERM_YMD>20050301</PERM_YMD>
+            <BGCONS_YMD>20050401</BGCONS_YMD>
+            <USE_APRV_YMD>20050820</USE_APRV_YMD>
+        </BLDG_LEDG_GEN_HDS_INFO>
+    </BODY>
+</RESPONSE>

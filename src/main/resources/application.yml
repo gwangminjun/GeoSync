@@ -37,6 +37,12 @@ koreps:
   url: ${KOREPS_URL:http://10.188.226.221:8385/conn/estateGateway}
   conn-sys-id: ${KOREPS_CONN_SYS_ID:VUHK-MFG4-XUME-M9AO}
 
+# 개발 환경 전용 mock estateGateway (/mock/estateGateway).
+# true로 켜면 API 테스트 화면에서 실 게이트웨이 없이 테스트할 수 있다.
+mock:
+  gateway:
+    enabled: ${MOCK_GATEWAY:false}
+
 ods:
   schema: ${ODS_SCHEMA:ods}
   schedule: ${ODS_SCHEDULE:0 30 5 * * *}

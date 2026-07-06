@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<RESPONSE>
+    <HEADER>
+        <CODE>0000</CODE>
+        <MESSAGE>SUCCESS(MOCK)</MESSAGE>
+    </HEADER>
+    <BODY>
+        <CBLDG_HDS_INFO_LIST>
+            <CBLDG_HDS_INFO>
+                <BLDG_GBN_NO>{{BNO}}</BLDG_GBN_NO>
+                <BLDG_NM>예양연립</BLDG_NM>
+                <DONG>가</DONG>
+                <MAIN_SUB_GBN_NM>주건축물</MAIN_SUB_GBN_NM>
+                <MAIN_SUB_SEQNO>1</MAIN_SUB_SEQNO>
+                <STRU_NM>철근콘크리트구조</STRU_NM>
+                <ROOF_NM>(철근)콘크리트</ROOF_NM>
+                <LAREA>452.0</LAREA>
+                <BAREA>210.4</BAREA>
+                <GAREA>630.8</GAREA>
+                <MAIN_USE_NM>연립주택</MAIN_USE_NM>
+                <FMLY_CNT>0</FMLY_CNT>
+                <HEHD_CNT>0</HEHD_CNT>
+                <HO_CNT>6</HO_CNT>
+                <VIO_BLDG_YN>N</VIO_BLDG_YN>
+                <LEGA_YN>Y</LEGA_YN>
+                <LAND_CNT>1</LAND_CNT>
+                <BLDG_KIND_CD>02</BLDG_KIND_CD>
+            </CBLDG_HDS_INFO>
+        </CBLDG_HDS_INFO_LIST>
+    </BODY>
+</RESPONSE>

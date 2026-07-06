@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<RESPONSE>
+    <HEADER>
+        <CODE>0000</CODE>
+        <MESSAGE>SUCCESS(MOCK)</MESSAGE>
+    </HEADER>
+    <BODY>
+        <BLDG_HDS_INFO_LIST>
+            <BLDG_HDS_INFO>
+                <BLDG_GBN_NO>{{BNO}}</BLDG_GBN_NO>
+                <BLDG_NM>예양리주택</BLDG_NM>
+                <DONG>1</DONG>
+                <MAIN_SUB_GBN_NM>주건축물</MAIN_SUB_GBN_NM>
+                <MAIN_SUB_SEQNO>1</MAIN_SUB_SEQNO>
+                <STRU_NM>일반목구조</STRU_NM>
+                <ROOF_NM>기와</ROOF_NM>
+                <LAREA>452.0</LAREA>
+                <BAREA>98.5</BAREA>
+                <GAREA>98.5</GAREA>
+                <MAIN_USE_NM>단독주택</MAIN_USE_NM>
+                <FMLY_CNT>1</FMLY_CNT>
+                <HEHD_CNT>1</HEHD_CNT>
+                <HO_CNT>1</HO_CNT>
+                <VIO_BLDG_YN>N</VIO_BLDG_YN>
+                <LEGA_YN>Y</LEGA_YN>
+                <LAND_CNT>1</LAND_CNT>
+                <BLDG_KIND_CD>01</BLDG_KIND_CD>
+                <FLOORINFOLIST>
+                    <FLR>1</FLR>
+                    <FLR_GBN_CD>10</FLR_GBN_CD>
+                    <MAIN_USE_NM>단독주택</MAIN_USE_NM>
+                    <BTM_AREA>98.5</BTM_AREA>
+                    <MAIN_SUB_GBN_NM>주건축물</MAIN_SUB_GBN_NM>
+                    <MAIN_SUB_SEQNO>1</MAIN_SUB_SEQNO>
+                </FLOORINFOLIST>
+                <USERINFOLIST>
+                    <CHG_YMD>20200315</CHG_YMD>
+                    <OWNER_NM>홍길동</OWNER_NM>
+                    <DREGNO>500101-1******</DREGNO>
+                    <DETL_ADDR>전라남도 장흥군 장흥읍 예양리</DETL_ADDR>
+                    <LAST_YN>Y</LAST_YN>
+                    <CHG_RSN_NM>소유권이전</CHG_RSN_NM>
+                    <OWN_GBN_NM>개인</OWN_GBN_NM>
+                    <JIBUN_DESC>1/1</JIBUN_DESC>
+                </USERINFOLIST>
+                <CHGDATALIST>
+                    <CHG_RSN_NM>신축</CHG_RSN_NM>
+                    <CHG_CNTN>신축</CHG_CNTN>
+                    <CHG_YMD>20050820</CHG_YMD>
+                    <ADJ_YMD>20050825</ADJ_YMD>
+                </CHGDATALIST>
+            </BLDG_HDS_INFO>
+        </BLDG_HDS_INFO_LIST>
+    </BODY>
+</RESPONSE>

@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<RESPONSE>
+    <HEADER>
+        <CODE>0000</CODE>
+        <MESSAGE>SUCCESS(MOCK)</MESSAGE>
+    </HEADER>
+    <BODY>
+        <LAND_USE_PLAN_CNF_ATTR_SET>
+            <LAND_USE_PLAN_CNF_ATTR>
+                <UCODE>UQA100</UCODE>
+                <DIVNO>1</DIVNO>
+                <GUBUN>1</GUBUN>
+                <CTYPE>포함</CTYPE>
+                <UNM>계획관리지역</UNM>
+                <SEQ>1</SEQ>
+                <LAWNM>국토의 계획 및 이용에 관한 법률</LAWNM>
+                <UNAME>계획관리지역</UNAME>
+            </LAND_USE_PLAN_CNF_ATTR>
+            <LAND_USE_PLAN_CNF_ATTR>
+                <UCODE>UM7010</UCODE>
+                <DIVNO>2</DIVNO>
+                <GUBUN>2</GUBUN>
+                <CTYPE>저촉</CTYPE>
+                <UNM>소로2류</UNM>
+                <SEQ>2</SEQ>
+                <LAWNM>국토의 계획 및 이용에 관한 법률</LAWNM>
+                <UNAME>소로2류(폭 8m~10m)</UNAME>
+            </LAND_USE_PLAN_CNF_ATTR>
+        </LAND_USE_PLAN_CNF_ATTR_SET>
+    </BODY>
+</RESPONSE>

@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<RESPONSE>
+    <HEADER>
+        <CODE>0000</CODE>
+        <MESSAGE>SUCCESS(MOCK)</MESSAGE>
+    </HEADER>
+    <BODY>
+        <CBLDG_DFHS_INFO_SET>
+            <CBLDG_DFHS_INFO>
+                <BLDG_GBN_NO>{{BNO}}</BLDG_GBN_NO>
+                <UPPER_BLDG_NO>0</UPPER_BLDG_NO>
+                <FLR_NO>101</FLR_NO>
+                <MONOALL>
+                    <BLDG_GBN_NO>{{BNO}}</BLDG_GBN_NO>
+                    <MAIN_SUB_GBN_NM>주건축물</MAIN_SUB_GBN_NM>
+                    <EXPOS_COMM_GBN_NM>전유</EXPOS_COMM_GBN_NM>
+                    <FLR>1</FLR>
+                    <STRU_NM>철근콘크리트구조</STRU_NM>
+                    <MAIN_USE_NM>연립주택</MAIN_USE_NM>
+                </MONOALL>
+                <USERINFOM>
+                    <BLDG_GBN_NO>{{BNO}}</BLDG_GBN_NO>
+                    <CHG_YMD>20200315</CHG_YMD>
+                    <OWNER_NM>홍길동</OWNER_NM>
+                    <DREGNO>500101-1******</DREGNO>
+                    <DETL_ADDR>전라남도 장흥군 장흥읍 예양리</DETL_ADDR>
+                    <LAST_YN>Y</LAST_YN>
+                    <CHG_RSN_NM>소유권이전</CHG_RSN_NM>
+                    <OWN_GBN_NM>개인</OWN_GBN_NM>
+                    <JIBUN_DESC>1/1</JIBUN_DESC>
+                </USERINFOM>
+                <ALLPRICE>
+                    <BLDG_GBN_NO>{{BNO}}</BLDG_GBN_NO>
+                    <BASE_YMD>20260101</BASE_YMD>
+                    <HOUSE_PRC>85000000</HOUSE_PRC>
+                </ALLPRICE>
+            </CBLDG_DFHS_INFO>
+        </CBLDG_DFHS_INFO_SET>
+    </BODY>
+</RESPONSE>

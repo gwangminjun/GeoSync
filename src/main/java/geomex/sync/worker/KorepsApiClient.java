@@ -4,12 +4,11 @@ import geomex.sync.service.RuntimeSettingsService;
 import geomex.sync.util.XmlUtil;
 import org.apache.hc.client5.http.classic.methods.HttpPost;
 import org.apache.hc.client5.http.config.RequestConfig;
-import org.apache.hc.client5.http.entity.UrlEncodedFormEntity;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
 import org.apache.hc.client5.http.impl.classic.HttpClients;
-import org.apache.hc.core5.http.NameValuePair;
+import org.apache.hc.core5.http.ContentType;
 import org.apache.hc.core5.http.io.entity.EntityUtils;
-import org.apache.hc.core5.http.message.BasicNameValuePair;
+import org.apache.hc.core5.http.io.entity.StringEntity;
 import org.apache.hc.core5.util.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,9 +20,7 @@ import org.w3c.dom.NodeList;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 
 /**
@@ -90,10 +87,13 @@ public class KorepsApiClient implements DisposableBean {
     }
 
     /**
-     * KOREPS 단건 조회: conn_svc_id + pnu [+ bno] → raw XML bytes 반환.
+     * KOREPS 단건 조회: conn_svc_id + PNU 분해 파라미터 [+ bno] → raw XML bytes 반환.
+     *
+     * 기존 kras 웹앱(KorepsConn)과 동일하게 pnu를 통째로 보내지 않고
+     * adm_sect_cd / land_loc_cd / ledg_gbn / bobn / bubn 으로 분해해 POST 한다.
      *
      * @param connSvcId  서비스 코드 (예: KOREPS00011)
-     * @param pnu        필지번호
+     * @param pnu        필지번호 (19자리)
      * @param extraParams 추가 파라미터 (bno 등, null 가능)
      */
     public byte[] query(String connSvcId, String pnu, Map<String, String> extraParams) throws Exception {
@@ -104,20 +104,41 @@ public class KorepsApiClient implements DisposableBean {
     }
 
     private Map<String, String> baseParams(String connSvcId, String pnu) {
+        // 파라미터 구성·순서를 기존 KorepsConn과 동일하게: conn_sys_id, gpki_id(항상), conn_svc_id, PNU분해
         Map<String, String> params = new LinkedHashMap<>();
-        params.put("conn_svc_id", connSvcId);
         params.put("conn_sys_id", settings.korepsConnSysId());
-        params.put("adm_sect_cd", settings.orgCode());
-        params.put("pnu",         pnu != null ? pnu : "");
+        params.put("gpki_id", "");
+        params.put("conn_svc_id", connSvcId);
+        KrasApiClient.putPnuParams(params, settings.orgCode(), pnu);
         return params;
     }
 
-    private byte[] postRaw(Map<String, String> params) throws Exception {
-        List<NameValuePair> pairs = new ArrayList<>();
-        params.forEach((k, v) -> pairs.add(new BasicNameValuePair(k, v != null ? v : "")));
+    /**
+     * 연결 정보를 직접 지정해 단건 조회. API 테스트 화면에서 URL/연결ID/기관코드 오버라이드 시 사용.
+     * null 또는 빈 값이면 settings 기본값으로 폴백한다.
+     */
+    public byte[] queryDirect(String connSvcId, String pnu, Map<String, String> extraParams,
+                               String gatewayUrl, String connSysId, String orgCode) throws Exception {
+        String url = (gatewayUrl != null && !gatewayUrl.isBlank()) ? gatewayUrl : settings.korepsUrl();
+        Map<String, String> params = new LinkedHashMap<>();
+        params.put("conn_sys_id", (connSysId != null && !connSysId.isBlank()) ? connSysId : settings.korepsConnSysId());
+        params.put("gpki_id", "");
+        params.put("conn_svc_id", connSvcId);
+        KrasApiClient.putPnuParams(params, (orgCode != null && !orgCode.isBlank()) ? orgCode : settings.orgCode(), pnu);
+        if (extraParams != null) params.putAll(extraParams);
+        log.debug("[KOREPS] queryDirect svc={} pnu={} url={}", connSvcId, pnu, url);
+        return postRawTo(url, params);
+    }
 
-        HttpPost request = new HttpPost(settings.korepsUrl());
-        request.setEntity(new UrlEncodedFormEntity(pairs, StandardCharsets.UTF_8));
+    private byte[] postRaw(Map<String, String> params) throws Exception {
+        return postRawTo(settings.korepsUrl(), params);
+    }
+
+    private byte[] postRawTo(String url, Map<String, String> params) throws Exception {
+        // 기존 싱크와 동일: URL 인코딩 없는 raw 본문 + charset 표기 없는 Content-Type
+        HttpPost request = new HttpPost(url);
+        request.setEntity(new StringEntity(KrasApiClient.joinParams(params),
+                ContentType.create("application/x-www-form-urlencoded")));
 
         byte[] data = httpClient.execute(request, response ->
                 EntityUtils.toByteArray(response.getEntity()));

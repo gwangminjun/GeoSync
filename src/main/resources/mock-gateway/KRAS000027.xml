@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<RESPONSE>
+    <HEADER>
+        <CODE>0000</CODE>
+        <MESSAGE>SUCCESS(MOCK)</MESSAGE>
+    </HEADER>
+    <BODY>
+        <USE_ZONE>
+            <USE_ZONE_ZONE_CD>UQA100</USE_ZONE_ZONE_CD>
+            <USE_ZONE_ZONE_CD_NM>계획관리지역</USE_ZONE_ZONE_CD_NM>
+            <CFLT_YN>N</CFLT_YN>
+            <ADM_SECT_CD>{{ADM}}</ADM_SECT_CD>
+            <LAND_LOC_CD>{{LOC}}</LAND_LOC_CD>
+            <LEDG_GBN>{{GBN}}</LEDG_GBN>
+            <BOBN>{{BOBN}}</BOBN>
+            <BUBN>{{BUBN}}</BUBN>
+        </USE_ZONE>
+        <USE_ZONE>
+            <USE_ZONE_ZONE_CD>UM7010</USE_ZONE_ZONE_CD>
+            <USE_ZONE_ZONE_CD_NM>소로2류</USE_ZONE_ZONE_CD_NM>
+            <CFLT_YN>Y</CFLT_YN>
+            <ADM_SECT_CD>{{ADM}}</ADM_SECT_CD>
+            <LAND_LOC_CD>{{LOC}}</LAND_LOC_CD>
+            <LEDG_GBN>{{GBN}}</LEDG_GBN>
+            <BOBN>{{BOBN}}</BOBN>
+            <BUBN>{{BUBN}}</BUBN>
+        </USE_ZONE>
+    </BODY>
+</RESPONSE>

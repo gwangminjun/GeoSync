@@ -9,12 +9,11 @@ import geomex.sync.service.RuntimeSettingsService;
 import geomex.sync.util.XmlUtil;
 import org.apache.hc.client5.http.classic.methods.HttpPost;
 import org.apache.hc.client5.http.config.RequestConfig;
-import org.apache.hc.client5.http.entity.UrlEncodedFormEntity;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
 import org.apache.hc.client5.http.impl.classic.HttpClients;
-import org.apache.hc.core5.http.NameValuePair;
+import org.apache.hc.core5.http.ContentType;
 import org.apache.hc.core5.http.io.entity.EntityUtils;
-import org.apache.hc.core5.http.message.BasicNameValuePair;
+import org.apache.hc.core5.http.io.entity.StringEntity;
 import org.apache.hc.core5.util.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -128,7 +127,7 @@ public class KrasApiClient implements DisposableBean {
             log.info("[KRAS] GPKI 인증 활성화 (gpki_id={})", gpkiService.gpkiId());
         }
         Map<String, String> params = baseParams(SVC_LAYER_LIST);
-        gpkiService.addAuthentication(params);
+        gpkiService.addGpkiIdAlways(params); // KrasWorker.getUseZoneLayers도 gpki_id를 항상 전송
         Document doc = postXml(params);
 
         String code = textOf(doc, "CODE");
@@ -149,6 +148,7 @@ public class KrasApiClient implements DisposableBean {
      */
     public JsonNode layerList() throws Exception {
         Map<String, String> params = baseParams(SVC_LAYER_LIST);
+        gpkiService.addGpkiIdAlways(params);
         Document doc = postXml(params);
 
         ArrayNode layersNode = objectMapper.createArrayNode();
@@ -241,19 +241,42 @@ public class KrasApiClient implements DisposableBean {
     }
 
     /**
-     * PNU 기반 단건 조회: conn_svc_id + pnu [+ extraParams] → raw XML bytes.
+     * PNU 기반 단건 조회: conn_svc_id + PNU 분해 파라미터 [+ extraParams] → raw XML bytes.
+     *
+     * 기존 kras 웹앱(KrasConn)과 동일하게 pnu를 통째로 보내지 않고
+     * adm_sect_cd / land_loc_cd / ledg_gbn / bobn / bubn 으로 분해해 POST 한다.
+     * (파일 다운로드 계열(KRAS000037~40)은 adm_sec_cd 사용 — baseParams 참고)
      *
      * @param connSvcId  서비스 코드 (예: KRAS000002)
-     * @param pnu        필지번호
+     * @param pnu        필지번호 (19자리)
      * @param extraParams 추가 파라미터 (bno, map_width 등, null 가능)
      */
     public byte[] query(String connSvcId, String pnu, Map<String, String> extraParams) throws Exception {
-        Map<String, String> params = baseParams(connSvcId);
-        params.put("pnu", pnu != null ? pnu : "");
+        // 파라미터 구성·순서를 기존 KrasConn과 동일하게: conn_sys_id, gpki_id(항상), conn_svc_id, PNU분해
+        Map<String, String> params = new LinkedHashMap<>();
+        params.put("conn_sys_id", settings.krasConnSysId());
+        gpkiService.addGpkiIdAlways(params);
+        params.put("conn_svc_id", connSvcId);
+        putPnuParams(params, settings.orgCode(), pnu);
         if (extraParams != null) params.putAll(extraParams);
-        gpkiService.addAuthentication(params);
         log.debug("[KRAS] query svc={} pnu={}", connSvcId, pnu);
         return postRaw(params);
+    }
+
+    /**
+     * 단건 조회 파라미터 구성 (기존 KrasConn/KorepsConn.getData 방식).
+     * pnu가 19자리면 분해해서 넣고, 아니면 pnu 그대로 전달(하위호환).
+     */
+    static void putPnuParams(Map<String, String> params, String admSectCd, String pnu) {
+        params.put("adm_sect_cd", admSectCd);
+        if (pnu != null && pnu.matches("\\d{19}")) {
+            params.put("land_loc_cd", pnu.substring(5, 10));
+            params.put("ledg_gbn",    pnu.substring(10, 11));
+            params.put("bobn",        pnu.substring(11, 15));
+            params.put("bubn",        pnu.substring(15));
+        } else {
+            params.put("pnu", pnu != null ? pnu : "");
+        }
     }
 
     // ──────────────────────────────────────────────────────────────────
@@ -299,9 +322,26 @@ public class KrasApiClient implements DisposableBean {
         return XmlUtil.parse(text.getBytes(StandardCharsets.UTF_8));
     }
 
+    /**
+     * 연결 정보를 직접 지정해 단건 조회. API 테스트 화면에서 URL/연결ID/기관코드 오버라이드 시 사용.
+     * null 또는 빈 값이면 settings 기본값으로 폴백한다.
+     */
+    public byte[] queryDirect(String connSvcId, String pnu, Map<String, String> extraParams,
+                               String gatewayUrl, String connSysId, String orgCode) throws Exception {
+        String url = (gatewayUrl != null && !gatewayUrl.isBlank()) ? gatewayUrl : settings.krasUrl();
+        Map<String, String> params = new LinkedHashMap<>();
+        params.put("conn_sys_id", (connSysId != null && !connSysId.isBlank()) ? connSysId : settings.krasConnSysId());
+        gpkiService.addGpkiIdAlways(params);
+        params.put("conn_svc_id", connSvcId);
+        putPnuParams(params, (orgCode != null && !orgCode.isBlank()) ? orgCode : settings.orgCode(), pnu);
+        if (extraParams != null) params.putAll(extraParams);
+        log.debug("[KRAS] queryDirect svc={} pnu={} url={}", connSvcId, pnu, url);
+        return postRawWith(httpClient, url, params);
+    }
+
     /** Form POST → 바이너리 응답 (파일 다운로드 HttpClient 사용) */
     private byte[] postBinary(Map<String, String> params) throws Exception {
-        byte[] data = postRawWith(fileHttpClient, params);
+        byte[] data = postRawWith(fileHttpClient, settings.krasUrl(), params);
         if (data.length > 0 && data[0] == (byte) '<') {
             String errorText = new String(data, StandardCharsets.UTF_8);
             throw new IOException("KRAS 오류 응답: " +
@@ -312,17 +352,30 @@ public class KrasApiClient implements DisposableBean {
 
     /** 단건 조회용 HTTP POST → raw bytes */
     private byte[] postRaw(Map<String, String> params) throws Exception {
-        return postRawWith(httpClient, params);
+        return postRawWith(httpClient, settings.krasUrl(), params);
     }
 
-    /** 지정 HttpClient로 Form POST 실행 → raw bytes */
-    private byte[] postRawWith(CloseableHttpClient client, Map<String, String> params) throws Exception {
-        List<NameValuePair> pairs = new ArrayList<>();
-        params.forEach((k, v) -> pairs.add(new BasicNameValuePair(k, v != null ? v : "")));
-        HttpPost request = new HttpPost(settings.krasUrl());
-        request.setEntity(new UrlEncodedFormEntity(pairs, StandardCharsets.UTF_8));
+    /**
+     * 지정 HttpClient + URL로 Form POST 실행 → raw bytes.
+     * 기존 싱크(HttpURLConnection)와 동일하게 URL 인코딩 없는 raw 본문과
+     * charset 표기 없는 Content-Type(application/x-www-form-urlencoded)을 사용한다.
+     */
+    private byte[] postRawWith(CloseableHttpClient client, String url, Map<String, String> params) throws Exception {
+        HttpPost request = new HttpPost(url);
+        request.setEntity(new StringEntity(joinParams(params),
+                ContentType.create("application/x-www-form-urlencoded")));
         return client.execute(request, response ->
                 EntityUtils.toByteArray(response.getEntity()));
+    }
+
+    /** 기존 MapUtils.join(params, "=", "&")과 동일한 raw 본문 생성 */
+    static String joinParams(Map<String, String> params) {
+        StringBuilder sb = new StringBuilder();
+        params.forEach((k, v) -> {
+            if (sb.length() > 0) sb.append('&');
+            sb.append(k).append('=').append(v != null ? v : "");
+        });
+        return sb.toString();
     }
 
     /** XML 전체에서 태그명으로 첫 번째 텍스트 추출 */

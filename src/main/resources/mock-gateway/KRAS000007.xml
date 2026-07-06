@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<RESPONSE>
+    <HEADER>
+        <CODE>0000</CODE>
+        <MESSAGE>SUCCESS(MOCK)</MESSAGE>
+    </HEADER>
+    <BODY>
+        <OWN_RGT_HIST_SET>
+            <OWN_RGT_HIST>
+                <ADM_SECT_CD>{{ADM}}</ADM_SECT_CD>
+                <LAND_LOC_CD>{{LOC}}</LAND_LOC_CD>
+                <LEDG_GBN>{{GBN}}</LEDG_GBN>
+                <BOBN>{{BOBN}}</BOBN>
+                <BUBN>{{BUBN}}</BUBN>
+                <OWN_RGT_CHG_HIST_ODRNO>1</OWN_RGT_CHG_HIST_ODRNO>
+                <OWN_RGT_CHG_RSN_CD>01</OWN_RGT_CHG_RSN_CD>
+                <OWN_RGT_CHG_RSN_CD_NM>소유권보존</OWN_RGT_CHG_RSN_CD_NM>
+                <DYMD>20000110</DYMD>
+                <OWNER_NM>홍판서</OWNER_NM>
+                <OWN_GBN>01</OWN_GBN>
+                <OWN_GBN_NM>개인</OWN_GBN_NM>
+                <SHR_CNT>0</SHR_CNT>
+            </OWN_RGT_HIST>
+            <OWN_RGT_HIST>
+                <ADM_SECT_CD>{{ADM}}</ADM_SECT_CD>
+                <LAND_LOC_CD>{{LOC}}</LAND_LOC_CD>
+                <LEDG_GBN>{{GBN}}</LEDG_GBN>
+                <BOBN>{{BOBN}}</BOBN>
+                <BUBN>{{BUBN}}</BUBN>
+                <OWN_RGT_CHG_HIST_ODRNO>2</OWN_RGT_CHG_HIST_ODRNO>
+                <OWN_RGT_CHG_RSN_CD>02</OWN_RGT_CHG_RSN_CD>
+                <OWN_RGT_CHG_RSN_CD_NM>소유권이전</OWN_RGT_CHG_RSN_CD_NM>
+                <DYMD>20200315</DYMD>
+                <OWNER_NM>홍길동</OWNER_NM>
+                <OWN_GBN>01</OWN_GBN>
+                <OWN_GBN_NM>개인</OWN_GBN_NM>
+                <SHR_CNT>0</SHR_CNT>
+            </OWN_RGT_HIST>
+        </OWN_RGT_HIST_SET>
+    </BODY>
+</RESPONSE>

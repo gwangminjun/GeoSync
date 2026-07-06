@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<RESPONSE>
+    <HEADER>
+        <CODE>0000</CODE>
+        <MESSAGE>SUCCESS(MOCK)</MESSAGE>
+    </HEADER>
+    <BODY>
+        <CONT_CMAP_LAYER_LIST_SET>
+            <CONT_CMAP_LAYER_LIST>
+                <GRP_ID>BASE_00001</GRP_ID>
+                <GRP_NM>기본도</GRP_NM>
+                <GRP_ORDER>1</GRP_ORDER>
+                <LAYER_CD>MLTM.LSMD_CONT_LDREG</LAYER_CD>
+                <TYPE>MLTM.LSMD_CONT_LDREG</TYPE>
+                <LAYER_NM>연속지적도</LAYER_NM>
+                <LAYER_ORDER>100</LAYER_ORDER>
+                <AUTH_CD>99</AUTH_CD>
+                <STYLE_ID>STL_01001</STYLE_ID>
+            </CONT_CMAP_LAYER_LIST>
+            <CONT_CMAP_LAYER_LIST>
+                <GRP_ID>THEM_00001</GRP_ID>
+                <GRP_NM>용도지역지구</GRP_NM>
+                <GRP_ORDER>2</GRP_ORDER>
+                <LAYER_CD>MLTM.LSMD_CONT_UQ111</LAYER_CD>
+                <TYPE>MLTM.LSMD_CONT_UQ111</TYPE>
+                <LAYER_NM>(용도지역)도시지역</LAYER_NM>
+                <LAYER_ORDER>200</LAYER_ORDER>
+                <AUTH_CD>99</AUTH_CD>
+                <STYLE_ID>STL_01101</STYLE_ID>
+            </CONT_CMAP_LAYER_LIST>
+            <CONT_CMAP_LAYER_LIST>
+                <GRP_ID>THEM_00001</GRP_ID>
+                <GRP_NM>용도지역지구</GRP_NM>
+                <GRP_ORDER>2</GRP_ORDER>
+                <LAYER_CD>MLTM.LSMD_CONT_UB201</LAYER_CD>
+                <TYPE>MLTM.LSMD_CONT_UB201</TYPE>
+                <LAYER_NM>(구역)개발제한구역</LAYER_NM>
+                <LAYER_ORDER>210</LAYER_ORDER>
+                <AUTH_CD>99</AUTH_CD>
+                <STYLE_ID>STL_01102</STYLE_ID>
+            </CONT_CMAP_LAYER_LIST>
+        </CONT_CMAP_LAYER_LIST_SET>
+    </BODY>
+</RESPONSE>

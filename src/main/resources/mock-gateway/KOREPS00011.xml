@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<RESPONSE>
+    <HEADER>
+        <CODE>0000</CODE>
+        <MESSAGE>SUCCESS(MOCK)</MESSAGE>
+    </HEADER>
+    <BODY>
+        <JIGA_LIST>
+            <JIGA>
+                <BASE_YEAR>2026</BASE_YEAR>
+                <BASE_MON>01</BASE_MON>
+                <PANN_JIGA>128000</PANN_JIGA>
+                <JIGA_JIBN>{{BOBN}}-{{BUBN}}</JIGA_JIBN>
+                <PANN_YMD>20260530</PANN_YMD>
+                <JIBUN>{{BOBN}}-{{BUBN}}</JIBUN>
+            </JIGA>
+            <JIGA>
+                <BASE_YEAR>2025</BASE_YEAR>
+                <BASE_MON>01</BASE_MON>
+                <PANN_JIGA>121000</PANN_JIGA>
+                <JIGA_JIBN>{{BOBN}}-{{BUBN}}</JIGA_JIBN>
+                <PANN_YMD>20250530</PANN_YMD>
+                <JIBUN>{{BOBN}}-{{BUBN}}</JIBUN>
+            </JIGA>
+            <JIGA>
+                <BASE_YEAR>2024</BASE_YEAR>
+                <BASE_MON>01</BASE_MON>
+                <PANN_JIGA>115000</PANN_JIGA>
+                <JIGA_JIBN>{{BOBN}}-{{BUBN}}</JIGA_JIBN>
+                <PANN_YMD>20240530</PANN_YMD>
+                <JIBUN>{{BOBN}}-{{BUBN}}</JIBUN>
+            </JIGA>
+        </JIGA_LIST>
+    </BODY>
+</RESPONSE>

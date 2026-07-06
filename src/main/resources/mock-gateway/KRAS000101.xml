@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<RESPONSE>
+    <HEADER>
+        <CODE>0000</CODE>
+        <MESSAGE>SUCCESS(MOCK)</MESSAGE>
+    </HEADER>
+    <BODY>
+        <LAND_BLDG_CHECK>
+            <REAL_GBN>1</REAL_GBN>
+            <ADM_SECT_CD>{{ADM}}</ADM_SECT_CD>
+            <LAND_LOC_CD>{{LOC}}</LAND_LOC_CD>
+            <LEDG_GBN>{{GBN}}</LEDG_GBN>
+            <BOBN>{{BOBN}}</BOBN>
+            <BUBN>{{BUBN}}</BUBN>
+            <ADM_SECT_NM>전라남도 장흥군</ADM_SECT_NM>
+            <SECT_LOC_NM>장흥읍 예양리</SECT_LOC_NM>
+            <MAP_GBN>1</MAP_GBN>
+        </LAND_BLDG_CHECK>
+    </BODY>
+</RESPONSE>

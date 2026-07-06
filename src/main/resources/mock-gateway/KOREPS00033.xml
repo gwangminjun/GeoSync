@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<RESPONSE>
+    <HEADER>
+        <CODE>0000</CODE>
+        <MESSAGE>SUCCESS(MOCK)</MESSAGE>
+    </HEADER>
+    <BODY>
+        <HOUSE_INFO_SET>
+            <HOUSE_INFO_LIST>
+                <BASE_YEAR>2026</BASE_YEAR>
+                <INDI_HOUSE_PRC>85000000</INDI_HOUSE_PRC>
+                <LAND_AREA>452.0</LAND_AREA>
+                <LAND_CALC_AREA>452.0</LAND_CALC_AREA>
+                <BLDG_AREA>98.5</BLDG_AREA>
+                <BLDG_CALC_AREA>98.5</BLDG_CALC_AREA>
+                <DONG_NO>{{BNO}}</DONG_NO>
+                <STDMT>01</STDMT>
+            </HOUSE_INFO_LIST>
+            <HOUSE_INFO_LIST>
+                <BASE_YEAR>2025</BASE_YEAR>
+                <INDI_HOUSE_PRC>81000000</INDI_HOUSE_PRC>
+                <LAND_AREA>452.0</LAND_AREA>
+                <LAND_CALC_AREA>452.0</LAND_CALC_AREA>
+                <BLDG_AREA>98.5</BLDG_AREA>
+                <BLDG_CALC_AREA>98.5</BLDG_CALC_AREA>
+                <DONG_NO>{{BNO}}</DONG_NO>
+                <STDMT>01</STDMT>
+            </HOUSE_INFO_LIST>
+        </HOUSE_INFO_SET>
+    </BODY>
+</RESPONSE>

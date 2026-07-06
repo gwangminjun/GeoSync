@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<RESPONSE>
+    <HEADER>
+        <CODE>0000</CODE>
+        <MESSAGE>SUCCESS(MOCK)</MESSAGE>
+    </HEADER>
+    <BODY>
+        <LAND_INFO>
+            <ADM_SECT_CD>{{ADM}}</ADM_SECT_CD>
+            <LAND_LOC_CD>{{LOC}}</LAND_LOC_CD>
+            <LEDG_GBN>{{GBN}}</LEDG_GBN>
+            <BOBN>{{BOBN}}</BOBN>
+            <BUBN>{{BUBN}}</BUBN>
+            <JIMOK>08</JIMOK>
+            <JIMOK_NM>대</JIMOK_NM>
+            <PAREA>452.0</PAREA>
+            <GRD>0</GRD>
+            <LAND_MOV_RSN_CD>10</LAND_MOV_RSN_CD>
+            <LAND_MOV_RSN_CD_NM>신규등록</LAND_MOV_RSN_CD_NM>
+            <LAND_MOV_YMD>20200103</LAND_MOV_YMD>
+            <MAP_GBN>1</MAP_GBN>
+            <OWNER_NM>홍길동</OWNER_NM>
+            <OWN_GBN>01</OWN_GBN>
+            <OWN_GBN_NM>개인</OWN_GBN_NM>
+            <SHR_CNT>0</SHR_CNT>
+            <OWNER_ADDR>전라남도 장흥군 장흥읍 예양리</OWNER_ADDR>
+            <OWN_RGT_CHG_RSN_CD>02</OWN_RGT_CHG_RSN_CD>
+            <OWN_RGT_CHG_RSN_CD_NM>소유권이전</OWN_RGT_CHG_RSN_CD_NM>
+            <OWNDYMD>20200315</OWNDYMD>
+            <SCALE>1200</SCALE>
+            <SCALE_NM>1/1200</SCALE_NM>
+            <JIGA_BASE_MON>202601</JIGA_BASE_MON>
+            <PANN_JIGA>128000</PANN_JIGA>
+        </LAND_INFO>
+    </BODY>
+</RESPONSE>

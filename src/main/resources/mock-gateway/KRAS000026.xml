@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<RESPONSE>
+    <HEADER>
+        <CODE>0000</CODE>
+        <MESSAGE>SUCCESS(MOCK)</MESSAGE>
+    </HEADER>
+    <BODY>
+        <LAND_USE_PLAN_CNF_INFO_SET>
+            <LAND_USE_PLAN_CNF_INFO_BASE>
+                <ISS_SCALE>1/1200</ISS_SCALE>
+                <ISS_NO>2026-000001</ISS_NO>
+                <SEQNO>1</SEQNO>
+                <ADM_SECT_HEAD>장흥군수</ADM_SECT_HEAD>
+                <LAND_LOC_NM>전라남도 장흥군 장흥읍 예양리</LAND_LOC_NM>
+                <JIBN>{{BOBN}}-{{BUBN}}</JIBN>
+                <JIMOK>08</JIMOK>
+                <JIMOK_NM>대</JIMOK_NM>
+                <PAREA>452.0</PAREA>
+                <USELAW_A>계획관리지역</USELAW_A>
+                <USELAW_B>소로2류(저촉)</USELAW_B>
+                <IMG>iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==</IMG>
+                <SCALE>1200</SCALE>
+                <JIGA_YM>202601</JIGA_YM>
+                <JIGA>128000</JIGA>
+            </LAND_USE_PLAN_CNF_INFO_BASE>
+            <LEGEND>
+                <IMG>iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==</IMG>
+                <TEXT>계획관리지역</TEXT>
+            </LEGEND>
+            <LAND_USE_PLAN_RESTRICT>
+                <USE_RESTRICT>계획관리지역 행위제한 내용</USE_RESTRICT>
+                <UCODE>UQA100</UCODE>
+                <LAW_CONTENTS>국토의 계획 및 이용에 관한 법률 제76조</LAW_CONTENTS>
+                <LAW_LEVEL>1</LAW_LEVEL>
+                <LAW_FULL_CD>UQA100</LAW_FULL_CD>
+            </LAND_USE_PLAN_RESTRICT>
+        </LAND_USE_PLAN_CNF_INFO_SET>
+    </BODY>
+</RESPONSE>

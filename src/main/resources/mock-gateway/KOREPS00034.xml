@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<RESPONSE>
+    <HEADER>
+        <CODE>0000</CODE>
+        <MESSAGE>SUCCESS(MOCK)</MESSAGE>
+    </HEADER>
+    <BODY>
+        <DECSN_JIGA>
+            <BASE_YEAR>2026</BASE_YEAR>
+            <STDMT>01</STDMT>
+            <JIGA>128000</JIGA>
+        </DECSN_JIGA>
+    </BODY>
+</RESPONSE>

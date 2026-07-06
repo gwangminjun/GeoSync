@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<RESPONSE>
+    <HEADER>
+        <CODE>0000</CODE>
+        <MESSAGE>SUCCESS(MOCK)</MESSAGE>
+    </HEADER>
+    <BODY>
+        <SHR_YMB_SET>
+            <SHR_YMB>
+                <ADM_SECT_CD>{{ADM}}</ADM_SECT_CD>
+                <LAND_LOC_CD>{{LOC}}</LAND_LOC_CD>
+                <LEDG_GBN>{{GBN}}</LEDG_GBN>
+                <BOBN>{{BOBN}}</BOBN>
+                <BUBN>{{BUBN}}</BUBN>
+                <SHR_SEQNO>1</SHR_SEQNO>
+                <OWN_RGT_CHG_RSN_CD>02</OWN_RGT_CHG_RSN_CD>
+                <OWN_RGT_CHG_RSN_NM>소유권이전</OWN_RGT_CHG_RSN_NM>
+                <OWN_RGT_CHG_YMD>20200315</OWN_RGT_CHG_YMD>
+                <OWNER_REGNO>500101-1******</OWNER_REGNO>
+                <OWNER_NM>홍길동</OWNER_NM>
+                <OWNER_ADDR>전라남도 장흥군 장흥읍 예양리</OWNER_ADDR>
+                <OWN_RGT_JIBUN>1/2</OWN_RGT_JIBUN>
+                <OWN_GBN>01</OWN_GBN>
+                <OWN_GBN_NM>개인</OWN_GBN_NM>
+            </SHR_YMB>
+            <SHR_YMB>
+                <ADM_SECT_CD>{{ADM}}</ADM_SECT_CD>
+                <LAND_LOC_CD>{{LOC}}</LAND_LOC_CD>
+                <LEDG_GBN>{{GBN}}</LEDG_GBN>
+                <BOBN>{{BOBN}}</BOBN>
+                <BUBN>{{BUBN}}</BUBN>
+                <SHR_SEQNO>2</SHR_SEQNO>
+                <OWN_RGT_CHG_RSN_CD>02</OWN_RGT_CHG_RSN_CD>
+                <OWN_RGT_CHG_RSN_NM>소유권이전</OWN_RGT_CHG_RSN_NM>
+                <OWN_RGT_CHG_YMD>20200315</OWN_RGT_CHG_YMD>
+                <OWNER_REGNO>520505-2******</OWNER_REGNO>
+                <OWNER_NM>김영희</OWNER_NM>
+                <OWNER_ADDR>전라남도 장흥군 장흥읍 건산리</OWNER_ADDR>
+                <OWN_RGT_JIBUN>1/2</OWN_RGT_JIBUN>
+                <OWN_GBN>01</OWN_GBN>
+                <OWN_GBN_NM>개인</OWN_GBN_NM>
+            </SHR_YMB>
+        </SHR_YMB_SET>
+    </BODY>
+</RESPONSE>

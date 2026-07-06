@@ -43,6 +43,15 @@ public class KrasGpkiService {
         }
     }
 
+    /**
+     * gpki_id 파라미터를 항상 추가 (미설정 시 빈 값).
+     * 기존 kras 웹앱(KrasConn)은 gpki_use=false여도 gpki_id 키를 무조건 전송했고,
+     * 게이트웨이가 이 키의 존재를 전제할 수 있으므로 단건 조회는 항상 포함한다.
+     */
+    public void addGpkiIdAlways(Map<String, String> params) {
+        params.put("gpki_id", isEnabled() ? properties.getId() : "");
+    }
+
     public void assertReady() {
         if (!isEnabled()) {
             return;
