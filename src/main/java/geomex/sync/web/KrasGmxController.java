@@ -1,8 +1,10 @@
 package geomex.sync.web;
 
+import geomex.sync.service.ConnRequestLogService;
 import geomex.sync.util.XmlUtil;
 import geomex.sync.worker.KorepsApiClient;
 import geomex.sync.worker.KrasApiClient;
+import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.DisposableBean;
@@ -42,13 +44,18 @@ public class KrasGmxController implements DisposableBean {
 
     private final KrasApiClient krasApiClient;
     private final KorepsApiClient korepsApiClient;
+    private final ConnRequestLogService connLog;
+    private final HttpServletRequest request;
     private final int apiTimeoutSeconds;
     private final Executor gmxExecutor;
 
     public KrasGmxController(KrasApiClient krasApiClient, KorepsApiClient korepsApiClient,
+                              ConnRequestLogService connLog, HttpServletRequest request,
                               @Value("${kras.api-timeout-seconds:30}") int apiTimeoutSeconds) {
         this.krasApiClient = krasApiClient;
         this.korepsApiClient = korepsApiClient;
+        this.connLog = connLog;
+        this.request = request;
         this.apiTimeoutSeconds = apiTimeoutSeconds;
 
         ThreadPoolTaskExecutor exec = new ThreadPoolTaskExecutor();
@@ -118,7 +125,8 @@ public class KrasGmxController implements DisposableBean {
     public ResponseEntity<String> getHouseInfo(
             @RequestParam String pnu,
             @RequestParam(required = false) String bno) {
-        return gmxSingle("GetHouseInfo", "house_info", pnu, bnoExtra(bno));
+        // 기존 GetHouseInfo는 HouseInfoService.getData(pnu) — bno를 게이트웨이에 보내지 않음
+        return gmxSingle("GetHouseInfo", "house_info", pnu, null);
     }
 
     @GetMapping(value = "/GetJeonyubldg", produces = MediaType.APPLICATION_XML_VALUE)
@@ -184,7 +192,7 @@ public class KrasGmxController implements DisposableBean {
         return gmxMulti("GetBldgInfo", pnu,
                 entry("bldg_dong_info", null),
                 entry("bldg_hds_info", bno_),
-                entry("bldg_ledg_gen_hds_info", bno_),
+                entry("bldg_ledg_gen_hds_info", null),
                 entry("cbldg_hds_info", bno_));
     }
 
@@ -196,7 +204,7 @@ public class KrasGmxController implements DisposableBean {
         return gmxMulti("GetDjyrecaptitle", pnu,
                 entry("bldg_dong_info", null),
                 entry("bldg_hds_info", bno_),
-                entry("bldg_ledg_gen_hds_info", bno_),
+                entry("bldg_ledg_gen_hds_info", null),
                 entry("cbldg_hds_info", bno_));
     }
 
@@ -214,14 +222,31 @@ public class KrasGmxController implements DisposableBean {
 
     private ResponseEntity<String> gmxSingle(String svc, String path, String pnu,
                                               Map<String, String> extra) {
-        if (!isValidPnu(pnu)) return badRequest(svc, "PNU 형식 오류: 19자리 숫자여야 합니다");
+        long t0 = System.currentTimeMillis();
+        String ip = ConnRequestLogService.clientIp(request);
+        String bno = extra != null ? extra.get("bldg_gbn_no") : null;
+        if (!isValidPnu(pnu)) {
+            connLog.record("GMX", svc, null, pnu, bno, ip,
+                    ConnRequestLogService.ST_BAD_REQ, null, "PNU 형식 오류",
+                    System.currentTimeMillis() - t0);
+            return badRequest(svc, "PNU 형식 오류: 19자리 숫자여야 합니다");
+        }
         try {
             byte[] xml = callGateway(path, pnu, extra);
             Map<String, byte[]> result = new LinkedHashMap<>();
             result.put(path, xml);
-            return ok(buildGmxXml(svc, result));
+            String gmxXml = buildGmxXml(svc, result);
+            String gwCode = ConnRequestLogService.gwCode(xml);
+            String status = (gwCode == null || "0000".equals(gwCode))
+                    ? ConnRequestLogService.ST_SUCCESS : ConnRequestLogService.ST_GW_ERROR;
+            connLog.record("GMX", svc, null, pnu, bno, ip,
+                    status, gwCode, null, System.currentTimeMillis() - t0);
+            return ok(gmxXml);
         } catch (Exception e) {
             log.error("[GmxAPI] {} 실패: {}", svc, e.getMessage());
+            connLog.record("GMX", svc, null, pnu, bno, ip,
+                    ConnRequestLogService.ST_FAILED, null, e.getMessage(),
+                    System.currentTimeMillis() - t0);
             return err(svc, e.getMessage());
         }
     }
@@ -229,7 +254,18 @@ public class KrasGmxController implements DisposableBean {
     @SafeVarargs
     private ResponseEntity<String> gmxMulti(String svc, String pnu,
             Map.Entry<String, Map<String, String>>... pathEntries) {
-        if (!isValidPnu(pnu)) return badRequest(svc, "PNU 형식 오류: 19자리 숫자여야 합니다");
+        long t0 = System.currentTimeMillis();
+        String ip = ConnRequestLogService.clientIp(request);
+        String bno = null;
+        for (var pe : pathEntries) {
+            if (pe.getValue().containsKey("bldg_gbn_no")) { bno = pe.getValue().get("bldg_gbn_no"); break; }
+        }
+        if (!isValidPnu(pnu)) {
+            connLog.record("GMX", svc, null, pnu, bno, ip,
+                    ConnRequestLogService.ST_BAD_REQ, null, "PNU 형식 오류",
+                    System.currentTimeMillis() - t0);
+            return badRequest(svc, "PNU 형식 오류: 19자리 숫자여야 합니다");
+        }
 
         Map<String, CompletableFuture<byte[]>> futures = new LinkedHashMap<>();
         for (var pe : pathEntries) {
@@ -249,9 +285,16 @@ public class KrasGmxController implements DisposableBean {
             for (var fe : futures.entrySet()) {
                 results.put(fe.getKey(), fe.getValue().get(apiTimeoutSeconds, TimeUnit.SECONDS));
             }
-            return ok(buildGmxXml(svc, results));
+            String gmxXml = buildGmxXml(svc, results);
+            connLog.record("GMX", svc, null, pnu, bno, ip,
+                    ConnRequestLogService.ST_SUCCESS, null, null,
+                    System.currentTimeMillis() - t0);
+            return ok(gmxXml);
         } catch (Exception e) {
             log.error("[GmxAPI] {} 실패: {}", svc, e.getMessage());
+            connLog.record("GMX", svc, null, pnu, bno, ip,
+                    ConnRequestLogService.ST_FAILED, null, e.getMessage(),
+                    System.currentTimeMillis() - t0);
             return err(svc, e.getMessage());
         }
     }
@@ -305,7 +348,8 @@ public class KrasGmxController implements DisposableBean {
     }
 
     private static Map<String, String> bnoExtra(String bno) {
-        return (bno != null && !bno.isBlank()) ? Map.of("bno", bno) : null;
+        // 게이트웨이 파라미터명은 bldg_gbn_no (기존 KrasConn.getBldgData와 동일)
+        return (bno != null && !bno.isBlank()) ? Map.of("bldg_gbn_no", bno) : null;
     }
 
     private static Map.Entry<String, Map<String, String>> entry(String path, Map<String, String> extra) {

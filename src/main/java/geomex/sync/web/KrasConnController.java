@@ -1,8 +1,10 @@
 package geomex.sync.web;
 
+import geomex.sync.service.ConnRequestLogService;
 import geomex.sync.util.XmlUtil;
 import geomex.sync.worker.KorepsApiClient;
 import geomex.sync.worker.KrasApiClient;
+import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
@@ -36,10 +38,15 @@ public class KrasConnController {
 
     private final KrasApiClient krasApiClient;
     private final KorepsApiClient korepsApiClient;
+    private final ConnRequestLogService connLog;
+    private final HttpServletRequest request;
 
-    public KrasConnController(KrasApiClient krasApiClient, KorepsApiClient korepsApiClient) {
+    public KrasConnController(KrasApiClient krasApiClient, KorepsApiClient korepsApiClient,
+                              ConnRequestLogService connLog, HttpServletRequest request) {
         this.krasApiClient = krasApiClient;
         this.korepsApiClient = korepsApiClient;
+        this.connLog = connLog;
+        this.request = request;
     }
 
     @GetMapping(value = "/{path}/body", produces = MediaType.APPLICATION_XML_VALUE)
@@ -52,18 +59,7 @@ public class KrasConnController {
             @RequestParam(required = false) String legend_width,
             @RequestParam(required = false) String legend_height,
             @RequestParam(required = false) String scale) {
-
-        if (!isValidPnu(pnu)) {
-            return badRequest(errorXml(path, "PNU 형식 오류: 19자리 숫자여야 합니다"));
-        }
-        log.info("[ConnAPI/body] {} pnu={} bno={}", path, pnu, bno);
-        try {
-            byte[] xml = fetchXml(path, pnu, bno, map_width, map_height, legend_width, legend_height, scale);
-            return xmlOk(extractBodyXml(xml));
-        } catch (Exception e) {
-            log.error("[ConnAPI/body] {} 조회 실패: {}", path, e.getMessage());
-            return xmlErr(errorXml(path, e.getMessage()));
-        }
+        return handle(path, pnu, bno, map_width, map_height, legend_width, legend_height, scale, true);
     }
 
     @GetMapping(value = "/{path}", produces = MediaType.APPLICATION_XML_VALUE)
@@ -76,16 +72,39 @@ public class KrasConnController {
             @RequestParam(required = false) String legend_width,
             @RequestParam(required = false) String legend_height,
             @RequestParam(required = false) String scale) {
+        return handle(path, pnu, bno, map_width, map_height, legend_width, legend_height, scale, false);
+    }
+
+    private ResponseEntity<String> handle(String path, String pnu, String bno,
+            String mapWidth, String mapHeight, String legendWidth, String legendHeight,
+            String scale, boolean bodyOnly) {
+        long t0 = System.currentTimeMillis();
+        String ip = ConnRequestLogService.clientIp(request);
+        String svcId = GatewayPaths.KRAS.containsKey(path)
+                ? GatewayPaths.KRAS.get(path) : GatewayPaths.KOREPS.get(path);
+        String tag = bodyOnly ? "[ConnAPI/body]" : "[ConnAPI]";
 
         if (!isValidPnu(pnu)) {
+            connLog.record("CONN", path, svcId, pnu, bno, ip,
+                    ConnRequestLogService.ST_BAD_REQ, null, "PNU 형식 오류",
+                    System.currentTimeMillis() - t0);
             return badRequest(errorXml(path, "PNU 형식 오류: 19자리 숫자여야 합니다"));
         }
-        log.info("[ConnAPI] {} pnu={} bno={}", path, pnu, bno);
+        log.info("{} {} pnu={} bno={} ip={}", tag, path, pnu, bno, ip);
         try {
-            byte[] xml = fetchXml(path, pnu, bno, map_width, map_height, legend_width, legend_height, scale);
-            return xmlOk(new String(xml, StandardCharsets.UTF_8));
+            byte[] xml = fetchXml(path, pnu, bno, mapWidth, mapHeight, legendWidth, legendHeight, scale);
+            String body = bodyOnly ? extractBodyXml(xml) : new String(xml, StandardCharsets.UTF_8);
+            String gwCode = ConnRequestLogService.gwCode(xml);
+            String status = (gwCode == null || "0000".equals(gwCode))
+                    ? ConnRequestLogService.ST_SUCCESS : ConnRequestLogService.ST_GW_ERROR;
+            connLog.record("CONN", path, svcId, pnu, bno, ip,
+                    status, gwCode, null, System.currentTimeMillis() - t0);
+            return xmlOk(body);
         } catch (Exception e) {
-            log.error("[ConnAPI] {} 조회 실패: {}", path, e.getMessage());
+            log.error("{} {} 조회 실패: {}", tag, path, e.getMessage());
+            connLog.record("CONN", path, svcId, pnu, bno, ip,
+                    ConnRequestLogService.ST_FAILED, null, e.getMessage(),
+                    System.currentTimeMillis() - t0);
             return xmlErr(errorXml(path, e.getMessage()));
         }
     }
@@ -106,8 +125,8 @@ public class KrasConnController {
             String mapWidth, String mapHeight,
             String legendWidth, String legendHeight, String scale) {
         Map<String, String> extra = new LinkedHashMap<>();
-        if (GatewayPaths.BNO_PATHS.contains(path) && bno != null && !bno.isBlank()) {
-            extra.put("bno", bno);
+        if (GatewayPaths.BLDG_GBN_NO_PATHS.contains(path) && bno != null && !bno.isBlank()) {
+            extra.put("bldg_gbn_no", bno);
         }
         if ("land_use_plan_info".equals(path)) {
             if (mapWidth     != null) extra.put("map_width",     mapWidth);

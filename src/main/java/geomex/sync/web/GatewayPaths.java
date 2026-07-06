@@ -30,9 +30,9 @@ final class GatewayPaths {
         "land_attr",     "KOREPS00047"
     );
 
-    static final Set<String> BNO_PATHS = Set.of(
-        "bldg_dong_info", "bldg_hds_info", "bldg_ho_info",
-        "bldg_ledg_gen_hds_info", "cbldg_hds_info", "cbldg_dfhs_info", "house_info"
+    // 기존 KrasConn.getBldgData 사용 서비스만 건물번호를 bldg_gbn_no 파라미터로 전송
+    static final Set<String> BLDG_GBN_NO_PATHS = Set.of(
+        "bldg_hds_info", "cbldg_hds_info", "cbldg_dfhs_info", "bldg_ho_info"
     );
 
     private GatewayPaths() {}
