@@ -2,12 +2,14 @@ package geomex.sync.web;
 
 import geomex.sync.service.KrasCatalogStatusService;
 import geomex.sync.service.RuntimeSettingsService;
+import geomex.sync.service.SyncExecutionLogService;
 import geomex.sync.service.SyncStatusService;
 import geomex.sync.worker.KorepsApiClient;
 import geomex.sync.worker.KrasApiClient;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 
 import java.util.LinkedHashMap;
@@ -22,17 +24,20 @@ public class DashboardController {
     private final RuntimeSettingsService settings;
     private final KrasApiClient krasApiClient;
     private final KorepsApiClient korepsApiClient;
+    private final SyncExecutionLogService syncExecutionLogService;
 
     public DashboardController(SyncStatusService statusService,
                                KrasCatalogStatusService catalogStatusService,
                                RuntimeSettingsService settings,
                                KrasApiClient krasApiClient,
-                               KorepsApiClient korepsApiClient) {
+                               KorepsApiClient korepsApiClient,
+                               SyncExecutionLogService syncExecutionLogService) {
         this.statusService = statusService;
         this.catalogStatusService = catalogStatusService;
         this.settings = settings;
         this.krasApiClient = krasApiClient;
         this.korepsApiClient = korepsApiClient;
+        this.syncExecutionLogService = syncExecutionLogService;
     }
 
     @GetMapping("/")
@@ -48,6 +53,13 @@ public class DashboardController {
         model.addAttribute("catalogStatuses", catalogStatusService.getStatuses());
         model.addAttribute("history", statusService.getRecentHistory(20));
         return "dashboard";
+    }
+
+    /** sync_execution_log 기반 집계 통계 */
+    @GetMapping("/api/sync-stats")
+    @ResponseBody
+    public Map<String, Object> syncStats(@RequestParam(defaultValue = "today") String period) {
+        return syncExecutionLogService.getStats(period);
     }
 
     /** KRAS / KOREPS estateGateway 연결 상태 확인 — 두 게이트웨이 병렬 조회 */

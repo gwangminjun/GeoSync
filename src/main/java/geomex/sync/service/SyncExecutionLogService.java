@@ -9,6 +9,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -113,6 +114,50 @@ public class SyncExecutionLogService {
         } catch (Exception e) {
             log.warn("[SyncLog] tableExists 확인 실패: schema={}, 오류={}", schema, e.getMessage());
             return false;
+        }
+    }
+
+    public Map<String, Object> getStats(String period) {
+        JdbcTemplate jdbc = jdbc();
+        if (jdbc == null) return Collections.emptyMap();
+        String where = switch (period) {
+            case "today" -> "started_at >= CURRENT_DATE";
+            case "7d"    -> "started_at >= NOW() - INTERVAL '7 days'";
+            default      -> "started_at >= NOW() - INTERVAL '30 days'";
+        };
+        try {
+            Map<String, Object> summary = jdbc.queryForMap(
+                "SELECT COUNT(*) FILTER (WHERE status<>'RUNNING') AS total," +
+                "       COUNT(*) FILTER (WHERE status='SUCCESS')  AS success," +
+                "       COUNT(*) FILTER (WHERE status='FAILED')   AS failed," +
+                "       COUNT(*) FILTER (WHERE status='RUNNING')  AS running," +
+                "       COALESCE(SUM(rows_ok),0)  AS rows_ok," +
+                "       COALESCE(SUM(rows_err),0) AS rows_err," +
+                "       ROUND(AVG(duration_s) FILTER (WHERE status='SUCCESS'))::INTEGER AS avg_dur_s" +
+                " FROM " + logTable() + " WHERE " + where);
+
+            List<Map<String, Object>> byType = jdbc.queryForList(
+                "SELECT type," +
+                "       COUNT(*) FILTER (WHERE status<>'RUNNING') AS total," +
+                "       COUNT(*) FILTER (WHERE status='SUCCESS')  AS success," +
+                "       COUNT(*) FILTER (WHERE status='FAILED')   AS failed," +
+                "       ROUND(AVG(duration_s) FILTER (WHERE status='SUCCESS'))::INTEGER AS avg_dur_s" +
+                " FROM " + logTable() + " WHERE " + where +
+                " GROUP BY type ORDER BY total DESC");
+
+            List<Map<String, Object>> byTrigger = jdbc.queryForList(
+                "SELECT triggered, COUNT(*) AS cnt" +
+                " FROM " + logTable() + " WHERE " + where +
+                " GROUP BY triggered ORDER BY triggered");
+
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("summary", summary);
+            result.put("byType", byType);
+            result.put("byTrigger", byTrigger);
+            return result;
+        } catch (Exception e) {
+            log.warn("[SyncLog] getStats 조회 실패: {}", e.getMessage());
+            return Collections.emptyMap();
         }
     }
 

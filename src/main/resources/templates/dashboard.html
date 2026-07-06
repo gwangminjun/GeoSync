@@ -207,6 +207,30 @@
     </div>
   </div>
 
+  <!-- 실행 통계 -->
+  <div style="margin-bottom:26px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div style="font-size:14px;font-weight:700;color:#f3f5f7;">실행 통계</div>
+        <div style="display:flex;gap:0;border:1px solid #2e3640;border-radius:7px;overflow:hidden;">
+          <button id="statsTabToday" type="button" onclick="switchStatsTab('today')"
+                  style="padding:5px 12px;border:none;background:#1e242c;color:#66c4be;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer;">오늘</button>
+          <button id="statsTab7d" type="button" onclick="switchStatsTab('7d')"
+                  style="padding:5px 12px;border:none;border-left:1px solid #2e3640;background:transparent;color:#69707b;font-size:12px;font-weight:600;font-family:inherit;cursor:pointer;">7일</button>
+          <button id="statsTab30d" type="button" onclick="switchStatsTab('30d')"
+                  style="padding:5px 12px;border:none;border-left:1px solid #2e3640;background:transparent;color:#69707b;font-size:12px;font-weight:600;font-family:inherit;cursor:pointer;">30일</button>
+        </div>
+      </div>
+      <button type="button" onclick="refreshStats()" id="statsRefreshBtn"
+              style="padding:5px 12px;border-radius:6px;border:1px solid #2e3640;background:#1e242c;color:#9aa2ad;font-size:12px;font-family:inherit;cursor:pointer;">
+        새로고침
+      </button>
+    </div>
+    <div id="statsArea">
+      <div style="color:#69707b;font-size:13px;padding:10px 0;">불러오는 중...</div>
+    </div>
+  </div>
+
   <!-- 실행 이력 -->
   <div style="font-size:14px;font-weight:700;color:#f3f5f7;margin-bottom:12px;">최근 실행 이력</div>
   <div style="background:#1a1f26;border:1px solid #262c35;border-radius:11px;overflow:hidden;">
@@ -1206,6 +1230,164 @@
       next(0);
     }
 
+    /* ── 실행 통계 ──────────────────────────────────── */
+    var _statsPeriod = 'today';
+
+    function switchStatsTab(period) {
+      _statsPeriod = period;
+      ['today','7d','30d'].forEach(function(p) {
+        var btn = document.getElementById('statsTab' + p);
+        if (!btn) return;
+        var active = p === period;
+        btn.style.background    = active ? '#1e242c' : 'transparent';
+        btn.style.color         = active ? '#66c4be' : '#69707b';
+        btn.style.fontWeight    = active ? '700' : '600';
+      });
+      loadStats();
+    }
+
+    function refreshStats() { loadStats(); }
+
+    function loadStats() {
+      var area = document.getElementById('statsArea');
+      var btn  = document.getElementById('statsRefreshBtn');
+      area.innerHTML = '<div style="color:#69707b;font-size:13px;padding:10px 0;">불러오는 중...</div>';
+      btn.disabled = true;
+      fetch('/api/sync-stats?period=' + _statsPeriod)
+        .then(function(r) { return r.json(); })
+        .then(function(data) { renderStats(data); })
+        .catch(function(e) {
+          area.innerHTML = '<div style="color:#e88a82;font-size:13px;">조회 실패: ' + escapeHtml(String(e)) + '</div>';
+        })
+        .finally(function() { btn.disabled = false; });
+    }
+
+    function renderStats(data) {
+      var area = document.getElementById('statsArea');
+      if (!data || !data.summary) {
+        area.innerHTML = '<div style="color:#5b626d;font-size:13px;padding:12px 0;">통계 데이터 없음 (DB 연결 필요).</div>';
+        return;
+      }
+      var s        = data.summary;
+      var total    = Number(s.total   || 0);
+      var success  = Number(s.success || 0);
+      var failed   = Number(s.failed  || 0);
+      var running  = Number(s.running || 0);
+      var rowsOk   = Number(s.rows_ok  || 0);
+      var rowsErr  = Number(s.rows_err || 0);
+      var avgDur   = (s.avg_dur_s != null && s.avg_dur_s !== '') ? Number(s.avg_dur_s) : null;
+      var successRate = total > 0 ? Math.round(success * 100 / total) : null;
+
+      var html = '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:12px;">';
+
+      // 실행 횟수
+      html += '<div style="background:#1a1f26;border:1px solid #262c35;border-radius:10px;padding:16px;">';
+      html += '<div style="font-size:11px;color:#69707b;font-weight:600;margin-bottom:8px;">실행 횟수</div>';
+      html += '<div style="font-size:22px;font-weight:700;color:#e7eaee;font-variant-numeric:tabular-nums;">' + (total + running) + '</div>';
+      html += '<div style="margin-top:6px;font-size:11.5px;line-height:1.6;">';
+      if (success > 0) html += '<span style="color:#5fc98a;">완료 ' + success + '</span>&ensp;';
+      if (failed  > 0) html += '<span style="color:#e88a82;">실패 ' + failed  + '</span>&ensp;';
+      if (running > 0) html += '<span style="color:#d9b066;">실행중 ' + running + '</span>';
+      if (total === 0 && running === 0) html += '<span style="color:#5b626d;">—</span>';
+      html += '</div></div>';
+
+      // 성공률
+      html += '<div style="background:#1a1f26;border:1px solid #262c35;border-radius:10px;padding:16px;">';
+      html += '<div style="font-size:11px;color:#69707b;font-weight:600;margin-bottom:8px;">성공률</div>';
+      if (successRate !== null) {
+        var rateColor = successRate >= 90 ? '#5fc98a' : successRate >= 70 ? '#d9b066' : '#e88a82';
+        html += '<div style="font-size:22px;font-weight:700;color:' + rateColor + ';font-variant-numeric:tabular-nums;">'
+              + successRate + '<span style="font-size:14px;font-weight:500;color:#69707b;">%</span></div>';
+        html += '<div style="margin-top:8px;height:4px;background:#1e242c;border-radius:99px;overflow:hidden;">';
+        html += '<div style="height:100%;width:' + successRate + '%;background:' + rateColor + ';border-radius:99px;"></div></div>';
+      } else {
+        html += '<div style="font-size:22px;font-weight:700;color:#5b626d;">—</div>';
+        html += '<div style="margin-top:6px;font-size:11.5px;color:#5b626d;">기록 없음</div>';
+      }
+      html += '</div>';
+
+      // 처리 건수
+      html += '<div style="background:#1a1f26;border:1px solid #262c35;border-radius:10px;padding:16px;">';
+      html += '<div style="font-size:11px;color:#69707b;font-weight:600;margin-bottom:8px;">처리 건수</div>';
+      html += '<div style="font-size:22px;font-weight:700;color:#0e9b94;font-variant-numeric:tabular-nums;">' + rowsOk.toLocaleString() + '</div>';
+      html += '<div style="margin-top:6px;font-size:11.5px;color:' + (rowsErr > 0 ? '#e88a82' : '#5b626d') + ';">';
+      html += rowsErr > 0 ? '오류 ' + rowsErr.toLocaleString() + '건' : '오류 없음';
+      html += '</div></div>';
+
+      // 평균 소요 시간
+      html += '<div style="background:#1a1f26;border:1px solid #262c35;border-radius:10px;padding:16px;">';
+      html += '<div style="font-size:11px;color:#69707b;font-weight:600;margin-bottom:8px;">평균 소요 시간</div>';
+      if (avgDur !== null && !isNaN(avgDur)) {
+        var durStr = avgDur >= 3600
+          ? Math.floor(avgDur/3600) + '시간 ' + Math.floor((avgDur%3600)/60) + '분'
+          : avgDur >= 60
+            ? Math.floor(avgDur/60) + '분 ' + (avgDur%60) + '초'
+            : avgDur + '초';
+        html += '<div style="font-size:22px;font-weight:700;color:#b68aff;font-variant-numeric:tabular-nums;">' + durStr + '</div>';
+        html += '<div style="margin-top:6px;font-size:11.5px;color:#5b626d;">성공 기준</div>';
+      } else {
+        html += '<div style="font-size:22px;font-weight:700;color:#5b626d;">—</div>';
+        html += '<div style="margin-top:6px;font-size:11.5px;color:#5b626d;">기록 없음</div>';
+      }
+      html += '</div>';
+
+      html += '</div>'; // grid end
+
+      // 타입별 현황
+      var byType    = data.byType    || [];
+      var byTrigger = data.byTrigger || [];
+
+      if (byType.length > 0) {
+        html += '<div style="background:#1a1f26;border:1px solid #262c35;border-radius:10px;overflow:hidden;">';
+        html += '<table style="width:100%;border-collapse:collapse;font-size:12.5px;">';
+        html += '<thead><tr style="background:#171b21;">'
+          + '<th style="text-align:left;padding:9px 16px;font-size:11px;font-weight:600;color:#69707b;letter-spacing:0.03em;border-bottom:1px solid #262c35;">타입</th>'
+          + '<th style="text-align:right;padding:9px 12px;font-size:11px;font-weight:600;color:#69707b;letter-spacing:0.03em;border-bottom:1px solid #262c35;">실행</th>'
+          + '<th style="text-align:right;padding:9px 12px;font-size:11px;font-weight:600;color:#69707b;letter-spacing:0.03em;border-bottom:1px solid #262c35;">완료</th>'
+          + '<th style="text-align:right;padding:9px 12px;font-size:11px;font-weight:600;color:#69707b;letter-spacing:0.03em;border-bottom:1px solid #262c35;">실패</th>'
+          + '<th style="text-align:right;padding:9px 16px;font-size:11px;font-weight:600;color:#69707b;letter-spacing:0.03em;border-bottom:1px solid #262c35;">평균 소요</th>'
+          + '</tr></thead><tbody>';
+        byType.forEach(function(row) {
+          var t   = Number(row.total   || 0);
+          var sc  = Number(row.success || 0);
+          var fc  = Number(row.failed  || 0);
+          var ad  = (row.avg_dur_s != null && row.avg_dur_s !== '') ? Number(row.avg_dur_s) : null;
+          var adStr = (ad !== null && !isNaN(ad))
+            ? (ad >= 60 ? Math.floor(ad/60) + 'm ' + (ad%60) + 's' : ad + 's')
+            : '—';
+          html += '<tr style="border-bottom:1px solid #21262e;">'
+            + '<td style="padding:9px 16px;">'
+              + '<span style="padding:2px 8px;border-radius:5px;font-size:11.5px;font-weight:600;background:#232830;color:#aab1bb;font-family:\'JetBrains Mono\',monospace;">'
+              + escapeHtml(row.type || '') + '</span></td>'
+            + '<td style="padding:9px 12px;text-align:right;color:#e7eaee;font-variant-numeric:tabular-nums;">' + t + '</td>'
+            + '<td style="padding:9px 12px;text-align:right;color:' + (sc > 0 ? '#5fc98a' : '#5b626d') + ';font-variant-numeric:tabular-nums;">' + sc + '</td>'
+            + '<td style="padding:9px 12px;text-align:right;color:' + (fc > 0 ? '#e88a82' : '#5b626d') + ';font-variant-numeric:tabular-nums;">' + fc + '</td>'
+            + '<td style="padding:9px 16px;text-align:right;color:#9aa2ad;font-variant-numeric:tabular-nums;">' + adStr + '</td>'
+            + '</tr>';
+        });
+        html += '</tbody></table>';
+
+        if (byTrigger.length > 0) {
+          var trigTotal = byTrigger.reduce(function(a, r) { return a + Number(r.cnt || 0); }, 0);
+          html += '<div style="display:flex;gap:18px;padding:9px 16px;background:#171b21;border-top:1px solid #262c35;">';
+          byTrigger.forEach(function(r) {
+            var pct = trigTotal > 0 ? Math.round(Number(r.cnt) * 100 / trigTotal) : 0;
+            var tc  = r.triggered === 'SCHEDULE' ? '#66c4be' : '#d9b066';
+            html += '<span style="font-size:11.5px;color:#69707b;">'
+              + '<span style="color:' + tc + ';font-weight:600;">' + escapeHtml(r.triggered || '') + '</span>'
+              + ' ' + Number(r.cnt) + '건 (' + pct + '%)</span>';
+          });
+          html += '</div>';
+        }
+        html += '</div>';
+      } else {
+        html += '<div style="padding:16px;background:#1a1f26;border:1px solid #262c35;border-radius:10px;'
+              + 'color:#5b626d;font-size:13px;text-align:center;">해당 기간 실행 이력이 없습니다.</div>';
+      }
+
+      area.innerHTML = html;
+    }
+
     /* ── 로딩바 폴링 ─────────────────────────────────── */
     var _pollTimer   = null;
     var _startTimes  = {};   // type → Date (null = not running)
@@ -1371,6 +1553,9 @@
         }
       });
       if (anyRunning) startPolling();
+
+      // 실행 통계 자동 조회
+      loadStats();
 
       // estateGateway 연결 상태 자동 조회
       refreshGatewayStatus();
