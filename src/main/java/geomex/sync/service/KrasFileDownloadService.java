@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -75,17 +76,18 @@ public class KrasFileDownloadService {
             }
             job.total = (cbndShp ? 1 : 0) + uzoneLayers.size() + (jigaTxt ? 1 : 0) + (landTxt ? 1 : 0);
 
-            // 1. 연속지적도 SHP
+            // 1. 연속지적도 SHP (lsmd_cont_ldreg.* 로 받은 뒤 lp_pa_cbnd.* 이름으로도 복사 저장)
             if (cbndShp) {
                 String layerCd = "LSMD_CONT_LDREG";
                 job.current = "연속지적도 SHP (" + layerCd + ")";
                 try {
                     String baseName = apiClient.downloadLayer(layerCd, outputDir);
+                    copyAs(outputDir, baseName, "lp_pa_cbnd");
                     long size = sizeOf(outputDir, baseName, ".shp")
                               + sizeOf(outputDir, baseName, ".dbf")
                               + sizeOf(outputDir, baseName, ".shx");
                     job.results.add(new DownloadResult(layerCd, outputDir.resolve(baseName + ".shp").toString(), size, true, null));
-                    log.info("[FileDL] {} 완료 ({}B)", layerCd, size);
+                    log.info("[FileDL] {} 완료 ({}B, lp_pa_cbnd.*로도 저장)", layerCd, size);
                 } catch (Exception e) {
                     log.error("[FileDL] {} 실패: {}", layerCd, e.getMessage());
                     job.results.add(new DownloadResult(layerCd, outputDir.toString(), 0, false, e.getMessage()));
@@ -174,5 +176,15 @@ public class KrasFileDownloadService {
 
     private static long sizeOf(Path dir, String baseName, String ext) {
         try { return Files.size(dir.resolve(baseName + ext)); } catch (IOException e) { return 0; }
+    }
+
+    /** srcBaseName.shp/.dbf/.shx 를 같은 디렉토리에 targetBaseName 이름으로 복사 저장 */
+    private static void copyAs(Path dir, String srcBaseName, String targetBaseName) throws IOException {
+        for (String ext : new String[]{".shp", ".dbf", ".shx"}) {
+            Path src = dir.resolve(srcBaseName + ext);
+            if (Files.exists(src)) {
+                Files.copy(src, dir.resolve(targetBaseName + ext), StandardCopyOption.REPLACE_EXISTING);
+            }
+        }
     }
 }
