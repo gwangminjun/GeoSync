@@ -59,7 +59,7 @@ public class KrasCatalogStatusService {
         List<CatalogFileStatus> statuses = new ArrayList<>();
         statuses.add(usezoneSummaryStatus(groups, lastSuccess));
         statuses.add(exactStatus(groups, "KRAS 수신 원본", "연속지적도", "lp_pa_cbnd",
-                        "lp_pa_cbnd.*", Set.of(".shp", ".dbf", ".gmx"), 1, lastSuccess,
+                        "lsmd_cont_ldreg.*", SHP_SET, 1, lastSuccess,
                         "lp_pa_cbnd", false));
         return statuses;
     }
