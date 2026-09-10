@@ -1,7 +1,7 @@
 package geomex.sync;
 
-import geomex.sync.config.KrasGpkiProperties;
-import geomex.sync.config.TargetDbProperties;
+import geomex.sync.configuration.KrasGpkiProperties;
+import geomex.sync.configuration.TargetDbProperties;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;

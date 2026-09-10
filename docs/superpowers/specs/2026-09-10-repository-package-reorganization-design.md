@@ -68,6 +68,7 @@ src/main/java/geomex/sync/
 │  └─ UsezoneCodeService.java
 ├─ kras/
 │  ├─ KrasApiClient.java
+│  ├─ KorepsApiClient.java
 │  ├─ KrasGpkiService.java
 │  ├─ KrasFileReader.java
 │  ├─ KrasFileWriter.java
@@ -78,11 +79,11 @@ src/main/java/geomex/sync/
 │  ├─ FileDownloadController.java
 │  └─ MockGatewayController.java
 ├─ gateway/
-│  ├─ KorepsApiClient.java
 │  ├─ KrasConnController.java
 │  ├─ KrasGmxController.java
 │  ├─ GatewayPaths.java
 │  ├─ ConnRequestLogService.java
+│  ├─ ApiTestProxyController.java
 │  └─ ConnStatsController.java
 ├─ synchronization/
 │  ├─ model/
@@ -101,11 +102,10 @@ src/main/java/geomex/sync/
    ├─ CatalogFileStatus.java
    ├─ DashboardController.java
    ├─ LogController.java
-   ├─ ApiTestController.java
-   └─ ApiTestProxyController.java
+   └─ ApiTestController.java
 ```
 
-`ApiTestController`와 `ApiTestProxyController`는 현재 관리 UI에서 연결 상태와 API 동작을 확인하는 역할이므로 `monitoring`에 둔다.
+`ApiTestController`는 관리 UI의 연결 상태와 API 동작을 확인하는 화면이므로 `monitoring`에 둔다. `ApiTestProxyController`는 `KrasConnController`의 package-private XML 본문 추출 기능을 공유하므로 `gateway`에 둔다.
 
 ### 4.1 배치 원칙
 
@@ -113,6 +113,8 @@ src/main/java/geomex/sync/
 - 클래스명과 구현은 유지하고 `package` 선언과 필요한 `import`만 변경한다.
 - `OdsTableDdl`은 `OdsRepository`와 같은 `ods` 패키지에 둔다.
 - `GatewayPaths`는 이를 사용하는 게이트웨이 컨트롤러와 같은 `gateway` 패키지에 둔다.
+- `ApiTestProxyController`는 `KrasConnController`의 package-private XML 처리 기능을 공유하므로 같은 `gateway` 패키지에 둔다.
+- `KorepsApiClient`는 `KrasApiClient`의 package-private 요청 조립 기능을 공유하므로 같은 `kras` 패키지에 둔다.
 - 기존 결합을 해소하기 위한 인터페이스 도입이나 클래스 분리는 하지 않는다.
 - 기존 `web`, `service`, `worker`, `repository`, `scheduler`, `model`, `mapper`, `geo`, `util` 패키지는 최종적으로 제거한다.
 
@@ -144,7 +146,6 @@ repository/
 ├─ INSTALL.md
 ├─ build.gradle
 ├─ settings.gradle
-├─ gradlew
 └─ gradlew.bat
 ```
 

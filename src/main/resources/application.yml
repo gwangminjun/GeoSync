@@ -4,7 +4,7 @@ server:
 spring:
   datasource:
     driver-class-name: org.postgresql.Driver
-    url: ${DB_URL:jdbc:postgresql://110.20.1.218:1990/ygspdb}
+    url: ${DB_URL:jdbc:postgresql://112.216.98.130:31613/YG-Space_260714?autoReconnect=true&useUnicode=true&characterEncoding=utf8&allowMultiQueries=true&zeroDateTimeBehavior=convertToNull}
     username: ${DB_USER:postgres}
     password: ${DB_PASSWORD:}
     hikari:
