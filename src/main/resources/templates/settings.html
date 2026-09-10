@@ -64,53 +64,49 @@
   <form method="post" th:action="@{/settings}" id="settings-form"
         style="display:flex;flex-direction:column;gap:26px;">
 
-    <!-- ── 대상 DB 서버 ── -->
+    <!-- ── 단일 DB 서버 ── -->
     <div style="display:flex;flex-direction:column;gap:14px;">
-      <div style="display:flex;align-items:center;justify-content:space-between;">
-        <div class="gs-section" style="border:none;padding:0;">대상 DB 서버</div>
-        <button type="button" class="btn-ghost" onclick="addTargetRow()">+ 추가</button>
+      <div class="gs-section" style="border:none;padding:0;">데이터베이스</div>
+      <div style="display:grid;grid-template-columns:2fr 3fr 1fr 2fr;gap:12px;align-items:end;">
+        <div>
+          <label class="gs-label">표시 이름</label>
+          <input class="gs-input" type="text" name="db_display_name" id="db_display_name"
+                 th:value="${values['db_display_name']}" placeholder="운영 DB">
+        </div>
+        <div>
+          <label class="gs-label">호스트 (IP)</label>
+          <input class="gs-input mono" type="text" name="db_host" id="db_host"
+                 th:value="${targets[0].host}" required>
+        </div>
+        <div>
+          <label class="gs-label">포트</label>
+          <input class="gs-input mono" type="text" name="db_port" id="db_port"
+                 th:value="${targets[0].port}" required>
+        </div>
+        <div>
+          <label class="gs-label">데이터베이스</label>
+          <input class="gs-input mono" type="text" name="db_name" id="db_name"
+                 th:value="${targets[0].dbname}" required>
+        </div>
+        <div>
+          <label class="gs-label">사용자</label>
+          <input class="gs-input" type="text" name="db_user" id="db_user"
+                 th:value="${values['db_user']}" required>
+        </div>
+        <div>
+          <label class="gs-label">비밀번호</label>
+          <input class="gs-input mono" type="password" name="db_password" id="db_password"
+                 th:value="${values['db_password']}">
+        </div>
+        <div style="grid-column:span 2;display:flex;gap:8px;align-items:center;">
+          <button type="button" class="btn-ghost" onclick="testDatabase()">연결 테스트</button>
+          <span id="db-test-result" class="test-result"></span>
+          <button type="button" class="btn-ghost" onclick="checkOdsSchema(0)">ODS 확인</button>
+        </div>
       </div>
-      <div style="overflow-x:auto;">
-        <table class="tgt-table">
-          <thead>
-            <tr>
-              <th>이름</th><th>호스트 (IP)</th><th style="width:70px;">포트</th>
-              <th>데이터베이스</th><th>사용자</th><th>비밀번호</th>
-              <th style="width:44px;text-align:center;">활성</th><th style="width:160px;"></th>
-            </tr>
-          </thead>
-          <tbody id="tgt-tbody">
-            <tr th:each="t,i : ${targets}" class="tgt-row" th:attr="data-idx=${i.index}">
-              <td><input class="gs-input" type="text"
-                         th:name="'tgt_name_' + ${i.index}" th:value="${t.name}" placeholder="메인DB"></td>
-              <td><input class="gs-input mono" type="text"
-                         th:name="'tgt_host_' + ${i.index}" th:value="${t.host}"></td>
-              <td><input class="gs-input mono" type="text"
-                         th:name="'tgt_port_' + ${i.index}" th:value="${t.port}"></td>
-              <td><input class="gs-input mono" type="text"
-                         th:name="'tgt_dbname_' + ${i.index}" th:value="${t.dbname}"></td>
-              <td><input class="gs-input" type="text"
-                         th:name="'tgt_user_' + ${i.index}" th:value="${t.username}"></td>
-              <td><input class="gs-input mono" type="password"
-                         th:name="'tgt_pass_' + ${i.index}" th:value="${t.password}"></td>
-              <td style="text-align:center;">
-                <input type="checkbox" th:name="'tgt_enabled_' + ${i.index}"
-                       th:checked="${t.enabled}"
-                       style="width:16px;height:16px;accent-color:#0e9b94;cursor:pointer;">
-              </td>
-              <td style="white-space:nowrap;">
-                <button type="button" class="btn-ghost"
-                        th:onclick="'testTarget(' + ${i.index} + ')'">테스트</button>
-                <button type="button" class="btn-danger"
-                        onclick="removeRow(this)">✕</button>
-                <span th:id="'res-' + ${i.index}" class="test-result"></span>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      <input type="hidden" name="tgt_count" id="tgt_count"
-             th:value="${#lists.size(targets)}">
+      <input type="hidden" name="db_url" id="db_url" th:value="${values['db_url']}">
+      <input type="hidden" name="tgt_count" value="0">
+      <div style="font-size:12px;color:#69707b;">실행 중에는 이 DB 하나만 사용합니다. 기존 `targets[]` 설정은 저장 시 자동 제거됩니다.</div>
     </div>
 
     <!-- ── KRAS ── -->
@@ -125,17 +121,12 @@
         <div style="flex:3;min-width:280px;">
           <label class="gs-label">대상 DB 확인</label>
           <div id="ods-target-tabs" style="display:flex;gap:8px;flex-wrap:wrap;">
-            <button th:each="t,i : ${targets}" type="button" class="btn-ghost"
-                    th:onclick="'checkOdsSchema(' + ${i.index} + ')'"
-                    th:text="${t.name != null && !#strings.isEmpty(t.name) ? t.name : 'DB ' + (i.index + 1)}">DB</button>
+            <span class="btn-ghost" th:text="${values['db_display_name']}">운영 DB</span>
           </div>
         </div>
       </div>
       <div id="ods-check-result"
            style="display:none;border:1px solid #262c35;border-radius:8px;background:#171b21;padding:12px;overflow-x:auto;"></div>
-      <div th:if="${#lists.isEmpty(targets)}" style="font-size:12.5px;color:#d9b066;">
-        대상 DB를 먼저 추가하고 저장한 뒤 확인할 수 있습니다.
-      </div>
     </div>
 
     <div style="display:flex;flex-direction:column;gap:14px;">
@@ -443,6 +434,13 @@
         .find(m => document.getElementById(`${key}-mode-${m}`)?.classList.contains('active')) || 'off';
       syncHidden(key, mode);
     });
+    const host = document.getElementById('db_host')?.value.trim();
+    const port = document.getElementById('db_port')?.value.trim() || '5432';
+    const name = document.getElementById('db_name')?.value.trim();
+    const previous = document.getElementById('db_url')?.value || '';
+    const query = previous.includes('?') ? previous.substring(previous.indexOf('?')) : '';
+    if (host && name) document.getElementById('db_url').value =
+      'jdbc:postgresql://' + host + ':' + port + '/' + name + query;
   });
 
   /* ── DB 대상 테이블 ────────────────────────────────────────── */
@@ -519,6 +517,24 @@
     b.append('db_host',host); b.append('db_port',port); b.append('db_name',dbname);
     b.append('db_user',user); b.append('db_password',pw);
     callTest('/settings/test-db', b, res);
+  }
+
+  function testDatabase() {
+    const host = document.getElementById('db_host').value.trim();
+    const port = document.getElementById('db_port').value.trim() || '5432';
+    const name = document.getElementById('db_name').value.trim();
+    const user = document.getElementById('db_user').value.trim();
+    const pw = document.getElementById('db_password').value;
+    const result = document.getElementById('db-test-result');
+    if (!host || !name || !user) {
+      result.textContent = '호스트/DB/사용자 필수';
+      result.style.color = '#d9b066';
+      return;
+    }
+    const body = new FormData();
+    body.append('db_host', host); body.append('db_port', port);
+    body.append('db_name', name); body.append('db_user', user); body.append('db_password', pw);
+    callTest('/settings/test-db', body, result);
   }
 
   function testKras() {

@@ -35,7 +35,7 @@ class PackageArchitectureTest {
         assertPackage("DatabaseConfig", "geomex.sync.configuration");
         assertPackage("KrasGpkiProperties", "geomex.sync.configuration");
         assertPackage("TargetDb", "geomex.sync.configuration");
-        assertPackage("TargetDbProperties", "geomex.sync.configuration");
+        assertPackage("DatabaseSettings", "geomex.sync.settings");
     }
 
     @Test
@@ -43,6 +43,7 @@ class PackageArchitectureTest {
         assertPackage("RuntimeSettingsService", "geomex.sync.settings");
         assertPackage("SettingsController", "geomex.sync.settings");
         assertPackage("TargetDbService", "geomex.sync.database");
+        assertPackage("DatabaseConnectionService", "geomex.sync.database");
         assertPackage("TargetTableNameService", "geomex.sync.database");
         assertPackage("DbSetupService", "geomex.sync.database");
         assertPackage("DbSetupController", "geomex.sync.database");

@@ -85,16 +85,11 @@
 
   <div th:unless="${#lists.isEmpty(targets)}">
 
-    <!-- ① 데이터베이스 선택 -->
+    <!-- ① 현재 데이터베이스 -->
     <div style="margin-bottom:18px;">
       <div class="section-label" style="margin-bottom:8px;">데이터베이스</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;" id="db-tabs">
-        <button th:each="t,i : ${targets}"
-                class="seg-btn"
-                th:classappend="${i.first} ? ' active' : ''"
-                th:attr="data-idx=${i.index}"
-                th:text="${t.name()}"
-                onclick="selectDb(this)">DB</button>
+        <span class="seg-btn active" th:text="${targets[0].name()}">운영 DB</span>
       </div>
     </div>
 

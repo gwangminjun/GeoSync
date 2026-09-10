@@ -88,22 +88,17 @@ public class SyncController {
             return "redirect:/";
         }
 
-        Map<Integer, String> schemaMap = new java.util.HashMap<>();
-        if (targetIdx != null) {
-            for (Integer idx : targetIdx) {
-                String schema = allParams.get("schema_" + idx);
-                if (schema != null && !schema.isBlank()) schemaMap.put(idx, schema.trim());
-            }
-        }
+        String schema = DatabaseRequestCompatibility.schema(allParams, tableNameService.getOdsSchema());
+        Map<Integer, String> schemaMap = schema.isBlank() ? null : Map.of(0, schema);
 
         java.util.Set<String> tableFilter = (tables != null && !tables.isEmpty())
                 ? new java.util.HashSet<>(tables) : null;
 
         statusService.recordStart("KRAS_LOAD");
-        scheduler.triggerKrasDirectLoadAsync(targetIdx, schemaMap.isEmpty() ? null : schemaMap, tableFilter);
+        scheduler.triggerKrasDirectLoadAsync(null, schemaMap, tableFilter);
 
         String tableDesc = tableFilter == null ? "전체 테이블" : String.join(", ", tableFilter);
-        String targetDesc = (targetIdx == null || targetIdx.isEmpty()) ? "전체 DB" : targetIdx.size() + "개 DB";
+        String targetDesc = "단일 DB";
         ra.addFlashAttribute("message", "KRAS 적재를 시작했습니다 (" + targetDesc + " / " + tableDesc + ").");
         return "redirect:/";
     }
@@ -138,7 +133,7 @@ public class SyncController {
             @RequestParam(required = false) List<Integer> targetIdx,
             @RequestParam(defaultValue = "test") String schema) {
         try {
-            return ResponseEntity.ok(krasWorker.runMockLoad(targetIdx, schema));
+            return ResponseEntity.ok(krasWorker.runMockLoad(null, schema));
         } catch (Exception e) {
             return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
         }

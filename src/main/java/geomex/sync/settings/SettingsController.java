@@ -47,12 +47,14 @@ public class SettingsController {
     private final RuntimeSettingsService settings;
     private final DynamicScheduleManager scheduleManager;
     private final TargetDbService targetDbService;
+    private final SettingsFileService settingsFileService;
 
     public SettingsController(RuntimeSettingsService settings, DynamicScheduleManager scheduleManager,
-                              TargetDbService targetDbService) {
+                              TargetDbService targetDbService, SettingsFileService settingsFileService) {
         this.settings = settings;
         this.scheduleManager = scheduleManager;
         this.targetDbService = targetDbService;
+        this.settingsFileService = settingsFileService;
     }
 
     @Value("${spring.config.location:conf/application.yml}")
@@ -102,6 +104,24 @@ public class SettingsController {
                 log.warn("설정 파일 읽기 실패: {}", e.getMessage());
             }
         }
+        if (targets.isEmpty()) {
+            targets = targetDbService.getTargets().stream().map(t -> {
+                Map<String, Object> row = new LinkedHashMap<>();
+                row.put("name", t.getName());
+                row.put("host", t.getHost());
+                row.put("port", t.getPort());
+                row.put("dbname", t.getDbname());
+                row.put("username", t.getUsername());
+                row.put("password", t.getPassword());
+                row.put("enabled", true);
+                return row;
+            }).toList();
+        }
+        DatabaseSettings database = settings.database();
+        values.putIfAbsent("db_display_name", database.displayName());
+        values.putIfAbsent("db_url", database.url());
+        values.putIfAbsent("db_user", database.username());
+        values.putIfAbsent("db_password", database.password());
         values.putIfAbsent("ods_schema", "ods");
         values.putIfAbsent("kras_shp_charset", "MS949");
         values.putIfAbsent("sync_org_code", settings.orgCode());
@@ -144,37 +164,18 @@ public class SettingsController {
     public Map<String, Object> checkOdsSchema(
             @RequestParam int target_index,
             @RequestParam(required = false, defaultValue = "ods") String ods_schema) {
-        Path configFile = resolveConfigPath();
-        if (!Files.exists(configFile)) {
-            return Map.of("success", false, "message", "Config file not found");
-        }
-
         try {
-            String content = Files.readString(configFile, StandardCharsets.UTF_8);
-            List<Map<String, Object>> targets = readTargets(content);
-            if (target_index < 0 || target_index >= targets.size()) {
-                return Map.of("success", false, "message", "Target DB not found");
-            }
-
-            Map<String, Object> target = targets.get(target_index);
             String schema = safe(ods_schema).isEmpty() ? "ods" : safe(ods_schema);
-            String host = mapValue(target, "host");
-            String port = mapValue(target, "port");
-            String dbname = mapValue(target, "dbname");
-            String user = mapValue(target, "username");
-            String password = mapValue(target, "password");
-            String name = mapValue(target, "name");
-            String url = "jdbc:postgresql://" + host + ":" + port + "/" + dbname;
-
-            Class.forName("org.postgresql.Driver");
-            try (Connection conn = DriverManager.getConnection(url, user, password)) {
+            TargetDbService.ActiveTarget target = targetDbService.getActiveTargets().get(0);
+            String url = target.url();
+            try (Connection conn = target.jdbc().getDataSource().getConnection()) {
                 boolean schemaExists = schemaExists(conn, schema);
                 List<Map<String, Object>> tables = schemaExists
                         ? inspectSchemaTables(conn, schema)
                         : List.of();
                 return Map.of(
                         "success", true,
-                        "target", name.isEmpty() ? url : name,
+                        "target", target.name(),
                         "url", url,
                         "schema", schema,
                         "schemaExists", schemaExists,
@@ -236,8 +237,9 @@ public class SettingsController {
 
         Path configFile = resolveConfigPath();
         try {
-            Files.createDirectories(configFile.getParent());
-            Files.writeString(configFile, buildYaml(params), StandardCharsets.UTF_8);
+            DatabaseSettings database = databaseFromParams(params);
+            Map<String, Object> managed = readYamlRoot(buildYaml(params));
+            settingsFileService.save(configFile, database, managed);
             settings.reload();
             targetDbService.evictStaleTargets();
             scheduleManager.reloadSchedules();
@@ -248,6 +250,23 @@ public class SettingsController {
             ra.addFlashAttribute("error", "설정 저장 실패: " + e.getMessage());
         }
         return "redirect:/settings";
+    }
+
+    private DatabaseSettings databaseFromParams(Map<String, String> params) {
+        String url = safe(params.get("db_url"));
+        String user = safe(params.get("db_user"));
+        String password = params.getOrDefault("db_password", "");
+        String display = safe(params.get("db_display_name"));
+        if (url.isEmpty()) {
+            String host = safe(params.get("tgt_host_0"));
+            String port = safe(params.get("tgt_port_0")).isEmpty() ? "5432" : safe(params.get("tgt_port_0"));
+            String dbname = safe(params.get("tgt_dbname_0"));
+            url = "jdbc:postgresql://" + host + ":" + port + "/" + dbname;
+            if (user.isEmpty()) user = safe(params.get("tgt_user_0"));
+            if (password.isEmpty()) password = params.getOrDefault("tgt_pass_0", "");
+            if (display.isEmpty()) display = safe(params.get("tgt_name_0"));
+        }
+        return new DatabaseSettings(display, url, user, password, DatabaseSettings.Source.CANONICAL);
     }
 
     // ── private helpers ──────────────────────────────────────────────────────

@@ -2,6 +2,8 @@ package geomex.sync.settings;
 
 import geomex.sync.configuration.TargetDb;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Service;
 import org.yaml.snakeyaml.Yaml;
 
@@ -16,8 +18,11 @@ import java.util.Map;
 @Service
 public class RuntimeSettingsService {
 
-    @Value("${spring.config.location:conf/application.yml}")
-    private String configLocation;
+    private final Environment environment;
+    private final String configLocation;
+    private final String startupDbUrl;
+    private final String startupDbUsername;
+    private final String startupDbPassword;
 
     @Value("${kras.url:http://110.20.1.12:8385/conn/estateGateway}")
     private String defaultKrasUrl;
@@ -65,6 +70,20 @@ public class RuntimeSettingsService {
     private boolean defaultSyncEnabled;
 
     private volatile Snapshot snapshot;
+
+    @Autowired
+    public RuntimeSettingsService(
+            Environment environment,
+            @Value("${spring.config.location:conf/application.yml}") String configLocation,
+            @Value("${spring.datasource.url:}") String startupDbUrl,
+            @Value("${spring.datasource.username:}") String startupDbUsername,
+            @Value("${spring.datasource.password:}") String startupDbPassword) {
+        this.environment = environment;
+        this.configLocation = configLocation;
+        this.startupDbUrl = startupDbUrl;
+        this.startupDbUsername = startupDbUsername;
+        this.startupDbPassword = startupDbPassword;
+    }
 
     public void reload() {
         snapshot = null;
@@ -168,8 +187,39 @@ public class RuntimeSettingsService {
         return value != null ? Boolean.parseBoolean(String.valueOf(value)) : defaultSyncEnabled;
     }
 
+    public DatabaseSettings database() {
+        Map<String, Object> root = snapshot().root();
+        Map<String, Object> datasource = childMap(childMap(root, "spring"), "datasource");
+        String canonicalUrl = resolve(datasource.get("url"));
+        String canonicalUser = resolve(datasource.get("username"));
+        if (!blank(canonicalUrl) && !blank(canonicalUser)) {
+            String display = resolve(childMap(childMap(root, "geomex"), "database").get("display-name"));
+            return new DatabaseSettings(defaultDisplay(display, canonicalUrl), canonicalUrl,
+                    canonicalUser, resolve(datasource.get("password")), DatabaseSettings.Source.CANONICAL);
+        }
+
+        List<TargetDb> legacy = parseTargets(root);
+        TargetDb selected = legacy.stream().filter(TargetDb::isEnabled).findFirst()
+                .orElseGet(() -> legacy.stream().filter(t -> !blank(t.getHost()) && !blank(t.getUsername()))
+                        .findFirst().orElse(null));
+        if (selected != null && !blank(selected.getHost()) && !blank(selected.getUsername())) {
+            String url = selected.jdbcUrl();
+            return new DatabaseSettings(defaultDisplay(selected.getName(), url), url,
+                    selected.getUsername(), selected.getPassword(), DatabaseSettings.Source.LEGACY);
+        }
+
+        String url = resolve(startupDbUrl);
+        String user = resolve(startupDbUsername);
+        return new DatabaseSettings(defaultDisplay("", url), url, user,
+                resolve(startupDbPassword), DatabaseSettings.Source.STARTUP);
+    }
+
     public List<TargetDb> targets() {
-        Object raw = snapshot().root().get("targets");
+        return parseTargets(snapshot().root());
+    }
+
+    private List<TargetDb> parseTargets(Map<String, Object> root) {
+        Object raw = root.get("targets");
         if (!(raw instanceof List<?> list)) return Collections.emptyList();
 
         List<TargetDb> targets = new ArrayList<>();
@@ -186,6 +236,33 @@ public class RuntimeSettingsService {
             targets.add(target);
         }
         return targets;
+    }
+
+    private Map<String, Object> childMap(Map<String, Object> parent, String key) {
+        Object value = parent.get(key);
+        if (value instanceof Map<?, ?> map) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> cast = (Map<String, Object>) map;
+            return cast;
+        }
+        return Collections.emptyMap();
+    }
+
+    private String resolve(Object value) {
+        if (value == null) return "";
+        return environment.resolvePlaceholders(String.valueOf(value)).trim();
+    }
+
+    private static boolean blank(String value) {
+        return value == null || value.isBlank();
+    }
+
+    private static String defaultDisplay(String display, String url) {
+        if (!blank(display)) return display.trim();
+        if (url == null || url.isBlank()) return "default DB";
+        String clean = url.substring(url.lastIndexOf('/') + 1);
+        int query = clean.indexOf('?');
+        return query >= 0 ? clean.substring(0, query) : clean;
     }
 
     private Map<String, Object> child(String key) {

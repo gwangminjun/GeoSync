@@ -3,12 +3,14 @@ package geomex.sync.ods;
 import geomex.sync.database.TargetTableNameService;
 
 import geomex.sync.database.TargetDbService;
+import geomex.sync.database.DatabaseChangedEvent;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowCallbackHandler;
 import org.springframework.stereotype.Service;
+import org.springframework.context.event.EventListener;
 
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -46,6 +48,12 @@ public class UsezoneCodeService {
     /** 동기화 시작 시 캐시 강제 갱신용. */
     public void refresh() {
         loadFromDb();
+    }
+
+    @EventListener
+    public void onDatabaseChanged(DatabaseChangedEvent event) {
+        codeToName = null;
+        loadedAt = 0;
     }
 
     private synchronized void ensureLoaded() {

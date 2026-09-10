@@ -1,132 +1,92 @@
 package geomex.sync.database;
 
-import geomex.sync.settings.RuntimeSettingsService;
-
-import com.zaxxer.hikari.HikariDataSource;
 import geomex.sync.configuration.TargetDb;
-import geomex.sync.configuration.TargetDbProperties;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import geomex.sync.settings.DatabaseSettings;
+import geomex.sync.settings.RuntimeSettingsService;
 import org.springframework.beans.factory.DisposableBean;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 
+/** Compatibility facade for callers that still expect a target list. */
 @Service
 public class TargetDbService implements DisposableBean {
-
-    private static final Logger log = LoggerFactory.getLogger(TargetDbService.class);
-
-    private final TargetDbProperties props;
-    private final JdbcTemplate primaryJdbc;
+    private final DatabaseConnectionService connectionService;
     private final RuntimeSettingsService settings;
-    private final ConcurrentMap<String, CachedTarget> targetCache = new ConcurrentHashMap<>();
+    private DatabaseSession session;
+    private String sessionFingerprint;
 
-    @Value("${spring.datasource.url:}")
-    private String primaryUrl;
-
-    public TargetDbService(TargetDbProperties props, JdbcTemplate primaryJdbc,
+    public TargetDbService(DatabaseConnectionService connectionService,
                            RuntimeSettingsService settings) {
-        this.props = props;
-        this.primaryJdbc = primaryJdbc;
+        this.connectionService = connectionService;
         this.settings = settings;
     }
 
-    public List<JdbcTemplate> getActiveTemplates() {
-        return getActiveTargets().stream()
-                .map(ActiveTarget::jdbc)
-                .toList();
+    public synchronized List<JdbcTemplate> getActiveTemplates() {
+        return List.of(getActiveTargets().get(0).jdbc());
     }
 
-    public List<ActiveTarget> getActiveTargets() {
-        List<TargetDb> configured = settings.targets();
-        if (configured.isEmpty()) configured = props.getTargets();
-        List<TargetDb> enabled = configured.stream()
-                .filter(TargetDb::isEnabled)
-                .toList();
-
-        if (enabled.isEmpty()) {
-            log.debug("[TargetDbService] no targets configured; using primary DataSource");
-            return fallbackTargets();
+    public synchronized List<ActiveTarget> getActiveTargets() {
+        DatabaseSettings configured = settings.database();
+        if (session == null || !configuredFingerprint(configured).equals(sessionFingerprint)) {
+            closeSession();
+            session = connectionService.acquire();
+            sessionFingerprint = session.fingerprint();
         }
-
-        List<ActiveTarget> result = new ArrayList<>();
-        for (TargetDb t : enabled) {
-            try {
-                if (t.getHost() == null || t.getHost().isBlank()) continue;
-                result.add(cachedTarget(t.getName(), t.jdbcUrl(), t.getUsername(),
-                        t.getPassword() != null ? t.getPassword() : ""));
-                log.debug("[TargetDbService] active target: {} ({})", t.getName(), t.jdbcUrl());
-            } catch (Exception e) {
-                log.warn("[TargetDbService] {} init failed: {}", t.getName(), e.getMessage());
-            }
-        }
-        return result.isEmpty() ? fallbackTargets() : result;
+        return List.of(new ActiveTarget(session.displayName(), session.url(), session.jdbc()));
     }
 
     public List<TargetDb> getTargets() {
-        List<TargetDb> configured = settings.targets();
-        return configured.isEmpty() ? props.getTargets() : configured;
+        DatabaseSettings db = settings.database();
+        TargetDb target = new TargetDb();
+        target.setName(db.displayName());
+        target.setUsername(db.username());
+        target.setPassword(db.password());
+        target.setEnabled(true);
+        String[] parts = parseUrl(db.url());
+        target.setHost(parts[0]);
+        target.setPort(Integer.parseInt(parts[1]));
+        target.setDbname(parts[2]);
+        return List.of(target);
     }
 
-    public List<ActiveTarget> getConfiguredTargets() {
-        return getActiveTargets();
-    }
+    public List<ActiveTarget> getConfiguredTargets() { return getActiveTargets(); }
 
-    private HikariDataSource buildDataSource(String url, String username, String password) {
-        HikariDataSource ds = new HikariDataSource();
-        ds.setJdbcUrl(url);
-        ds.setUsername(username);
-        ds.setPassword(password);
-        ds.setDriverClassName("org.postgresql.Driver");
-        ds.setMaximumPoolSize(3);
-        ds.setMinimumIdle(0);
-        ds.setConnectionTimeout(30000);
-        return ds;
-    }
-
-    private ActiveTarget cachedTarget(String name, String url, String username, String password) {
-        String key = url + "\n" + username + "\n" + password;
-        CachedTarget cached = targetCache.computeIfAbsent(key, ignored -> {
-            log.info("[TargetDbService] target DataSource created: {} ({})", name, url);
-            HikariDataSource dataSource = buildDataSource(url, username, password);
-            return new CachedTarget(dataSource, new JdbcTemplate(dataSource));
-        });
-        return new ActiveTarget(name, url, cached.jdbc());
-    }
-
-    public void evictStaleTargets() {
-        List<String> activeKeys = settings.targets().stream()
-                .filter(TargetDb::isEnabled)
-                .map(t -> t.jdbcUrl() + "\n" + t.getUsername() + "\n"
-                        + (t.getPassword() != null ? t.getPassword() : ""))
-                .toList();
-        targetCache.entrySet().removeIf(e -> {
-            if (!activeKeys.contains(e.getKey())) {
-                e.getValue().dataSource().close();
-                log.info("[TargetDbService] stale DataSource closed");
-                return true;
-            }
-            return false;
-        });
-    }
-
-    private List<ActiveTarget> fallbackTargets() {
-        return List.of(new ActiveTarget("default DB", primaryUrl, primaryJdbc));
+    public synchronized void evictStaleTargets() {
+        closeSession();
+        connectionService.refresh();
     }
 
     @Override
-    public void destroy() {
-        targetCache.values().forEach(cached -> cached.dataSource().close());
-        targetCache.clear();
+    public synchronized void destroy() {
+        closeSession();
+        connectionService.destroy();
     }
 
-    private record CachedTarget(HikariDataSource dataSource, JdbcTemplate jdbc) {
+    private void closeSession() {
+        if (session != null) session.close();
+        session = null;
+        sessionFingerprint = null;
+    }
+
+    private String configuredFingerprint(DatabaseSettings db) {
+        return db.url() + "\n" + db.username() + "\n" + db.password();
+    }
+
+    private String[] parseUrl(String url) {
+        String clean = url == null ? "" : url.replaceFirst("^jdbc:postgresql://", "");
+        int slash = clean.indexOf('/');
+        if (slash < 0) return new String[]{clean, "5432", ""};
+        String hostPort = clean.substring(0, slash);
+        String database = clean.substring(slash + 1);
+        int query = database.indexOf('?');
+        if (query >= 0) database = database.substring(0, query);
+        int colon = hostPort.lastIndexOf(':');
+        if (colon > 0 && colon < hostPort.length() - 1) {
+            return new String[]{hostPort.substring(0, colon), hostPort.substring(colon + 1), database};
+        }
+        return new String[]{hostPort, "5432", database};
     }
 
     public record ActiveTarget(String name, String url, JdbcTemplate jdbc) {

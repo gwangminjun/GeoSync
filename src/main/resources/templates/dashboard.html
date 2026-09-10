@@ -549,16 +549,15 @@
             list.innerHTML = '<div style="color:#e88a82;font-size:13px;">설정된 DB가 없습니다.</div>';
             return;
           }
-          targets.forEach(function(t) {
+          var t = targets[0];
+          if (t) {
             var wrapper = document.createElement('div');
             wrapper.style.cssText = 'border:1px solid #2e3640;border-radius:8px;background:#141820;overflow:hidden;';
 
-            var labelRow = document.createElement('label');
-            labelRow.style.cssText = 'display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer;';
+            var labelRow = document.createElement('div');
+            labelRow.style.cssText = 'display:flex;align-items:center;gap:10px;padding:10px 12px;';
             labelRow.innerHTML =
-              '<input type="checkbox" name="targetIdx" value="' + t.idx + '" checked ' +
-                'style="width:15px;height:15px;accent-color:#0e9b94;cursor:pointer;flex-shrink:0;" ' +
-                'onchange="onTargetCheck(this)">' +
+              '<input type="hidden" name="targetIdx" value="0">' +
               '<div style="flex:1;min-width:0;">' +
                 '<div style="font-size:13px;font-weight:600;color:#e7eaee;">' + escapeHtml(t.name) + '</div>' +
                 '<div style="font-size:11.5px;color:#69707b;font-family:monospace;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml(t.url) + '</div>' +
@@ -577,8 +576,8 @@
             wrapper.appendChild(labelRow);
             wrapper.appendChild(schemaRow);
             list.appendChild(wrapper);
-            fetchSchemas(t.idx, _defaultSchema);
-          });
+            fetchSchemas(0, _defaultSchema);
+          }
         })
         .catch(function() {
           document.getElementById('targetList').innerHTML =
@@ -908,18 +907,17 @@
             list.innerHTML = '<div style="color:#e88a82;font-size:13px;">설정된 DB가 없습니다.</div>';
             return;
           }
-          targets.forEach(function(t) {
-            var row = document.createElement('label');
-            row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid #2e3640;border-radius:8px;background:#141820;cursor:pointer;';
+          var t = targets[0];
+          if (t) {
+            var row = document.createElement('div');
+            row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid #2e3640;border-radius:8px;background:#141820;';
             row.innerHTML =
-              '<input type="checkbox" name="mockTargetIdx" value="' + t.idx + '" checked ' +
-                'style="width:15px;height:15px;accent-color:#c08a2a;cursor:pointer;flex-shrink:0;">' +
               '<div style="flex:1;min-width:0;">' +
                 '<div style="font-size:13px;font-weight:600;color:#e7eaee;">' + escapeHtml(t.name) + '</div>' +
                 '<div style="font-size:11.5px;color:#69707b;font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:2px;">' + escapeHtml(t.url) + '</div>' +
               '</div>';
             list.appendChild(row);
-          });
+          }
         })
         .catch(function() {
           list.innerHTML = '<div style="color:#e88a82;font-size:13px;">DB 목록을 불러오지 못했습니다.</div>';
@@ -931,9 +929,8 @@
       var btn = document.getElementById('mockRunBtn');
       var resultEl = document.getElementById('mockResult');
 
-      var checkedBoxes = document.querySelectorAll('input[name="mockTargetIdx"]:checked');
       var params = new URLSearchParams();
-      checkedBoxes.forEach(function(cb) { params.append('targetIdx', cb.value); });
+      params.append('targetIdx', '0');
       params.append('schema', schema);
 
       btn.disabled = true;
