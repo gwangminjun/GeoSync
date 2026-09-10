@@ -3,6 +3,7 @@ package geomex.sync.kras;
 import geomex.sync.synchronization.SyncStatusService;
 import geomex.sync.database.TargetTableNameService;
 import geomex.sync.database.TargetDbService;
+import geomex.sync.database.DatabaseChangedEvent;
 
 import geomex.sync.settings.RuntimeSettingsService;
 
@@ -12,6 +13,7 @@ import geomex.sync.database.TargetDbService.ActiveTarget;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.context.event.EventListener;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -68,6 +70,11 @@ public class KrasCatalogStatusService {
                         "lsmd_cont_ldreg.*", SHP_SET, 1, lastSuccess,
                         "lp_pa_cbnd", false));
         return statuses;
+    }
+
+    @EventListener
+    public void onDatabaseChanged(DatabaseChangedEvent event) {
+        dbStatusCache.clear();
     }
 
     private CatalogFileStatus usezoneSummaryStatus(Map<String, FileGroup> groups, LocalDateTime lastSuccess) {

@@ -45,10 +45,8 @@ public class OdsController {
     @ResponseBody
     public Map<String, Object> getSchemas(@RequestParam(defaultValue = "0") int idx) {
         List<TargetDbService.ActiveTarget> targets = targetDbService.getConfiguredTargets();
-        if (idx < 0 || idx >= targets.size()) {
-            return Map.of("error", "대상 DB를 찾을 수 없습니다");
-        }
-        JdbcTemplate jdbc = targets.get(idx).jdbc();
+        if (targets.isEmpty()) return Map.of("error", "DB가 준비되지 않았습니다");
+        JdbcTemplate jdbc = targets.get(0).jdbc();
         try {
             List<String> schemas = jdbc.queryForList(
                 "SELECT schema_name FROM information_schema.schemata " +
@@ -72,10 +70,8 @@ public class OdsController {
             return Map.of("error", "유효하지 않은 스키마명");
         }
         List<TargetDbService.ActiveTarget> targets = targetDbService.getConfiguredTargets();
-        if (idx < 0 || idx >= targets.size()) {
-            return Map.of("error", "대상 DB를 찾을 수 없습니다");
-        }
-        JdbcTemplate jdbc = targets.get(idx).jdbc();
+        if (targets.isEmpty()) return Map.of("error", "DB가 준비되지 않았습니다");
+        JdbcTemplate jdbc = targets.get(0).jdbc();
 
         try {
             List<String> tableNames = jdbc.queryForList(
@@ -119,10 +115,8 @@ public class OdsController {
         }
 
         List<TargetDbService.ActiveTarget> targets = targetDbService.getConfiguredTargets();
-        if (idx < 0 || idx >= targets.size()) {
-            return Map.of("error", "대상 DB를 찾을 수 없습니다");
-        }
-        JdbcTemplate jdbc = targets.get(idx).jdbc();
+        if (targets.isEmpty()) return Map.of("error", "DB가 준비되지 않았습니다");
+        JdbcTemplate jdbc = targets.get(0).jdbc();
 
         int pageSize = 20;
         int offset = page * pageSize;

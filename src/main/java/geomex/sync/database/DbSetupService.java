@@ -79,10 +79,9 @@ public class DbSetupService {
 
     public CreateResult createTable(int targetIdx, String tableName) {
         List<ActiveTarget> targets = targetDbService.getActiveTargets();
-        if (targetIdx < 0 || targetIdx >= targets.size())
-            return new CreateResult(false, "잘못된 대상 DB 인덱스: " + targetIdx);
+        if (targets.isEmpty()) return new CreateResult(false, "DB가 준비되지 않았습니다");
 
-        ActiveTarget t = targets.get(targetIdx);
+        ActiveTarget t = targets.get(0);
         String odsSchema = settings.odsSchema();
         try {
             switch (tableName) {
@@ -94,7 +93,7 @@ public class DbSetupService {
             }
             return new CreateResult(true, "[" + t.name() + "] " + tableName + " 생성 완료");
         } catch (Exception e) {
-            log.warn("[DbSetup] 테이블 생성 실패 ({}, idx={}): {}", tableName, targetIdx, e.getMessage());
+            log.warn("[DbSetup] 테이블 생성 실패 (단일 DB, 요청 idx={}): {}", tableName, targetIdx, e.getMessage());
             return new CreateResult(false, e.getMessage());
         }
     }

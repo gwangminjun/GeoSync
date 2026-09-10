@@ -238,14 +238,12 @@ public class KrasWorker {
 
     private List<TargetWithSchema> buildTargetsWithSchema(
             List<TargetDbService.ActiveTarget> all, List<Integer> indices, Map<Integer, String> schemaMap) {
-        List<TargetWithSchema> result = new ArrayList<>();
-        for (int i = 0; i < all.size(); i++) {
-            if (indices == null || indices.contains(i)) {
-                String schema = schemaMap != null ? schemaMap.get(i) : null;
-                result.add(new TargetWithSchema(all.get(i), schema));
-            }
+        if (all.isEmpty()) return List.of();
+        String schema = schemaMap == null ? null : schemaMap.get(0);
+        if (schema == null && schemaMap != null && !schemaMap.isEmpty()) {
+            schema = schemaMap.values().iterator().next();
         }
-        return result;
+        return List.of(new TargetWithSchema(all.get(0), schema));
     }
 
 
@@ -292,16 +290,13 @@ public class KrasWorker {
             log.warn("[KRAS] 활성 대상 DB 없음 — {} 저장 건너뜀", def.tgtTableName);
             return 0;
         }
-        int saved = 0;
-        for (TargetWithSchema ts : targets) {
-            log.info("[KRAS] loading {} into target {} (schema={}, rows={})",
-                    def.tgtTableName, ts.target().label(),
-                    ts.schema() != null ? ts.schema() : "default", rows.size());
-            saved = odsRepository.replaceAllTo(ts.target().jdbc(), def, settings.orgCode(),
-                    sourceEpsg(def), coordTransformer.getStorageEpsg(), rows, ts.schema(), "KRAS_LOAD",
-                    tableAlreadyCreated);
-        }
-        return saved;
+        TargetWithSchema ts = targets.get(0);
+        log.info("[KRAS] loading {} into target {} (schema={}, rows={})",
+                def.tgtTableName, ts.target().label(),
+                ts.schema() != null ? ts.schema() : "default", rows.size());
+        return odsRepository.replaceAllTo(ts.target().jdbc(), def, settings.orgCode(),
+                sourceEpsg(def), coordTransformer.getStorageEpsg(), rows, ts.schema(), "KRAS_LOAD",
+                tableAlreadyCreated);
     }
 
     /** 워크스페이스 SHP 파일 미리보기 */
@@ -337,17 +332,16 @@ public class KrasWorker {
         if (uzoneDef != null) {
             List<Map<String, Object>> mockRows = buildMockUzoneRows();
             deriveUsezoneFields(mockRows);
-            for (TargetWithSchema ts : selected) {
-                try {
-                    int saved = odsRepository.replaceAllTo(ts.target().jdbc(), uzoneDef,
-                            settings.orgCode(), KRAS_EPSG, storageEpsg,
-                            mockRows, safeSchema, null, false);
-                    results.add(Map.of("table", "lt_c_uzone", "source", "mock", "rows", mockRows.size(),
-                            "saved", saved, "target", ts.target().label()));
-                } catch (Exception e) {
-                    results.add(Map.of("table", "lt_c_uzone", "source", "mock",
-                            "error", e.getMessage(), "target", ts.target().label()));
-                }
+            TargetWithSchema ts = selected.get(0);
+            try {
+                int saved = odsRepository.replaceAllTo(ts.target().jdbc(), uzoneDef,
+                        settings.orgCode(), KRAS_EPSG, storageEpsg,
+                        mockRows, safeSchema, null, false);
+                results.add(Map.of("table", "lt_c_uzone", "source", "mock", "rows", mockRows.size(),
+                        "saved", saved, "target", ts.target().label()));
+            } catch (Exception e) {
+                results.add(Map.of("table", "lt_c_uzone", "source", "mock",
+                        "error", e.getMessage(), "target", ts.target().label()));
             }
         }
 
@@ -356,17 +350,16 @@ public class KrasWorker {
                 .filter(d -> tableBaseName(d.tgtTableName).equals("lp_pa_cbnd")).findFirst().orElse(null);
         if (cbndDef != null) {
             List<Map<String, Object>> shpRows = workspaceScanner.loadTable(cbndDef);
-            for (TargetWithSchema ts : selected) {
-                try {
-                    int saved = odsRepository.replaceAllTo(ts.target().jdbc(), cbndDef,
-                            settings.orgCode(), KRAS_EPSG, storageEpsg,
-                            shpRows, safeSchema, null, false);
-                    results.add(Map.of("table", "lp_pa_cbnd", "source", "SHP", "rows", shpRows.size(),
-                            "saved", saved, "target", ts.target().label()));
-                } catch (Exception e) {
-                    results.add(Map.of("table", "lp_pa_cbnd", "source", "SHP",
-                            "error", e.getMessage(), "target", ts.target().label()));
-                }
+            TargetWithSchema ts = selected.get(0);
+            try {
+                int saved = odsRepository.replaceAllTo(ts.target().jdbc(), cbndDef,
+                        settings.orgCode(), KRAS_EPSG, storageEpsg,
+                        shpRows, safeSchema, null, false);
+                results.add(Map.of("table", "lp_pa_cbnd", "source", "SHP", "rows", shpRows.size(),
+                        "saved", saved, "target", ts.target().label()));
+            } catch (Exception e) {
+                results.add(Map.of("table", "lp_pa_cbnd", "source", "SHP",
+                        "error", e.getMessage(), "target", ts.target().label()));
             }
         }
 
@@ -553,15 +546,12 @@ public class KrasWorker {
             return 0;
         }
 
-        int saved = 0;
-        for (TargetWithSchema ts : targets) {
-            log.info("[KRAS] {} → {} 적재 (schema={}, rows={})",
-                    def.tgtTableName, ts.target().label(),
-                    ts.schema() != null ? ts.schema() : "default", rows.size());
-            saved = odsRepository.replaceAllTo(ts.target().jdbc(), def, settings.orgCode(),
-                    sourceEpsg(def), coordTransformer.getStorageEpsg(), rows, ts.schema(), "KRAS_LOAD", false);
-        }
-        return saved;
+        TargetWithSchema ts = targets.get(0);
+        log.info("[KRAS] {} → {} 적재 (schema={}, rows={})",
+                def.tgtTableName, ts.target().label(),
+                ts.schema() != null ? ts.schema() : "default", rows.size());
+        return odsRepository.replaceAllTo(ts.target().jdbc(), def, settings.orgCode(),
+                sourceEpsg(def), coordTransformer.getStorageEpsg(), rows, ts.schema(), "KRAS_LOAD", false);
     }
 
     // ──────────────────────────────────────────────────────────────────
@@ -668,13 +658,10 @@ public class KrasWorker {
             log.warn("[KRAS] 활성 대상 DB 없음 — {} 저장 건너뜀", def.tgtTableName);
             return 0;
         }
-        int saved = 0;
-        for (TargetDbService.ActiveTarget target : targets) {
-            log.info("[KRAS] loading {} into target {}", def.tgtTableName, target.label());
-            saved = odsRepository.replaceAllTo(target.jdbc(), def, settings.orgCode(),
-                    sourceEpsg(def), coordTransformer.getStorageEpsg(), rows, settings.odsSchema(), "KRAS");
-        }
-        return saved;
+        TargetDbService.ActiveTarget target = targets.get(0);
+        log.info("[KRAS] loading {} into target {}", def.tgtTableName, target.label());
+        return odsRepository.replaceAllTo(target.jdbc(), def, settings.orgCode(),
+                sourceEpsg(def), coordTransformer.getStorageEpsg(), rows, settings.odsSchema(), "KRAS");
     }
 
     private List<String> fetchAvailableUsezoneLayers() {

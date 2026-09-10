@@ -2,6 +2,7 @@ package geomex.sync.gateway;
 
 import geomex.sync.settings.RuntimeSettingsService;
 import geomex.sync.database.TargetDbService;
+import geomex.sync.database.DatabaseChangedEvent;
 
 import geomex.sync.database.TargetDbService.ActiveTarget;
 import geomex.sync.common.xml.XmlUtil;
@@ -107,6 +108,12 @@ public class ConnRequestLogService implements DisposableBean {
         } catch (Exception e) {
             log.error("[ConnLog] 테이블 초기화 실패: {}", e.getMessage());
         }
+    }
+
+    @EventListener
+    public void onDatabaseChanged(DatabaseChangedEvent event) {
+        ready = false;
+        init();
     }
 
     /**

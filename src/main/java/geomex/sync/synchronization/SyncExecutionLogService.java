@@ -1,9 +1,9 @@
 package geomex.sync.synchronization;
 
 import geomex.sync.settings.RuntimeSettingsService;
-import geomex.sync.database.TargetDbService;
-
-import geomex.sync.database.TargetDbService.ActiveTarget;
+import geomex.sync.database.DatabaseChangedEvent;
+import geomex.sync.database.DatabaseConnectionService;
+import geomex.sync.database.DatabaseSession;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
@@ -15,24 +15,20 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 public class SyncExecutionLogService {
 
     private static final Logger log = LoggerFactory.getLogger(SyncExecutionLogService.class);
 
-    private final TargetDbService targetDbService;
+    private final DatabaseConnectionService connectionService;
     private final RuntimeSettingsService settings;
+    private final Map<Long, DatabaseSession> operationSessions = new ConcurrentHashMap<>();
 
-    public SyncExecutionLogService(TargetDbService targetDbService, RuntimeSettingsService settings) {
-        this.targetDbService = targetDbService;
+    public SyncExecutionLogService(DatabaseConnectionService connectionService, RuntimeSettingsService settings) {
+        this.connectionService = connectionService;
         this.settings = settings;
-    }
-
-    /** 첫 번째 활성 타겟 JdbcTemplate — 없으면 null */
-    private JdbcTemplate jdbc() {
-        List<ActiveTarget> targets = targetDbService.getActiveTargets();
-        return targets.isEmpty() ? null : targets.get(0).jdbc();
     }
 
     private String logTable() {
@@ -41,13 +37,9 @@ public class SyncExecutionLogService {
 
     @EventListener(ApplicationReadyEvent.class)
     public void init() {
-        JdbcTemplate jdbc = jdbc();
-        if (jdbc == null) {
-            log.warn("[SyncLog] 활성 타겟 DB 없음 — 실행 로그 테이블 생성 건너뜀");
-            return;
-        }
-        String schema = settings.odsSchema();
-        try {
+        try (DatabaseSession session = connectionService.acquire()) {
+            JdbcTemplate jdbc = session.jdbc();
+            String schema = settings.odsSchema();
             jdbc.execute("CREATE SCHEMA IF NOT EXISTS \"" + schema + "\"");
             jdbc.execute("""
                 CREATE TABLE IF NOT EXISTS "%s".sync_execution_log (
@@ -73,16 +65,28 @@ public class SyncExecutionLogService {
         }
     }
 
+    @EventListener
+    public void onDatabaseChanged(DatabaseChangedEvent event) {
+        init();
+    }
+
     public Long start(String type, String triggeredBy, String schedule) {
-        JdbcTemplate jdbc = jdbc();
-        if (jdbc == null) return null;
+        DatabaseSession session;
         try {
-            return jdbc.queryForObject(
+            session = connectionService.acquire();
+        } catch (Exception e) {
+            return null;
+        }
+        try {
+            Long id = session.jdbc().queryForObject(
                     "INSERT INTO " + logTable() +
                     " (type, triggered, status, started_at, org_code, schedule)" +
                     " VALUES (?, ?, 'RUNNING', NOW(), ?, ?) RETURNING id",
                     Long.class, type, triggeredBy, settings.orgCode(), schedule);
+            operationSessions.put(id, session);
+            return id;
         } catch (Exception e) {
+            session.close();
             log.warn("[SyncLog] start 기록 실패: {}", e.getMessage());
             return null;
         }
@@ -90,10 +94,13 @@ public class SyncExecutionLogService {
 
     public void finish(Long id, int rowsOk, int rowsErr, boolean failed, String errorMsg) {
         if (id == null) return;
-        JdbcTemplate jdbc = jdbc();
-        if (jdbc == null) return;
+        DatabaseSession session = operationSessions.remove(id);
+        if (session == null) {
+            try { session = connectionService.acquire(); }
+            catch (Exception e) { return; }
+        }
         try {
-            jdbc.update(
+            session.jdbc().update(
                     "UPDATE " + logTable() +
                     " SET status=?, ended_at=NOW()," +
                     "     duration_s=EXTRACT(EPOCH FROM (NOW() - started_at))::INTEGER," +
@@ -102,14 +109,15 @@ public class SyncExecutionLogService {
                     failed ? "FAILED" : "SUCCESS", rowsOk, rowsErr, errorMsg, id);
         } catch (Exception e) {
             log.warn("[SyncLog] finish 기록 실패: {}", e.getMessage());
+        } finally {
+            session.close();
         }
     }
 
     public boolean tableExists() {
-        JdbcTemplate jdbc = jdbc();
-        if (jdbc == null) return false;
         String schema = settings.odsSchema();
-        try {
+        try (DatabaseSession session = connectionService.acquire()) {
+            JdbcTemplate jdbc = session.jdbc();
             Boolean r = jdbc.queryForObject(
                 "SELECT EXISTS (SELECT 1 FROM pg_catalog.pg_tables WHERE schemaname=? AND tablename='sync_execution_log')",
                 Boolean.class, schema);
@@ -121,8 +129,8 @@ public class SyncExecutionLogService {
     }
 
     public Map<String, Object> getStats(String period) {
-        JdbcTemplate jdbc = jdbc();
-        if (jdbc == null) return Collections.emptyMap();
+        try (DatabaseSession session = connectionService.acquire()) {
+            JdbcTemplate jdbc = session.jdbc();
         String where = switch (period) {
             case "today" -> "started_at >= CURRENT_DATE";
             case "7d"    -> "started_at >= NOW() - INTERVAL '7 days'";
@@ -162,12 +170,12 @@ public class SyncExecutionLogService {
             log.warn("[SyncLog] getStats 조회 실패: {}", e.getMessage());
             return Collections.emptyMap();
         }
+        }
     }
 
     public List<Map<String, Object>> recent(int limit) {
-        JdbcTemplate jdbc = jdbc();
-        if (jdbc == null) return Collections.emptyList();
-        try {
+        try (DatabaseSession session = connectionService.acquire()) {
+            JdbcTemplate jdbc = session.jdbc();
             return jdbc.queryForList(
                     "SELECT id, type, triggered, status, started_at, ended_at," +
                     "       duration_s, rows_ok, rows_err, error_msg, org_code, schedule" +

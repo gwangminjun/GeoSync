@@ -55,8 +55,6 @@ sync:
   org-code: ${SYNC_ORG_CODE:46870}
   enabled: ${SYNC_ENABLED:true}
 
-targets: []
-
 logging:
   charset:
     console: UTF-8
