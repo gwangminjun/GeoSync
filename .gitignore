@@ -20,3 +20,4 @@ workspace/kras/**/*.gmx_err
 workspace/kras/**/*.json
 .idea/
 *.iml
+.worktrees/
