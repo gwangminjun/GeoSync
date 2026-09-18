@@ -2,14 +2,14 @@
 
 ## Project Structure & Module Organization
 
-This is a Java 17 Spring Boot application for GEOMEX data synchronization. Main code lives under `src/main/java/geomex/sync`, organized by responsibility: `config`, `geo`, `mapper`, `model`, `repository`, `scheduler`, `service`, `web`, and `worker`. Thymeleaf templates are in `src/main/resources/templates`, static CSS is in `src/main/resources/static/css`, and runtime configuration is in `src/main/resources/application.yml`.
+This is a Java 17 Spring Boot application for GEOSYNC data synchronization. Main code lives under `src/main/java/geosync`, organized by responsibility: `config`, `geo`, `mapper`, `model`, `repository`, `scheduler`, `service`, `web`, and `worker`. Thymeleaf templates are in `src/main/resources/templates`, static CSS is in `src/main/resources/static/css`, and runtime configuration is in `src/main/resources/application.yml`.
 
 Repository-level configuration and deployment assets are separate from application code. Sync table XML and SQL scripts are under `conf/`, Windows service helpers are under `scripts/`, and packaged NSSM/runtime artifacts belong in `bin/` or generated `build/` output. Tests are under `src/test/java`.
 
 ## Build, Test, and Development Commands
 
 - `gradlew.bat test` runs the JUnit 5 test suite.
-- `gradlew.bat bootJar` builds `build/libs/geomex-sync.jar`.
+- `gradlew.bat bootJar` builds `build/libs/geosync.jar`.
 - `gradlew.bat jlinkZip` creates the distributable ZIP with the minimal JRE, scripts, `conf/`, and service assets.
 - `gradlew.bat bootRun` starts the Spring Boot app locally using the current configuration.
 
@@ -17,7 +17,7 @@ Run commands from the repository root. `jlinkZip` expects either `jdk/` in this 
 
 ## Coding Style & Naming Conventions
 
-Use standard Java conventions: 4-space indentation, PascalCase class names, camelCase methods and fields, and package names under `geomex.sync`. Keep controllers, services, workers, and configuration classes in their existing package boundaries. Prefer constructor injection or established Spring patterns when adding dependencies.
+Use standard Java conventions: 4-space indentation, PascalCase class names, camelCase methods and fields, and package names under `geosync`. Keep controllers, services, workers, and configuration classes in their existing package boundaries. Prefer constructor injection or established Spring patterns when adding dependencies.
 
 Configuration files should keep environment-specific values in YAML or `conf/` assets, not hard-coded in Java. Avoid committing generated files from `build/`, `logs/`, `.gradle/`, or `workspace/`.
 

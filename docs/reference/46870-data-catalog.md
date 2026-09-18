@@ -2,7 +2,7 @@
 
 > 작성일: 2026-06-23  
 > 기관코드: `46870` (완도군)  
-> 목적: 기존 geomex-sync2.jar 엔진이 생성한 중간 작업 파일 분류 및 신규 프로젝트 연계 정보
+> 목적: 기존 geosync2.jar 엔진이 생성한 중간 작업 파일 분류 및 신규 프로젝트 연계 정보
 
 ---
 
@@ -22,7 +22,7 @@ workspace/kras/46870/
 | 종류 | 파일 패턴 | 생성 주체 | 역할 |
 |------|-----------|-----------|------|
 | **KRAS 수신 원본** | `lsmd_cont_u*.shp` | KRAS estateGateway | 용도지역지구 레이어별 경계 SHP |
-| **엔진 중간 산출물** | `ods.*` | geomex-sync2.jar 내부 | PostgreSQL 적재 전 캐시/검증용 |
+| **엔진 중간 산출물** | `ods.*` | geosync2.jar 내부 | PostgreSQL 적재 전 캐시/검증용 |
 
 ---
 
@@ -166,7 +166,7 @@ workspace/kras/46870/
 
 ## 3. 엔진 중간 산출물 (ods.*)
 
-기존 `geomex-sync2.jar`가 KRAS에서 수신한 데이터를 PostgreSQL에 적재하기 전 내부적으로 생성하는 캐시/검증 파일이다. 신규 프로젝트에서는 생성하지 않는다.
+기존 `geosync2.jar`가 KRAS에서 수신한 데이터를 PostgreSQL에 적재하기 전 내부적으로 생성하는 캐시/검증 파일이다. 신규 프로젝트에서는 생성하지 않는다.
 
 ### `ods.lp_pa_cbnd.*`
 
@@ -192,7 +192,7 @@ workspace/kras/46870/
 
 | 항목 | 내용 |
 |------|------|
-| 형식 | GMX (geomex 내부 바이너리) |
+| 형식 | GMX (geosync 내부 바이너리) |
 | 소스 | 위 47개 `lsmd_cont_u*` SHP 파일 통합 |
 | 내용 | 용도지역지구 전체 통합 MULTIPOLYGON |
 | 주요 컬럼 | `org_cd`(5), `ulyr`(5), `ucode`(6), `uname`(100), geometry |
@@ -215,7 +215,7 @@ workspace/kras/46870/
 
 ## 4. GMX 파일 형식 (참고)
 
-`.gmx` / `.gmx_err` 는 기존 엔진(`geomex-sync2.jar`) 고유의 바이너리 포맷이다.
+`.gmx` / `.gmx_err` 는 기존 엔진(`geosync2.jar`) 고유의 바이너리 포맷이다.
 
 - 헤더에 레이어명, 대상 테이블명, 컬럼 정의 포함
 - 공간 데이터는 IEEE 754 배정밀도 좌표 스트림으로 직렬화

@@ -21,3 +21,4 @@ workspace/kras/**/*.json
 .idea/
 *.iml
 .worktrees/
+out/

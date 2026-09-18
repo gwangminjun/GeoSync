@@ -2,7 +2,7 @@
 
 ## 1. 목적
 
-GEOMEX 동기화 애플리케이션의 동작과 외부 계약을 유지하면서 저장소 루트와 Java 패키지를 기능 중심으로 재편한다. 이 작업은 필요한 파일을 찾기 쉽게 만들고, 각 기능의 관련 코드를 가까이 배치하며, 이후의 책임 분리 작업을 위한 명확한 경계를 제공한다.
+GEOSYNC 동기화 애플리케이션의 동작과 외부 계약을 유지하면서 저장소 루트와 Java 패키지를 기능 중심으로 재편한다. 이 작업은 필요한 파일을 찾기 쉽게 만들고, 각 기능의 관련 코드를 가까이 배치하며, 이후의 책임 분리 작업을 위한 명확한 경계를 제공한다.
 
 이번 변경은 구조 리팩터링이다. 클래스 책임 분리, 기능 추가, 알려진 버그 수정, 설정 체계 변경은 범위에 포함하지 않는다.
 
@@ -19,7 +19,7 @@ GEOMEX 동기화 애플리케이션의 동작과 외부 계약을 유지하면�
 - Windows 서비스 설치·실행·제거 스크립트의 사용 방식
 - 배포 ZIP 내부의 `bin`, `conf`, `jre`, `lib`, `workspace` 구조
 
-외부 시스템이 Java 클래스의 완전한 클래스명(FQCN)을 직접 참조하지 않으므로 `geomex.sync` 아래의 패키지명은 변경할 수 있다.
+외부 시스템이 Java 클래스의 완전한 클래스명(FQCN)을 직접 참조하지 않으므로 `geosync` 아래의 패키지명은 변경할 수 있다.
 
 ## 3. 현재 구조 분석
 
@@ -40,10 +40,10 @@ GEOMEX 동기화 애플리케이션의 동작과 외부 계약을 유지하면�
 
 ## 4. 목표 Java 패키지 구조
 
-`SyncApplication`은 Spring 컴포넌트 스캔의 루트로 `geomex.sync`에 유지한다.
+`SyncApplication`은 Spring 컴포넌트 스캔의 루트로 `geosync`에 유지한다.
 
 ```text
-src/main/java/geomex/sync/
+src/main/java/geosync/
 ├─ SyncApplication.java
 ├─ configuration/
 │  ├─ DatabaseConfig.java
@@ -135,7 +135,7 @@ repository/
 │  ├─ reference/
 │  │  ├─ 46870-data-catalog.md
 │  │  ├─ lt-c-uzone-plan.md
-│  │  └─ kras-geomex-sync-structure.md
+│  │  └─ kras-geosync-structure.md
 │  ├─ reviews/
 │  │  └─ improvements.md
 │  └─ superpowers/
@@ -164,7 +164,7 @@ repository/
 |---|---|
 | `46870_DATA_CATALOG.md` | `docs/reference/46870-data-catalog.md` |
 | `lt_c_uzone_plan.txt` | `docs/reference/lt-c-uzone-plan.md` |
-| `mock/KRAS_GEOMEX_SYNC_STRUCTURE.md` | `docs/reference/kras-geomex-sync-structure.md` |
+| `mock/KRAS_GEOSYNC_SYNC_STRUCTURE.md` | `docs/reference/kras-geosync-structure.md` |
 | `IMPROVEMENTS.md` | `docs/reviews/improvements.md` |
 
 텍스트 형식인 `lt_c_uzone_plan.txt`는 내용 변경 없이 Markdown 확장자로 옮긴다. 이동된 문서나 코드에서 기존 경로를 참조하면 새 경로로 갱신한다. `mock/`의 데이터 파일은 이동하지 않는다.

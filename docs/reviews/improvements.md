@@ -1,4 +1,4 @@
-# geomex-sync 기능 점검 및 개선사항
+# geosync 기능 점검 및 개선사항
 
 > 점검일: 2026-06-25  
 > 대상 기능: lt_c_uzone (KRAS API) / lp_pa_cbnd (SHP) 동기화, 스케줄링, 설정 관리

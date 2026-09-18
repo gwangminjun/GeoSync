@@ -16,7 +16,7 @@ if !errorlevel! == 0 (
 
 echo Installing service...
 "%SYNC_HOME%\bin\nssm.exe" install GeoSyncService "%SYNC_HOME%\jre\bin\java.exe"
-"%SYNC_HOME%\bin\nssm.exe" set GeoSyncService AppParameters "-Djava.library.path=%SYNC_HOME%\lib -jar %SYNC_HOME%\lib\geomex-sync.jar --spring.config.location=file:%SYNC_HOME%\conf\application.yml"
+"%SYNC_HOME%\bin\nssm.exe" set GeoSyncService AppParameters "-Djava.library.path=%SYNC_HOME%\lib -jar %SYNC_HOME%\lib\geosync.jar --spring.config.location=file:%SYNC_HOME%\conf\application.yml"
 "%SYNC_HOME%\bin\nssm.exe" set GeoSyncService AppDirectory "%SYNC_HOME%"
 "%SYNC_HOME%\bin\nssm.exe" set GeoSyncService DisplayName "GeoSync Spatial Data Service"
 "%SYNC_HOME%\bin\nssm.exe" set GeoSyncService Description "KRAS/KAIS Sync Service"

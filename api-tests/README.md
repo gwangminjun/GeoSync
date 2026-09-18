@@ -8,7 +8,7 @@
 
 - `gatewayBaseUrl`: `http://110.20.1.12:8385`
 - `krasBaseUrl`: 로컬 또는 배포된 `kras` 웹앱 주소
-- `connSysId`: `GEOMEX-SYNC-HOME/conf/sync.properties`의 `kras.conn_sys_id`
+- `connSysId`: `GEOSYNC-SYNC-HOME/conf/sync.properties`의 `kras.conn_sys_id`
 - `admSecCd`: 현재 설정 기준 `46870`
 - `gpkiId`: 현재 운영 로그 기준 `null`
 - `pnu`: 테스트 PNU

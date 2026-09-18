@@ -1,6 +1,6 @@
 {
   "info": {
-    "name": "KRAS / GEOMEX Sync API Tests",
+    "name": "KRAS / GEOSYNC Sync API Tests",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
     "description": "Existing-code based KRAS API test collection. Set variables before running."
   },

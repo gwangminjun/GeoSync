@@ -4,7 +4,7 @@
 
 **Goal:** Preserve every external runtime contract while reorganizing Java code by feature and moving loose reference documents under `docs/`.
 
-**Architecture:** Keep `geomex.sync.SyncApplication` as the component-scan root and relocate existing classes into feature-owned packages without changing their implementation. Add characterization and architecture tests before each move so endpoint mappings, operational paths, and target package placement remain executable contracts.
+**Architecture:** Keep `geosync.SyncApplication` as the component-scan root and relocate existing classes into feature-owned packages without changing their implementation. Add characterization and architecture tests before each move so endpoint mappings, operational paths, and target package placement remain executable contracts.
 
 **Tech Stack:** Java 17, Spring Boot 3.3.5, Spring MVC, Gradle, JUnit Jupiter, AssertJ, ArchUnit 1.3.0
 
@@ -26,9 +26,9 @@
 
 ### New test files
 
-- `src/test/java/geomex/sync/architecture/EndpointContractTest.java`: snapshots Spring MVC route and parameter annotations independently of package names.
-- `src/test/java/geomex/sync/architecture/PackageArchitectureTest.java`: asserts the approved destination of every production class and the small set of dependency/access rules.
-- `src/test/java/geomex/sync/architecture/RepositoryLayoutTest.java`: protects operational paths and the final documentation layout.
+- `src/test/java/geosync/architecture/EndpointContractTest.java`: snapshots Spring MVC route and parameter annotations independently of package names.
+- `src/test/java/geosync/architecture/PackageArchitectureTest.java`: asserts the approved destination of every production class and the small set of dependency/access rules.
+- `src/test/java/geosync/architecture/RepositoryLayoutTest.java`: protects operational paths and the final documentation layout.
 - `src/test/resources/contracts/http-endpoints.txt`: reviewed, deterministic endpoint-contract snapshot captured before package moves.
 
 ### Build file
@@ -67,7 +67,7 @@
 
 - `46870_DATA_CATALOG.md` → `docs/reference/46870-data-catalog.md`
 - `lt_c_uzone_plan.txt` → `docs/reference/lt-c-uzone-plan.md`
-- `mock/KRAS_GEOMEX_SYNC_STRUCTURE.md` → `docs/reference/kras-geomex-sync-structure.md`
+- `mock/KRAS_GEOSYNC_SYNC_STRUCTURE.md` → `docs/reference/kras-geosync-structure.md`
 - `IMPROVEMENTS.md` → `docs/reviews/improvements.md`
 
 ---
@@ -76,7 +76,7 @@
 
 **Files:**
 
-- Create: `src/test/java/geomex/sync/architecture/EndpointContractTest.java`
+- Create: `src/test/java/geosync/architecture/EndpointContractTest.java`
 - Modify: `build.gradle`
 
 **Interfaces:**
@@ -114,7 +114,7 @@ testImplementation 'com.tngtech.archunit:archunit-junit5:1.3.0'
 Create `EndpointContractTest` with:
 
 ```java
-package geomex.sync.architecture;
+package geosync.architecture;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.core.annotation.AnnotatedElementUtils;
@@ -131,20 +131,20 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class EndpointContractTest {
     private static final Class<?>[] CONTROLLERS = {
-        geomex.sync.web.ApiTestController.class,
-        geomex.sync.web.ApiTestProxyController.class,
-        geomex.sync.web.ConnStatsController.class,
-        geomex.sync.web.DashboardController.class,
-        geomex.sync.web.DbSetupController.class,
-        geomex.sync.web.FileDownloadController.class,
-        geomex.sync.web.KrasConnController.class,
-        geomex.sync.web.KrasGmxController.class,
-        geomex.sync.web.LogController.class,
-        geomex.sync.web.MockGatewayController.class,
-        geomex.sync.web.OdsController.class,
-        geomex.sync.web.ScheduleController.class,
-        geomex.sync.web.SettingsController.class,
-        geomex.sync.web.SyncController.class
+        geosync.web.ApiTestController.class,
+        geosync.web.ApiTestProxyController.class,
+        geosync.web.ConnStatsController.class,
+        geosync.web.DashboardController.class,
+        geosync.web.DbSetupController.class,
+        geosync.web.FileDownloadController.class,
+        geosync.web.KrasConnController.class,
+        geosync.web.KrasGmxController.class,
+        geosync.web.LogController.class,
+        geosync.web.MockGatewayController.class,
+        geosync.web.OdsController.class,
+        geosync.web.ScheduleController.class,
+        geosync.web.SettingsController.class,
+        geosync.web.SyncController.class
     };
 
     @Test
@@ -210,7 +210,7 @@ void printContractForInitialRecording() {
 
 - [ ] **Step 5: Run the endpoint contract test**
 
-Run: `.\gradlew.bat test --tests geomex.sync.architecture.EndpointContractTest`
+Run: `.\gradlew.bat test --tests geosync.architecture.EndpointContractTest`
 
 Expected: FAIL because `src/test/resources/contracts/http-endpoints.txt` does not exist, while the Gradle test report contains the sorted contract lines emitted by `printContractForInitialRecording`.
 
@@ -219,8 +219,8 @@ Expected: FAIL because `src/test/resources/contracts/http-endpoints.txt` does no
 Create `src/test/resources/contracts/http-endpoints.txt` from the emitted sorted lines, one contract per line. Remove `printContractForInitialRecording`, then compare the resource with:
 
 ```powershell
-rg -n '@(Get|Post|Put|Delete|Patch|Request)Mapping|@RequestParam|@PathVariable' src/main/java/geomex/sync/web
-.\gradlew.bat test --tests geomex.sync.architecture.EndpointContractTest
+rg -n '@(Get|Post|Put|Delete|Patch|Request)Mapping|@RequestParam|@PathVariable' src/main/java/geosync/web
+.\gradlew.bat test --tests geosync.architecture.EndpointContractTest
 ```
 
 Expected: every source mapping and bound parameter appears in the resource and the test succeeds. The resource is never regenerated during subsequent package moves.
@@ -235,21 +235,21 @@ Expected: only `build.gradle`, `EndpointContractTest.java`, and `http-endpoints.
 
 **Files:**
 
-- Create: `src/test/java/geomex/sync/architecture/PackageArchitectureTest.java`
+- Create: `src/test/java/geosync/architecture/PackageArchitectureTest.java`
 - Move: `CoordTransformer`, `XmlUtil`, and all four current `config` classes according to the File Map.
 - Modify: all production and test imports referring to those six classes.
 
 **Interfaces:**
 
 - Consumes: existing public class APIs unchanged.
-- Produces: `geomex.sync.common.geo`, `geomex.sync.common.xml`, and `geomex.sync.configuration` packages.
+- Produces: `geosync.common.geo`, `geosync.common.xml`, and `geosync.configuration` packages.
 
 - [ ] **Step 1: Write failing package placement rules**
 
 Create the test with explicit class-to-package assertions:
 
 ```java
-package geomex.sync.architecture;
+package geosync.architecture;
 
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
@@ -259,7 +259,7 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
 class PackageArchitectureTest {
-    private final JavaClasses classes = new ClassFileImporter().importPackages("geomex.sync");
+    private final JavaClasses classes = new ClassFileImporter().importPackages("geosync");
 
     @Test
     void commonAndConfigurationClassesAreFeatureOwned() {
@@ -284,20 +284,20 @@ class PackageArchitectureTest {
 
 - [ ] **Step 2: Verify the placement test fails**
 
-Run: `.\gradlew.bat test --tests geomex.sync.architecture.PackageArchitectureTest`
+Run: `.\gradlew.bat test --tests geosync.architecture.PackageArchitectureTest`
 
 Expected: FAIL because the six classes still reside in `geo`, `util`, and `config`.
 
 - [ ] **Step 3: Move the six source files and matching tests**
 
-Resolve and verify every source and destination is inside the repository, then use PowerShell `Move-Item -LiteralPath` for each file. Use `apply_patch` to change package declarations and imports. Move `CoordTransformerTest` to `src/test/java/geomex/sync/common/geo/CoordTransformerTest.java`.
+Resolve and verify every source and destination is inside the repository, then use PowerShell `Move-Item -LiteralPath` for each file. Use `apply_patch` to change package declarations and imports. Move `CoordTransformerTest` to `src/test/java/geosync/common/geo/CoordTransformerTest.java`.
 
 - [ ] **Step 4: Run focused and full tests**
 
 Run:
 
 ```powershell
-.\gradlew.bat test --tests geomex.sync.architecture.PackageArchitectureTest --tests geomex.sync.common.geo.CoordTransformerTest
+.\gradlew.bat test --tests geosync.architecture.PackageArchitectureTest --tests geosync.common.geo.CoordTransformerTest
 .\gradlew.bat test
 ```
 
@@ -325,7 +325,7 @@ Append rules using `haveSimpleNameMatching` so the two settings classes must res
 
 - [ ] **Step 2: Run the new rules and verify failure**
 
-Run: `.\gradlew.bat test --tests geomex.sync.architecture.PackageArchitectureTest`
+Run: `.\gradlew.bat test --tests geosync.architecture.PackageArchitectureTest`
 
 Expected: FAIL listing the six classes in their old packages.
 
@@ -335,7 +335,7 @@ Use verified `Move-Item -LiteralPath` operations, then `apply_patch` for declara
 
 - [ ] **Step 4: Run endpoint, architecture, and full tests**
 
-Run: `.\gradlew.bat test --tests 'geomex.sync.architecture.*'; .\gradlew.bat test`
+Run: `.\gradlew.bat test --tests 'geosync.architecture.*'; .\gradlew.bat test`
 
 Expected: both commands succeed.
 
@@ -348,7 +348,7 @@ Run: `git diff --check; git status --short`. Do not commit.
 **Files:**
 
 - Move: `OdsRepository`, `OdsTableDdl`, `OdsController`, `UsezoneCodeService` → `ods`.
-- Move tests: all current repository tests → `src/test/java/geomex/sync/ods/`.
+- Move tests: all current repository tests → `src/test/java/geosync/ods/`.
 - Modify: `PackageArchitectureTest` and affected imports.
 
 **Interfaces:** `OdsTableDdl` remains package-private beside `OdsRepository`; repository overloads and SQL remain unchanged.
@@ -366,8 +366,8 @@ Run the architecture test before moving and expect failure. Perform verified mov
 Run:
 
 ```powershell
-.\gradlew.bat test --tests 'geomex.sync.ods.*'
-.\gradlew.bat test --tests 'geomex.sync.architecture.*'
+.\gradlew.bat test --tests 'geosync.ods.*'
+.\gradlew.bat test --tests 'geosync.architecture.*'
 .\gradlew.bat test
 ```
 
@@ -382,7 +382,7 @@ Run: `git diff --check; git status --short`. Do not commit.
 **Files:**
 
 - Move the eleven KRAS classes listed in the File Map → `kras`.
-- Move: `KrasUzoneMockLoadTest` → `src/test/java/geomex/sync/kras/KrasUzoneMockLoadTest.java`.
+- Move: `KrasUzoneMockLoadTest` → `src/test/java/geosync/kras/KrasUzoneMockLoadTest.java`.
 - Modify: `PackageArchitectureTest` and all affected imports.
 
 **Interfaces:** Preserve KRAS API requests, file names, classpath resource paths, synchronization behavior, and `/file-download` plus `/mock/estateGateway` endpoints.
@@ -400,8 +400,8 @@ Do not alter constants, method bodies, annotations, XML paths, or file names.
 Run:
 
 ```powershell
-.\gradlew.bat test --tests 'geomex.sync.kras.*'
-.\gradlew.bat test --tests 'geomex.sync.architecture.*'
+.\gradlew.bat test --tests 'geosync.kras.*'
+.\gradlew.bat test --tests 'geosync.architecture.*'
 .\gradlew.bat test
 ```
 
@@ -430,7 +430,7 @@ Keep `GatewayPaths` with both gateway controllers. Do not edit endpoint or XML l
 
 - [ ] **Step 3: Run endpoint, architecture, and full tests**
 
-Run: `.\gradlew.bat test --tests 'geomex.sync.architecture.*'; .\gradlew.bat test`
+Run: `.\gradlew.bat test --tests 'geosync.architecture.*'; .\gradlew.bat test`
 
 Expected: both commands succeed.
 
@@ -444,7 +444,7 @@ Run: `git diff --check; git status --short`. Do not commit.
 
 - Move: `ColumnDef`, `SyncTableDef`, `SyncHistory` → `synchronization/model`.
 - Move: the eight synchronization classes listed in the File Map → `synchronization`.
-- Move: `TableMapperTest` → `src/test/java/geomex/sync/synchronization/TableMapperTest.java`.
+- Move: `TableMapperTest` → `src/test/java/geosync/synchronization/TableMapperTest.java`.
 - Modify: `PackageArchitectureTest` and all affected imports.
 
 **Interfaces:** Preserve all worker overloads, scheduler entry points, status keys, `/sync/**`, and `/schedule`.
@@ -462,8 +462,8 @@ Keep every constructor, overload, annotation, and method body unchanged.
 Run:
 
 ```powershell
-.\gradlew.bat test --tests geomex.sync.synchronization.TableMapperTest
-.\gradlew.bat test --tests 'geomex.sync.architecture.*'
+.\gradlew.bat test --tests geosync.synchronization.TableMapperTest
+.\gradlew.bat test --tests 'geosync.architecture.*'
 .\gradlew.bat test
 ```
 
@@ -490,10 +490,10 @@ Add exact placement assertions and:
 @Test
 void noProductionClassRemainsInLegacyLayerPackages() {
     noClasses().should().resideInAnyPackage(
-        "geomex.sync.web..", "geomex.sync.service..", "geomex.sync.worker..",
-        "geomex.sync.repository..", "geomex.sync.scheduler..", "geomex.sync.model..",
-        "geomex.sync.mapper..", "geomex.sync.geo..", "geomex.sync.util..",
-        "geomex.sync.config.."
+        "geosync.web..", "geosync.service..", "geosync.worker..",
+        "geosync.repository..", "geosync.scheduler..", "geosync.model..",
+        "geosync.mapper..", "geosync.geo..", "geosync.util..",
+        "geosync.config.."
     ).check(classes);
 }
 ```
@@ -504,7 +504,7 @@ Update `EndpointContractTest.CONTROLLERS` to the new package names only. Its exp
 
 - [ ] **Step 3: Run architecture and full tests**
 
-Run: `.\gradlew.bat test --tests 'geomex.sync.architecture.*'; .\gradlew.bat test`
+Run: `.\gradlew.bat test --tests 'geosync.architecture.*'; .\gradlew.bat test`
 
 Expected: all tests succeed and no old package contains a `.java` file.
 
@@ -513,8 +513,8 @@ Expected: all tests succeed and no old package contains a `.java` file.
 Run:
 
 ```powershell
-rg -n 'geomex\.sync\.(web|service|worker|repository|scheduler|model|mapper|geo|util|config)' src
-rg --files src/main/java/geomex/sync
+rg -n 'geosync\.sync\.(web|service|worker|repository|scheduler|model|mapper|geo|util|config)' src
+rg --files src/main/java/geosync
 ```
 
 Expected: the first command returns no stale references; the second lists only approved packages.
@@ -527,7 +527,7 @@ Run: `git diff --check; git status --short`. Do not commit.
 
 **Files:**
 
-- Create: `src/test/java/geomex/sync/architecture/RepositoryLayoutTest.java`
+- Create: `src/test/java/geosync/architecture/RepositoryLayoutTest.java`
 - Move the four documents listed in the File Map.
 - Modify: Markdown references to moved documents, if found.
 
@@ -538,7 +538,7 @@ Run: `git diff --check; git status --short`. Do not commit.
 Create:
 
 ```java
-package geomex.sync.architecture;
+package geosync.architecture;
 
 import org.junit.jupiter.api.Test;
 
@@ -566,7 +566,7 @@ class RepositoryLayoutTest {
     void referenceDocumentsHaveApprovedLocations() {
         assertThat(root.resolve("docs/reference/46870-data-catalog.md")).exists();
         assertThat(root.resolve("docs/reference/lt-c-uzone-plan.md")).exists();
-        assertThat(root.resolve("docs/reference/kras-geomex-sync-structure.md")).exists();
+        assertThat(root.resolve("docs/reference/kras-geosync-structure.md")).exists();
         assertThat(root.resolve("docs/reviews/improvements.md")).exists();
     }
 
@@ -580,7 +580,7 @@ class RepositoryLayoutTest {
 
 - [ ] **Step 2: Verify the document-location test fails**
 
-Run: `.\gradlew.bat test --tests geomex.sync.architecture.RepositoryLayoutTest`
+Run: `.\gradlew.bat test --tests geosync.architecture.RepositoryLayoutTest`
 
 Expected: FAIL because the four documents are still in their old locations.
 
@@ -589,12 +589,12 @@ Expected: FAIL because the four documents are still in their old locations.
 Resolve every source/destination under the repository, create `docs/reference` and `docs/reviews`, then use literal PowerShell moves. Update only references found by:
 
 ```powershell
-rg -n '46870_DATA_CATALOG|lt_c_uzone_plan|KRAS_GEOMEX_SYNC_STRUCTURE|IMPROVEMENTS' -g '!build/**' -g '!.gradle/**'
+rg -n '46870_DATA_CATALOG|lt_c_uzone_plan|KRAS_GEOSYNC_SYNC_STRUCTURE|IMPROVEMENTS' -g '!build/**' -g '!.gradle/**'
 ```
 
 - [ ] **Step 4: Run layout and full tests**
 
-Run: `.\gradlew.bat test --tests geomex.sync.architecture.RepositoryLayoutTest; .\gradlew.bat test`
+Run: `.\gradlew.bat test --tests geosync.architecture.RepositoryLayoutTest; .\gradlew.bat test`
 
 Expected: both commands succeed.
 
@@ -618,20 +618,20 @@ Expected: `BUILD SUCCESSFUL`.
 
 Run: `.\gradlew.bat bootJar`
 
-Expected: `build/libs/geomex-sync.jar` exists.
+Expected: `build/libs/geosync.jar` exists.
 
 - [ ] **Step 3: Build the distribution when a JLink-capable JDK is available**
 
 Run: `.\gradlew.bat jlinkZip`
 
-Expected: `build/distributions/geomex-sync-HOME-1.0.0.zip` exists and contains the unchanged external layout. If the local JDK lacks `jlink`, record this single verification as unavailable rather than changing the build.
+Expected: `build/distributions/geosync-HOME-1.0.0.zip` exists and contains the unchanged external layout. If the local JDK lacks `jlink`, record this single verification as unavailable rather than changing the build.
 
 - [ ] **Step 4: Confirm no runtime contract changed**
 
 Run:
 
 ```powershell
-.\gradlew.bat test --tests geomex.sync.architecture.EndpointContractTest
+.\gradlew.bat test --tests geosync.architecture.EndpointContractTest
 git diff --check
 git diff --find-renames --stat
 git status --short

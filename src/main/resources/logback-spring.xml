@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration>
     <springProperty scope="context" name="LOG_DIR" source="logging.file.name"
-                    defaultValue="./logs/geomex-sync.log"/>
+                    defaultValue="./logs/geosync.log"/>
 
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
@@ -27,5 +27,5 @@
         <appender-ref ref="FILE"/>
     </root>
 
-    <logger name="geomex.sync" level="DEBUG"/>
+    <logger name="geosync" level="DEBUG"/>
 </configuration>

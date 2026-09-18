@@ -11,9 +11,9 @@
 
 ### 개발 PC (ZIP 빌드)
 
-- [ ] `D:\IdeaProjects\local\geomex-sync\jdk\` 폴더에 JDK 17 존재 확인
+- [ ] `D:\IdeaProjects\local\geosync\jdk\` 폴더에 JDK 17 존재 확인
 - [ ] `gradlew.bat jlinkZip` 실행
-- [ ] `build\distributions\geomex-sync-HOME-1.0.0.zip` 생성 확인 (~90MB)
+- [ ] `build\distributions\geosync-HOME-1.0.0.zip` 생성 확인 (~90MB)
 
 ---
 
@@ -38,16 +38,16 @@ wmic os get Caption
 ### Step 2. ZIP 서버 복사 및 압축 해제
 
 ```
-설치 경로: C:\geomex-sync\
+설치 경로: C:\geosync\
 ```
 
 압축 해제 후 폴더 구조 확인:
-- [ ] `C:\geomex-sync\bin\install-service.bat` 존재
-- [ ] `C:\geomex-sync\lib\geomex-sync.jar` 존재
-- [ ] `C:\geomex-sync\jre\bin\java.exe` 존재 (번들 JRE)
-- [ ] `C:\geomex-sync\conf\kras\base-tables.xml` 존재
-- [ ] `C:\geomex-sync\conf\kais\base-tables.xml` 존재
-- [ ] `C:\geomex-sync\KAIS_WORK\` 폴더 존재
+- [ ] `C:\geosync\bin\install-service.bat` 존재
+- [ ] `C:\geosync\lib\geosync.jar` 존재
+- [ ] `C:\geosync\jre\bin\java.exe` 존재 (번들 JRE)
+- [ ] `C:\geosync\conf\kras\base-tables.xml` 존재
+- [ ] `C:\geosync\conf\kais\base-tables.xml` 존재
+- [ ] `C:\geosync\KAIS_WORK\` 폴더 존재
 
 ---
 
@@ -56,7 +56,7 @@ wmic os get Caption
 1. `https://nssm.cc/download` 에서 `nssm-2.24.zip` 다운로드
 2. `nssm-2.24\win64\nssm.exe` 파일 복사
 
-- [ ] `C:\geomex-sync\bin\nssm.exe` 존재 확인
+- [ ] `C:\geosync\bin\nssm.exe` 존재 확인
 
 ---
 
@@ -76,7 +76,7 @@ kras:
   schedule: 0 30 4 * * *             # 매일 04:30
 
 kais:
-  work-dir: C:\geomex-sync\KAIS_WORK
+  work-dir: C:\geosync\KAIS_WORK
   schedule: 0 30 3 * * *             # 매일 03:30
 ```
 
@@ -122,7 +122,7 @@ Test-NetConnection -ComputerName 110.20.1.218 -Port 1990
 
 **관리자 CMD에서 실행:**
 ```bat
-cd C:\geomex-sync
+cd C:\geosync
 bin\install-service.bat
 ```
 
@@ -154,12 +154,12 @@ http://서버IP:18080/
 ### Step 9. 로그 정상 확인
 
 ```
-C:\geomex-sync\logs\geomex-sync.log
+C:\geosync\logs\geosync.log
 ```
 
 서비스 기동 직후 아래 로그 확인:
 ```
-[INFO] geomex.sync.SyncApplication - Started SyncApplication in ...
+[INFO] geosync.SyncApplication - Started SyncApplication in ...
 ```
 
 - [ ] 기동 로그 확인
@@ -195,8 +195,8 @@ C:\geomex-sync\logs\geomex-sync.log
 
 ### 서비스가 시작되지 않는 경우
 ```
-C:\geomex-sync\logs\service-err.log   ← NSSM 오류 로그
-C:\geomex-sync\logs\geomex-sync.log   ← 앱 로그
+C:\geosync\logs\service-err.log   ← NSSM 오류 로그
+C:\geosync\logs\geosync.log   ← 앱 로그
 ```
 
 ### DB 연결 실패
@@ -212,7 +212,7 @@ server:
 
 ### 서비스 제거
 ```bat
-cd C:\geomex-sync
+cd C:\geosync
 bin\uninstall-service.bat
 ```
 
@@ -223,7 +223,7 @@ bin\uninstall-service.bat
 | 항목 | 내용 |
 |------|------|
 | 설치 일시 | |
-| 설치 경로 | `C:\geomex-sync\` |
+| 설치 경로 | `C:\geosync\` |
 | 서버 OS | |
 | 담당자 | |
 | 비고 | |

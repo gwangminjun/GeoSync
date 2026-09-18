@@ -4,7 +4,7 @@ plugins {
     id 'io.spring.dependency-management' version '1.1.6'
 }
 
-group = 'geomex'
+group = 'geosync'
 version = '1.0.0'
 
 java {
@@ -61,7 +61,7 @@ dependencies {
 }
 
 bootJar {
-    archiveFileName = 'geomex-sync.jar'
+    archiveFileName = 'geosync.jar'
 }
 
 // ── Step 8에서 추가: jlink 최소 JRE 생성 ──────────────────────────────────
@@ -93,11 +93,11 @@ tasks.register('createMinimalJre', Exec) {
 // ── Step 8에서 추가: 배포 ZIP 생성 ────────────────────────────────────────
 tasks.register('jlinkZip', Zip) {
     dependsOn bootJar, createMinimalJre
-    archiveFileName = "geomex-sync-HOME-${version}.zip"
+    archiveFileName = "geosync-HOME-${version}.zip"
     destinationDirectory = layout.buildDirectory.dir('distributions')
 
     from(layout.buildDirectory.dir('libs')) {
-        include 'geomex-sync.jar'
+        include 'geosync.jar'
         into 'lib'
     }
     from(layout.buildDirectory.dir('jre')) {

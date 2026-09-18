@@ -2,7 +2,7 @@
 
 ## Goal
 
-GEOMEX 동기화 애플리케이션의 다중 대상 DB 모델을 단일 대상 DB 모델로 단순화한다. 모든 수집·적재·로그·상태 확인 작업은 한 DB만 사용한다. 관리 화면에서 DB 접속 정보를 변경하고 재시작 없이 적용하는 기존 운영 기능은 유지한다.
+GEOSYNC 동기화 애플리케이션의 다중 대상 DB 모델을 단일 대상 DB 모델로 단순화한다. 모든 수집·적재·로그·상태 확인 작업은 한 DB만 사용한다. 관리 화면에서 DB 접속 정보를 변경하고 재시작 없이 적용하는 기존 운영 기능은 유지한다.
 
 ## Scope
 
@@ -24,7 +24,7 @@ GEOMEX 동기화 애플리케이션의 다중 대상 DB 모델을 단일 대상 
 정식 설정 형식은 다음과 같다.
 
 ```yaml
-geomex:
+geosync:
   database:
     display-name: "운영 DB"
 
@@ -36,7 +36,7 @@ spring:
 ```
 
 `spring.datasource`만 연결 설정을 소유한다. 화면과 호환 응답에 사용하는 표시 이름은
-`geomex.database.display-name`에 저장하며, 값이 없으면 JDBC URL의 DB명을 사용한다.
+`geosync.database.display-name`에 저장하며, 값이 없으면 JDBC URL의 DB명을 사용한다.
 
 런타임 설정 로더는 URL, 사용자명, 비밀번호를 서로 다른 출처에서 섞지 않고 다음
 우선순위로 하나의 완전한 설정 묶음을 선택한다.
@@ -185,7 +185,7 @@ KRAS 수동 적재, 예약 적재, mock 적재와 기존 파일 기반 적재는
 
 ## Migration and Compatibility
 
-애플리케이션을 새 버전으로 처음 시작할 때 기존 `targets[]` 설정은 수정하지 않고 읽기만 한다. 관리 화면에서 저장하는 순간 같은 DB 값을 `spring.datasource`와 `geomex.database.display-name`에 기록하며 레거시 배열은 제거된다. 다른 설정 키는 보존한다.
+애플리케이션을 새 버전으로 처음 시작할 때 기존 `targets[]` 설정은 수정하지 않고 읽기만 한다. 관리 화면에서 저장하는 순간 같은 DB 값을 `spring.datasource`와 `geosync.database.display-name`에 기록하며 레거시 배열은 제거된다. 다른 설정 키는 보존한다.
 
 HTTP 호출자는 기존 요청을 그대로 보낼 수 있다. 대상 선택 값은 수용되지만 단일 DB에서만 실행된다. 응답 구조 역시 배열을 기대하는 기존 JavaScript가 동작하도록 한 항목 배열을 유지한다.
 
@@ -195,7 +195,7 @@ HTTP 호출자는 기존 요청을 그대로 보낼 수 있다. 대상 선택 �
 ## Completion Criteria
 
 - 설정 파일의 정식 DB 정의가 `spring.datasource` 하나뿐이다.
-- DB 표시 이름은 `geomex.database.display-name`에 보존되며 연결 설정과 중복되지 않는다.
+- DB 표시 이름은 `geosync.database.display-name`에 보존되며 연결 설정과 중복되지 않는다.
 - 설정 저장 후 미관리 YAML 키가 유지되고 `targets`만 제거된다.
 - 설정 저장 직후 재시작 없이 새 DB 연결이 사용된다.
 - 실행 중이던 작업은 교체 전 DB 세션을 끝까지 사용하고 완료 후 이전 풀이 닫힌다.
