@@ -15,6 +15,10 @@
 -- 막을 방법이 없었다. 기존 public 건수 대비 새 건수가 50% 미만이면 "부분 발행으로 의심"하고
 -- 막는다. ponytail: 50%는 고정 임계값(휴리스틱)이다 — 실제 운영에서 정상적인 대규모 감소
 -- 케이스(예: 행정구역 통폐합)가 나오면 그때 파라미터화하거나 수동 승인 절차를 추가한다.
+--
+-- 2026-09-18 추가: TRUNCATE는 플래너 통계(reltuples)를 0으로 리셋한다. autovacuum이
+-- 다시 통계를 잡아줄 때까지 기다리지 않고 INSERT 직후 ANALYZE로 즉시 갱신한다(이 테이블
+-- 크기에서 비용 미미).
 CREATE OR REPLACE FUNCTION kras.sync_public_cadastral() RETURNS bigint
 LANGUAGE plpgsql AS $$
 DECLARE n bigint; prev bigint;
@@ -30,6 +34,7 @@ BEGIN
   TRUNCATE public.lp_pa_cbnd;
   INSERT INTO public.lp_pa_cbnd(uid,geom,jibun,bchk,pnu)
     SELECT uid,geom,jibun,bchk,pnu FROM kras.lp_pa_cbnd;
+  ANALYZE public.lp_pa_cbnd;
   RETURN n;
 END $$;
 
@@ -48,6 +53,7 @@ BEGIN
   TRUNCATE public.lt_c_uzone;
   INSERT INTO public.lt_c_uzone(mnum,remark,alias,layer_code,theme_code,theme_name,org_cd,uid,geom)
     SELECT mnum,remark,alias,layer_code,theme_code,theme_name,org_cd,uid,geom FROM kras.lt_c_uzone;
+  ANALYZE public.lt_c_uzone;
   RETURN n;
 END $$;
 
