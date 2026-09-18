@@ -25,7 +25,7 @@ CREATE TABLE public.lp_pa_cbnd (
 	uid int4 NULL,
 	geom public.geometry(multipolygon, 5186) NULL,
 	jibun varchar(100) NULL,
-	bchk varchar(1) NULL,
+	bchk varchar(2) NULL,
 	pnu varchar(19) NULL
 );
 

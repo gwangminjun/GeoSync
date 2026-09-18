@@ -9,13 +9,23 @@
 -- 0건 가드: 소스가 0건이면 TRUNCATE 전에 예외를 던진다. cadastral_file/usezone_file
 -- 데이터셋이 아직 UNVERIFIED/disabled인 지금 상태에서 이 함수를 돌리면 반드시 이 가드에서
 -- 막혀야 정상이다 — 실수로 실행돼도 살아있는 GeoServer 레이어가 비는 사고를 막는다.
+--
+-- 2026-09-18 추가: 건수 급감 가드. public.*은 자체 제약이 없는 테이블이라(PK/UNIQUE/NOT NULL
+-- 없음) 0건이 아니기만 하면 어떤 값이든 그대로 덮어써진다 — 부분 레이어만 수집해 게시해도
+-- 막을 방법이 없었다. 기존 public 건수 대비 새 건수가 50% 미만이면 "부분 발행으로 의심"하고
+-- 막는다. ponytail: 50%는 고정 임계값(휴리스틱)이다 — 실제 운영에서 정상적인 대규모 감소
+-- 케이스(예: 행정구역 통폐합)가 나오면 그때 파라미터화하거나 수동 승인 절차를 추가한다.
 CREATE OR REPLACE FUNCTION kras.sync_public_cadastral() RETURNS bigint
 LANGUAGE plpgsql AS $$
-DECLARE n bigint;
+DECLARE n bigint; prev bigint;
 BEGIN
   SELECT count(*) INTO n FROM kras.lp_pa_cbnd;
   IF n = 0 THEN
     RAISE EXCEPTION 'kras.lp_pa_cbnd has 0 published rows; refusing to truncate public.lp_pa_cbnd (would blank the live GeoServer layer)';
+  END IF;
+  SELECT count(*) INTO prev FROM public.lp_pa_cbnd;
+  IF prev > 0 AND n < prev * 0.5 THEN
+    RAISE EXCEPTION 'kras.lp_pa_cbnd(%) is less than half of current public.lp_pa_cbnd(%); refusing to truncate (looks like a partial publish)', n, prev;
   END IF;
   TRUNCATE public.lp_pa_cbnd;
   INSERT INTO public.lp_pa_cbnd(uid,geom,jibun,bchk,pnu)
@@ -25,11 +35,15 @@ END $$;
 
 CREATE OR REPLACE FUNCTION kras.sync_public_usezone() RETURNS bigint
 LANGUAGE plpgsql AS $$
-DECLARE n bigint;
+DECLARE n bigint; prev bigint;
 BEGIN
   SELECT count(*) INTO n FROM kras.lt_c_uzone;
   IF n = 0 THEN
     RAISE EXCEPTION 'kras.lt_c_uzone has 0 published rows; refusing to truncate public.lt_c_uzone (would blank up to 306 GeoServer layers)';
+  END IF;
+  SELECT count(*) INTO prev FROM public.lt_c_uzone;
+  IF prev > 0 AND n < prev * 0.5 THEN
+    RAISE EXCEPTION 'kras.lt_c_uzone(%) is less than half of current public.lt_c_uzone(%); refusing to truncate (looks like a partial publish)', n, prev;
   END IF;
   TRUNCATE public.lt_c_uzone;
   INSERT INTO public.lt_c_uzone(mnum,remark,alias,layer_code,theme_code,theme_name,org_cd,uid,geom)
@@ -38,8 +52,8 @@ BEGIN
 END $$;
 
 COMMENT ON FUNCTION kras.sync_public_cadastral() IS
-  'kras 게시본을 public.lp_pa_cbnd로 승격. 배치가 kras.publish_* 이후 호출한다. 0건이면 실패.';
+  'kras 게시본을 public.lp_pa_cbnd로 승격. 0건이거나 기존 대비 50% 미만으로 급감하면 실패(부분 발행 오인 방지).';
 COMMENT ON FUNCTION kras.sync_public_usezone() IS
-  'kras 게시본을 public.lt_c_uzone으로 승격. kras.publish_spatial_release 이후 호출한다. 0건이면 실패. 306개 필터 뷰는 테이블 내용만 바뀌므로 재등록 불필요.';
+  'kras 게시본을 public.lt_c_uzone으로 승격. 0건이거나 기존 대비 50% 미만으로 급감하면 실패(부분 발행 오인 방지). 306개 필터 뷰는 테이블 내용만 바뀌므로 재등록 불필요.';
 
 -- 호출 예: SELECT kras.sync_public_cadastral(); SELECT kras.sync_public_usezone();
