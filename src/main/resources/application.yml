@@ -6,7 +6,7 @@ spring:
     driver-class-name: org.postgresql.Driver
     url: ${DB_URL:jdbc:postgresql://112.216.98.130:31613/YG-Space_260714?autoReconnect=true&useUnicode=true&characterEncoding=utf8&allowMultiQueries=true&zeroDateTimeBehavior=convertToNull}
     username: ${DB_USER:postgres}
-    password: ${DB_PASSWORD:}
+    password: ${DB_PASSWORD:daeho1990!}
     hikari:
       connection-timeout: 30000
       maximum-pool-size: 5
@@ -18,7 +18,7 @@ kras:
   url: ${KRAS_URL:http://110.20.1.12:8385/conn/estateGateway}
   conn-svc-id: ${KRAS_CONN_SVC_ID:KRAS000037}
   conn-sys-id: ${KRAS_CONN_SYS_ID:HOH4-N9PX-73Y6-B393}
-  chk-pnu: ${KRAS_CHK_PNU:4687025625111190010}
+  chk-pnu: ${KRAS_CHK_PNU:1283025625111190010}
   config: ${KRAS_CONFIG:conf/kras/base-tables.xml}
   schedule: ${KRAS_SCHEDULE:0 30 4 * * *}
   timeout-seconds: 300
@@ -52,7 +52,7 @@ ods:
   schedule: ${ODS_SCHEDULE:0 30 5 * * *}
 
 sync:
-  org-code: ${SYNC_ORG_CODE:46870}
+  org-code: ${SYNC_ORG_CODE:12830}
   enabled: ${SYNC_ENABLED:true}
 
 logging:
@@ -60,11 +60,11 @@ logging:
     console: UTF-8
     file: UTF-8
   file:
-    name: ${LOG_DIR:./logs}/geomex-sync.log
+    name: ${LOG_DIR:./logs}/geosync.log
   logback:
     rollingpolicy:
-      file-name-pattern: ${LOG_DIR:./logs}/geomex-sync.%d{yyyy-MM-dd}.log
+      file-name-pattern: ${LOG_DIR:./logs}/geosync.%d{yyyy-MM-dd}.log
       max-history: 90
   level:
     root: INFO
-    geomex.sync: DEBUG
+    geosync: DEBUG
