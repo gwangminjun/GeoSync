@@ -16,9 +16,14 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * kras 스키마 신규 적재 화면(/kras-db). 기존 schedule.html/SyncController와 코드 레벨로 분리된
@@ -32,6 +37,40 @@ public class KrasSchemaController {
 
     private static final String LAYER_CODE = "LP_PA_CBND";
     private static final String CADASTRAL_TGT_TABLE = "ods.lp_pa_cbnd";
+
+    /**
+     * PNU 단건 API 중 land_info를 제외한 18개. dataset_code/service_code/api-test 딥링크 id/
+     * 승격 대상 업무 테이블은 kras.business_dataset(설계 원본)과 api-test.html의 APIS 목록에서 그대로 가져온 것 —
+     * 실제 파싱·적재 코드(KrasPnuIngestService)는 아직 없고, 이 표는 검증 화면 안내용이다.
+     */
+    private record PnuApiInfo(String datasetCode, String serviceCode, String apiTestId, String businessTables) {}
+
+    private static final List<PnuApiInfo> PNU_APIS = List.of(
+        new PnuApiInfo("shr_ymb", "KRAS000003", "conn/shr_ymb", "kras.land_share"),
+        new PnuApiInfo("land_mov_hist", "KRAS000006", "conn/land_mov_hist", "kras.land_movement_history, kras.land_movement_relation"),
+        new PnuApiInfo("own_rgt_hist", "KRAS000007", "conn/own_rgt_hist", "kras.land_ownership_history"),
+        new PnuApiInfo("bldg_hds_info", "KRAS000014", "conn/bldg_hds_info", "kras.building_title, kras.building_floor, kras.building_title_owner, kras.building_title_change"),
+        new PnuApiInfo("cbldg_hds_info", "KRAS000015", "conn/cbldg_hds_info", "kras.building_title"),
+        new PnuApiInfo("cbldg_dfhs_info", "KRAS000016", "conn/cbldg_dfhs_info", "kras.building_exclusive, kras.building_exclusive_area, kras.building_exclusive_owner, kras.building_exclusive_price"),
+        new PnuApiInfo("bldg_ledg_gen_hds_info", "KRAS000017", "conn/bldg_ledg_gen_hds_info", "kras.building_summary"),
+        new PnuApiInfo("land_use_plan_attr", "KRAS000025", "conn/land_use_plan_attr", "kras.land_use_attribute"),
+        new PnuApiInfo("land_use_plan_info", "KRAS000026", "conn/land_use_plan_info", "kras.land_use_plan, kras.land_use_restriction, kras.land_use_plan_asset"),
+        new PnuApiInfo("use_zone", "KRAS000027", "conn/use_zone", "kras.land_use_zone"),
+        new PnuApiInfo("land_bldg_check", "KRAS000101", "conn/land_bldg_check", "kras.parcel, kras.land_presence"),
+        new PnuApiInfo("bldg_dong_info", "KRAS000102", "conn/bldg_dong_info", "kras.building_register"),
+        new PnuApiInfo("bldg_ho_info", "KRAS000103", "conn/bldg_ho_info", "kras.building_unit"),
+        new PnuApiInfo("land_jiga", "KOREPS00011", "conn/land_jiga", "kras.koreps_land_price"),
+        new PnuApiInfo("house_info", "KOREPS00033", "conn/house_info", "kras.house_price"),
+        new PnuApiInfo("fin_dec_jiga", "KOREPS00034", "conn/fin_dec_jiga", "kras.final_land_price"),
+        new PnuApiInfo("read_dec_jiga", "KOREPS00035", "conn/read_dec_jiga", "kras.read_land_price"),
+        new PnuApiInfo("land_attr", "KOREPS00047", "conn/land_attr", "kras.land_attribute")
+    );
+
+    /** verify/revert-dataset이 건드릴 수 있는 dataset_code 화이트리스트 — 임의 문자열로 다른 데이터셋을 켜지 못하게 막는다. */
+    private static final Set<String> VERIFIABLE_DATASETS = Stream.concat(
+            Stream.of("cadastral_file", "land_info"),
+            PNU_APIS.stream().map(PnuApiInfo::datasetCode)
+    ).collect(Collectors.toUnmodifiableSet());
 
     private final TargetDbService targetDbService;
     private final RuntimeSettingsService settings;
@@ -69,6 +108,14 @@ public class KrasSchemaController {
         model.addAttribute("datasetStatus", dataset.get("contract_status"));
         model.addAttribute("datasetEnabled", Boolean.TRUE.equals(dataset.get("enabled")));
 
+        Map<String, Object> landInfoDataset = jdbc.queryForMap("""
+            SELECT contract_status, enabled FROM kras.sync_dataset WHERE dataset_code='land_info'
+            """);
+        model.addAttribute("landInfoStatus", landInfoDataset.get("contract_status"));
+        model.addAttribute("landInfoEnabled", Boolean.TRUE.equals(landInfoDataset.get("enabled")));
+
+        model.addAttribute("pnuDatasets", loadPnuDatasetRows(jdbc));
+
         Long krasCount = jdbc.queryForObject("SELECT count(*) FROM kras.lp_pa_cbnd", Long.class);
         Long publicCount = jdbc.queryForObject("SELECT count(*) FROM public.lp_pa_cbnd", Long.class);
         model.addAttribute("krasCount", krasCount);
@@ -86,22 +133,47 @@ public class KrasSchemaController {
     }
 
     /**
-     * cadastral_file 데이터셋을 VERIFIED+enabled로 전환한다.
+     * 지정한 dataset_code를 VERIFIED+enabled로 전환한다. 데이터셋은 한 번에 하나씩만 전환한다 —
+     * 33개를 일괄 전환하지 않는다(각 API 응답이 문서와 실제로 일치하는지는 데이터셋마다 따로 확인해야 함).
      * 이 버튼은 "운영 응답으로 계약을 실제 확인했다"는 사람의 선언을 DB에 반영만 한다 —
      * 검증 자체를 이 버튼이 대신하지 않는다(design §5.3, §14-1).
      */
     @PostMapping("/kras-db/verify-dataset")
-    public String verifyDataset(@RequestParam(defaultValue = "false") boolean confirmed,
+    public String verifyDataset(@RequestParam String datasetCode,
+                                 @RequestParam(defaultValue = "false") boolean confirmed,
                                  RedirectAttributes ra) {
+        if (!VERIFIABLE_DATASETS.contains(datasetCode)) {
+            ra.addFlashAttribute("message", "알 수 없는 dataset_code입니다: " + datasetCode);
+            return "redirect:/kras-db";
+        }
         if (!confirmed) {
             ra.addFlashAttribute("message", "확인 체크박스를 선택해야 활성화할 수 있습니다.");
             return "redirect:/kras-db";
         }
         jdbc().update("""
             UPDATE kras.sync_dataset SET contract_status='VERIFIED', enabled=true
-            WHERE dataset_code='cadastral_file'
-            """);
-        ra.addFlashAttribute("message", "cadastral_file 데이터셋을 VERIFIED로 전환했습니다.");
+            WHERE dataset_code=?
+            """, datasetCode);
+        ra.addFlashAttribute("message", datasetCode + " 데이터셋을 VERIFIED로 전환했습니다.");
+        return "redirect:/kras-db";
+    }
+
+    /**
+     * VERIFIED로 전환했던 dataset_code를 UNVERIFIED+disabled로 되돌린다.
+     * 이미 SUCCESS로 확정된 sync_item은 guard_item_transition이 불변으로 막아주므로
+     * 원복해도 과거 적재 결과는 건드리지 않는다 — 앞으로의 신규 수집만 다시 막힌다.
+     */
+    @PostMapping("/kras-db/revert-dataset")
+    public String revertDataset(@RequestParam String datasetCode, RedirectAttributes ra) {
+        if (!VERIFIABLE_DATASETS.contains(datasetCode)) {
+            ra.addFlashAttribute("message", "알 수 없는 dataset_code입니다: " + datasetCode);
+            return "redirect:/kras-db";
+        }
+        jdbc().update("""
+            UPDATE kras.sync_dataset SET contract_status='UNVERIFIED', enabled=false
+            WHERE dataset_code=?
+            """, datasetCode);
+        ra.addFlashAttribute("message", datasetCode + " 데이터셋 검증을 원복했습니다 (UNVERIFIED · disabled).");
         return "redirect:/kras-db";
     }
 
@@ -153,6 +225,33 @@ public class KrasSchemaController {
             lastCadastralResult = "승격 실패: " + e.getMessage();
             return Map.of("success", false, "message", lastCadastralResult);
         }
+    }
+
+    /** PNU_APIS 18개의 현재 contract_status/enabled를 한 번에 조회해 템플릿용 행으로 합친다. */
+    private List<Map<String, Object>> loadPnuDatasetRows(JdbcTemplate jdbc) {
+        List<String> codes = PNU_APIS.stream().map(PnuApiInfo::datasetCode).toList();
+        String placeholders = String.join(",", codes.stream().map(c -> "?").toList());
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT dataset_code, contract_status, enabled FROM kras.sync_dataset WHERE dataset_code IN (" + placeholders + ")",
+                codes.toArray());
+        Map<String, Map<String, Object>> statusByCode = new HashMap<>();
+        for (Map<String, Object> row : rows) {
+            statusByCode.put((String) row.get("dataset_code"), row);
+        }
+
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (PnuApiInfo api : PNU_APIS) {
+            Map<String, Object> status = statusByCode.get(api.datasetCode());
+            Map<String, Object> out = new HashMap<>();
+            out.put("datasetCode", api.datasetCode());
+            out.put("serviceCode", api.serviceCode());
+            out.put("apiTestId", api.apiTestId());
+            out.put("businessTables", api.businessTables());
+            out.put("status", status != null ? status.get("contract_status") : "UNVERIFIED");
+            out.put("enabled", status != null && Boolean.TRUE.equals(status.get("enabled")));
+            result.add(out);
+        }
+        return result;
     }
 
     private SyncTableDef findCadastralDef() {

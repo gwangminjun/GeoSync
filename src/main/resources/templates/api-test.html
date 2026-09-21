@@ -842,6 +842,8 @@ function copyXml() {
 document.addEventListener('DOMContentLoaded', () => {
   renderList();
   resetConnSettings();  // 서버 기본값으로 입력 필드 채우기
+  const apiId = new URLSearchParams(location.search).get('api');
+  if (apiId) openModal(apiId);
 });
 </script>
 </th:block>

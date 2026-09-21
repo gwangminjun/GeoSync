@@ -67,6 +67,7 @@
         그 결과를 DB에 반영만 합니다. 미검증 상태에서는 수집이 <code>guard_item_transition</code>에 막혀 SUCCESS로 못 갑니다.
       </p>
       <form method="post" action="/kras-db/verify-dataset" id="verify-form">
+        <input type="hidden" name="datasetCode" value="cadastral_file">
         <div class="confirm-row">
           <input type="checkbox" id="verify-confirm" onchange="document.getElementById('verify-submit').disabled = !this.checked;">
           <label for="verify-confirm">실제 운영 응답으로 cadastral_file 계약을 확인했음</label>
@@ -75,6 +76,113 @@
         <button type="submit" id="verify-submit" class="btn btn-primary" disabled
                 onclick="document.getElementById('verify-confirmed').value='true';">계약 확인 → VERIFIED로 전환</button>
       </form>
+    </div>
+    <form th:if="${datasetStatus == 'VERIFIED' and datasetEnabled}" method="post" action="/kras-db/revert-dataset"
+          onsubmit="return confirm('cadastral_file 검증을 원복하시겠습니까? UNVERIFIED/disabled로 되돌아가고, 앞으로의 신규 수집이 다시 막힙니다.');">
+      <input type="hidden" name="datasetCode" value="cadastral_file">
+      <button type="submit" class="btn btn-secondary">검증 원복</button>
+    </form>
+  </div>
+
+  <!-- 카드 1b: 데이터셋 계약 상태 — land_info -->
+  <div class="card">
+    <div class="card-title">
+      데이터셋 계약 상태 — land_info
+      <span th:if="${landInfoStatus == 'VERIFIED' and landInfoEnabled}" class="badge badge-on">VERIFIED · enabled</span>
+      <span th:unless="${landInfoStatus == 'VERIFIED' and landInfoEnabled}" class="badge badge-warn"
+            th:text="${landInfoStatus} + ' · ' + (${landInfoEnabled} ? 'enabled' : 'disabled')"></span>
+    </div>
+
+    <p style="font-size:12px;color:#69707b;font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;">
+      이 API가 동기화하는 테이블 (KRAS000002 · /conn/land_info)
+      <a href="/api-test?api=conn/land_info" target="_blank" style="text-transform:none;letter-spacing:normal;font-weight:600;color:#5fa8e8;">→ 테스트</a>
+    </p>
+    <div style="overflow-x:auto;margin-bottom:16px;">
+      <table class="hist-table">
+        <thead><tr><th>응답 항목(XML 태그)</th><th>stage 테이블</th><th>승격 대상(업무 테이블)</th><th>비고</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>ADM_SECT_CD, LAND_LOC_CD, LEDG_GBN, BOBN, BUBN</td>
+            <td>kras.stage_parcel</td>
+            <td>kras.parcel</td>
+            <td>PNU는 응답에 없음 — 요청 파라미터의 PNU 사용, 승격 전 5개 태그 조합과 대조</td>
+          </tr>
+          <tr>
+            <td>JIMOK/JIMOK_NM, PAREA, GRD, GRD_YMD, LAND_MOV_YMD, LAND_MOV_RSN_CD(_NM), LEDG_CNTRST_CNF_GBN, BIZ_ACT_NTC_GBN, MAP_GBN, SCALE(_NM), DOHO, JIGA_BASE_MON, PANN_JIGA, BLDG_GBN_NO 등</td>
+            <td>kras.stage_land_register</td>
+            <td>kras.land_register</td>
+            <td>지목·면적·공시지가 등 대장 속성. 날짜/숫자 파싱 실패 시 원문 보존 + 검증 실패 처리</td>
+          </tr>
+          <tr>
+            <td>OWNER_NM, DREGNO, OWN_GBN(_NM), SHR_CNT, OWNER_ADDR, OWN_RGT_CHG_RSN_CD(_NM), OWNDYMD</td>
+            <td>kras.stage_land_owner</td>
+            <td>kras.land_owner</td>
+            <td>소유자 정보. availability 판정(제공/비제공)은 요청 옵션 파라미터 확정 전까지 UNKNOWN/PROVIDED만 사용</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div th:unless="${landInfoStatus == 'VERIFIED' and landInfoEnabled}">
+      <p style="font-size:13px;color:#9aa2ad;margin-bottom:14px;">
+        위 3개 stage/업무 테이블에 실제로 채워지는 값이 문서와 일치하는지 확인한 뒤에만 전환하세요.
+        미검증 상태에서는 <code>guard_item_transition</code>이 SUCCESS 전환을 막습니다.
+      </p>
+      <form method="post" action="/kras-db/verify-dataset" id="verify-form-land-info">
+        <input type="hidden" name="datasetCode" value="land_info">
+        <div class="confirm-row">
+          <input type="checkbox" id="verify-confirm-land-info" onchange="document.getElementById('verify-submit-land-info').disabled = !this.checked;">
+          <label for="verify-confirm-land-info">실제 운영 응답으로 land_info 계약을 확인했음</label>
+        </div>
+        <input type="hidden" name="confirmed" id="verify-confirmed-land-info" value="false">
+        <button type="submit" id="verify-submit-land-info" class="btn btn-primary" disabled
+                onclick="document.getElementById('verify-confirmed-land-info').value='true';">계약 확인 → VERIFIED로 전환</button>
+      </form>
+    </div>
+    <form th:if="${landInfoStatus == 'VERIFIED' and landInfoEnabled}" method="post" action="/kras-db/revert-dataset"
+          onsubmit="return confirm('land_info 검증을 원복하시겠습니까? UNVERIFIED/disabled로 되돌아가고, 앞으로의 신규 수집이 다시 막힙니다.');">
+      <input type="hidden" name="datasetCode" value="land_info">
+      <button type="submit" class="btn btn-secondary">검증 원복</button>
+    </form>
+  </div>
+
+  <!-- 카드 1c: PNU 단건 API 계약 상태 — land_info 제외 18개 -->
+  <div class="card">
+    <div class="card-title">데이터셋 계약 상태 — PNU 단건 API 18개</div>
+    <p style="font-size:13px;color:#9aa2ad;margin-bottom:14px;">
+      아직 실제 적재 코드(<code>KrasPnuIngestService</code>)는 없습니다 — 이 표는 각 API가 나중에 어떤 업무 테이블로
+      승격될지 미리 정리해 둔 것입니다. "테스트"로 실제 응답을 먼저 확인한 뒤 VERIFIED로 전환하세요.
+    </p>
+    <div style="overflow-x:auto;">
+      <table class="hist-table">
+        <thead><tr><th>dataset_code</th><th>service_code</th><th>승격 대상(업무 테이블)</th><th>상태</th><th>응답 확인</th><th>동작</th></tr></thead>
+        <tbody>
+          <tr th:each="d : ${pnuDatasets}">
+            <td th:text="${d.datasetCode}"></td>
+            <td th:text="${d.serviceCode}"></td>
+            <td th:text="${d.businessTables}"></td>
+            <td>
+              <span th:if="${d.status == 'VERIFIED' and d.enabled}" class="badge badge-on">VERIFIED</span>
+              <span th:unless="${d.status == 'VERIFIED' and d.enabled}" class="badge badge-warn"
+                    th:text="${d.status} + ' · ' + (${d.enabled} ? 'enabled' : 'disabled')"></span>
+            </td>
+            <td><a th:href="'/api-test?api=' + ${d.apiTestId}" target="_blank" style="color:#5fa8e8;">테스트</a></td>
+            <td>
+              <form th:unless="${d.status == 'VERIFIED' and d.enabled}" method="post" action="/kras-db/verify-dataset" style="display:inline;">
+                <input type="hidden" name="datasetCode" th:value="${d.datasetCode}">
+                <input type="hidden" name="confirmed" value="true">
+                <button type="submit" class="btn btn-secondary" style="padding:5px 10px;font-size:11.5px;"
+                        th:attr="onclick=|return confirm('실제 운영 응답으로 ${d.datasetCode} 계약을 확인했습니까?')|">VERIFIED로 전환</button>
+              </form>
+              <form th:if="${d.status == 'VERIFIED' and d.enabled}" method="post" action="/kras-db/revert-dataset" style="display:inline;">
+                <input type="hidden" name="datasetCode" th:value="${d.datasetCode}">
+                <button type="submit" class="btn btn-secondary" style="padding:5px 10px;font-size:11.5px;"
+                        th:attr="onclick=|return confirm('${d.datasetCode} 검증을 원복하시겠습니까?')|">검증 원복</button>
+              </form>
+            </td>
+          </tr>
+        </tbody>
+      </table>
     </div>
   </div>
 
