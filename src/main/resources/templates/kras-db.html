@@ -117,7 +117,7 @@
             <td>OWNER_NM, DREGNO, OWN_GBN(_NM), SHR_CNT, OWNER_ADDR, OWN_RGT_CHG_RSN_CD(_NM), OWNDYMD</td>
             <td>kras.stage_land_owner</td>
             <td>kras.land_owner</td>
-            <td>소유자 정보. availability 판정(제공/비제공)은 요청 옵션 파라미터 확정 전까지 UNKNOWN/PROVIDED만 사용</td>
+            <td>소유자 정보. 소유내역 옵션 파라미터명이 확정되기 전까지 availability는 항상 NOT_REQUESTED로 채움</td>
           </tr>
         </tbody>
       </table>
@@ -146,11 +146,182 @@
     </form>
   </div>
 
-  <!-- 카드 1c: PNU 단건 API 계약 상태 — land_info 제외 18개 -->
+  <!-- 카드 1b-2: land_info PNU 테스트 수집/승격 -->
   <div class="card">
-    <div class="card-title">데이터셋 계약 상태 — PNU 단건 API 18개</div>
+    <div class="card-title">
+      land_info PNU 테스트 수집/승격
+      <span th:if="${landInfoRunning}" class="badge badge-warn">실행 중</span>
+    </div>
+    <p style="font-size:12px;color:#5b626d;margin-bottom:12px;">
+      수집은 kras.stage_parcel/stage_land_register/stage_land_owner까지만 채웁니다. 필드 파싱 경고가
+      하나도 없어야 item이 SUCCESS로 전환되고, 그래야 승격(kras.parcel/land_register/land_owner 반영)이
+      가능합니다. land_info가 VERIFIED · enabled 상태가 아니면 수집 자체는 되지만 SUCCESS 전환은
+      <code>guard_item_transition</code>이 막습니다.
+    </p>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+      <input type="text" id="land-info-pnu" placeholder="PNU 19자리" maxlength="19"
+             style="padding:8px 12px;border-radius:8px;border:1px solid #2e3640;background:#14171c;color:#e7eaee;font-family:'JetBrains Mono',monospace;width:220px;">
+      <button class="btn btn-primary" id="btn-land-info-ingest" th:disabled="${landInfoRunning}"
+              onclick="runLandInfoIngest()">테스트 수집</button>
+      <button class="btn btn-secondary" id="btn-land-info-promote" th:disabled="${landInfoRunning}" disabled
+              onclick="runLandInfoPromote()">업무 테이블로 승격</button>
+    </div>
+    <div id="land-info-result" class="result-box" th:if="${lastLandInfoResult}" th:text="${lastLandInfoResult}"></div>
+    <div id="land-info-result-js" class="result-box" style="display:none;"></div>
+    <pre id="land-info-preview" class="result-box" style="display:none;"></pre>
+  </div>
+
+  <!-- 카드 1b-3: 데이터셋 계약 상태 — land_bldg_check -->
+  <div class="card">
+    <div class="card-title">
+      데이터셋 계약 상태 — land_bldg_check
+      <span th:if="${landBldgCheckStatus == 'VERIFIED' and landBldgCheckEnabled}" class="badge badge-on">VERIFIED · enabled</span>
+      <span th:unless="${landBldgCheckStatus == 'VERIFIED' and landBldgCheckEnabled}" class="badge badge-warn"
+            th:text="${landBldgCheckStatus} + ' · ' + (${landBldgCheckEnabled} ? 'enabled' : 'disabled')"></span>
+    </div>
+    <p style="font-size:12px;color:#69707b;font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;">
+      이 API가 동기화하는 테이블 (KRAS000101 · /conn/land_bldg_check)
+      <a href="/api-test?api=conn/land_bldg_check" target="_blank" style="text-transform:none;letter-spacing:normal;font-weight:600;color:#5fa8e8;">→ 테스트</a>
+    </p>
+    <div style="overflow-x:auto;margin-bottom:16px;">
+      <table class="hist-table">
+        <thead><tr><th>응답 항목(XML 태그)</th><th>stage 테이블</th><th>승격 대상(업무 테이블)</th><th>비고</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>ADM_SECT_CD, LAND_LOC_CD, LEDG_GBN, BOBN, BUBN</td>
+            <td>kras.stage_parcel</td>
+            <td>kras.parcel</td>
+            <td>land_info와 동일하게 PNU 직접 분해값과 대조(docs/reference/kras.md §3)</td>
+          </tr>
+          <tr>
+            <td>REAL_GBN, SECT_LOC_CD, ADM_SECT_NM, SECT_LOC_NM, MAP_GBN</td>
+            <td>kras.stage_land_presence</td>
+            <td>kras.land_presence</td>
+            <td>전부 문자열/코드값 — 날짜·숫자 파싱이 없어 land_info와 달리 파싱 경고 자체가 없음</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div th:unless="${landBldgCheckStatus == 'VERIFIED' and landBldgCheckEnabled}">
+      <p style="font-size:13px;color:#9aa2ad;margin-bottom:14px;">
+        위 2개 stage/업무 테이블에 실제로 채워지는 값이 문서와 일치하는지 확인한 뒤에만 전환하세요.
+      </p>
+      <form method="post" action="/kras-db/verify-dataset" id="verify-form-land-bldg-check">
+        <input type="hidden" name="datasetCode" value="land_bldg_check">
+        <div class="confirm-row">
+          <input type="checkbox" id="verify-confirm-land-bldg-check" onchange="document.getElementById('verify-submit-land-bldg-check').disabled = !this.checked;">
+          <label for="verify-confirm-land-bldg-check">실제 운영 응답으로 land_bldg_check 계약을 확인했음</label>
+        </div>
+        <input type="hidden" name="confirmed" id="verify-confirmed-land-bldg-check" value="false">
+        <button type="submit" id="verify-submit-land-bldg-check" class="btn btn-primary" disabled
+                onclick="document.getElementById('verify-confirmed-land-bldg-check').value='true';">계약 확인 → VERIFIED로 전환</button>
+      </form>
+    </div>
+    <form th:if="${landBldgCheckStatus == 'VERIFIED' and landBldgCheckEnabled}" method="post" action="/kras-db/revert-dataset"
+          onsubmit="return confirm('land_bldg_check 검증을 원복하시겠습니까? UNVERIFIED/disabled로 되돌아갑니다.');">
+      <input type="hidden" name="datasetCode" value="land_bldg_check">
+      <button type="submit" class="btn btn-secondary">검증 원복</button>
+    </form>
+  </div>
+
+  <!-- 카드 1b-4: land_bldg_check PNU 테스트 수집/승격 -->
+  <div class="card">
+    <div class="card-title">
+      land_bldg_check PNU 테스트 수집/승격
+      <span th:if="${landBldgCheckRunning}" class="badge badge-warn">실행 중</span>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+      <input type="text" id="land-bldg-check-pnu" placeholder="PNU 19자리" maxlength="19"
+             style="padding:8px 12px;border-radius:8px;border:1px solid #2e3640;background:#14171c;color:#e7eaee;font-family:'JetBrains Mono',monospace;width:220px;">
+      <button class="btn btn-primary" id="btn-land-bldg-check-ingest" th:disabled="${landBldgCheckRunning}"
+              onclick="runLandBldgCheckIngest()">테스트 수집</button>
+      <button class="btn btn-secondary" id="btn-land-bldg-check-promote" th:disabled="${landBldgCheckRunning}" disabled
+              onclick="runLandBldgCheckPromote()">업무 테이블로 승격</button>
+    </div>
+    <div id="land-bldg-check-result" class="result-box" th:if="${lastLandBldgCheckResult}" th:text="${lastLandBldgCheckResult}"></div>
+    <div id="land-bldg-check-result-js" class="result-box" style="display:none;"></div>
+    <pre id="land-bldg-check-preview" class="result-box" style="display:none;"></pre>
+  </div>
+
+  <!-- 카드 1b-5: 데이터셋 계약 상태 — collective_building -->
+  <div class="card">
+    <div class="card-title">
+      데이터셋 계약 상태 — collective_building
+      <span th:if="${collectiveBuildingStatus == 'VERIFIED' and collectiveBuildingEnabled}" class="badge badge-on">VERIFIED · enabled</span>
+      <span th:unless="${collectiveBuildingStatus == 'VERIFIED' and collectiveBuildingEnabled}" class="badge badge-warn"
+            th:text="${collectiveBuildingStatus} + ' · ' + (${collectiveBuildingEnabled} ? 'enabled' : 'disabled')"></span>
+      <span class="badge" style="background:#3a1f1f;color:#e88a82;">conn_svc_id 미확인</span>
+    </div>
     <p style="font-size:13px;color:#9aa2ad;margin-bottom:14px;">
-      아직 실제 적재 코드(<code>KrasPnuIngestService</code>)는 없습니다 — 이 표는 각 API가 나중에 어떤 업무 테이블로
+      "대지권등록부(건물조회)" — PNU 하나에 집합건물이 여러 동이면 응답이 반복 구조(docs/reference/kras.md §4)라
+      승격도 land_info/land_bldg_check와 다른 방식(신원 매칭 후 UPSERT, pnu+cbldg_seqno)을 씁니다.
+      실제 KRAS conn_svc_id가 이 저장소 어디에도 없어서(kras.sync_dataset.service_code=NULL) 매퍼는
+      완성됐지만 실제 호출은 막혀 있습니다 — 담당자가 ID를 확인해 <code>CollectiveBuildingMapper.connSvcId()</code>에
+      채워야 테스트 수집이 실제로 동작합니다.
+    </p>
+    <div style="overflow-x:auto;margin-bottom:16px;">
+      <table class="hist-table">
+        <thead><tr><th>응답 항목(XML 태그)</th><th>stage 테이블</th><th>승격 대상(업무 테이블)</th><th>비고</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>ADM_SECT_CD, LAND_LOC_CD, LEDG_GBN, BOBN, BUBN</td>
+            <td>kras.stage_parcel</td>
+            <td>kras.parcel</td>
+            <td>반복 항목 첫 번째 것에서 읽어 PNU와 대조(모든 항목에 동일하게 들어있음)</td>
+          </tr>
+          <tr>
+            <td>CBLDG_SEQNO, CBLDG_NM (LAND_RGT_BLDG_INFO 반복)</td>
+            <td>kras.stage_collective_building</td>
+            <td>kras.collective_building</td>
+            <td>collective_unit이 collective_building_id를 참조하므로 삭제 후 재삽입 금지 — pnu+cbldg_seqno로 기존 행 찾아 UPDATE, 없으면 INSERT</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div th:unless="${collectiveBuildingStatus == 'VERIFIED' and collectiveBuildingEnabled}">
+      <form method="post" action="/kras-db/verify-dataset" id="verify-form-collective-building">
+        <input type="hidden" name="datasetCode" value="collective_building">
+        <div class="confirm-row">
+          <input type="checkbox" id="verify-confirm-collective-building" onchange="document.getElementById('verify-submit-collective-building').disabled = !this.checked;">
+          <label for="verify-confirm-collective-building">실제 운영 응답으로 collective_building 계약을 확인했음</label>
+        </div>
+        <input type="hidden" name="confirmed" id="verify-confirmed-collective-building" value="false">
+        <button type="submit" id="verify-submit-collective-building" class="btn btn-primary" disabled
+                onclick="document.getElementById('verify-confirmed-collective-building').value='true';">계약 확인 → VERIFIED로 전환</button>
+      </form>
+    </div>
+    <form th:if="${collectiveBuildingStatus == 'VERIFIED' and collectiveBuildingEnabled}" method="post" action="/kras-db/revert-dataset"
+          onsubmit="return confirm('collective_building 검증을 원복하시겠습니까? UNVERIFIED/disabled로 되돌아갑니다.');">
+      <input type="hidden" name="datasetCode" value="collective_building">
+      <button type="submit" class="btn btn-secondary">검증 원복</button>
+    </form>
+  </div>
+
+  <!-- 카드 1b-6: collective_building PNU 테스트 수집/승격 -->
+  <div class="card">
+    <div class="card-title">
+      collective_building PNU 테스트 수집/승격
+      <span th:if="${collectiveBuildingRunning}" class="badge badge-warn">실행 중</span>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+      <input type="text" id="collective-building-pnu" placeholder="PNU 19자리" maxlength="19"
+             style="padding:8px 12px;border-radius:8px;border:1px solid #2e3640;background:#14171c;color:#e7eaee;font-family:'JetBrains Mono',monospace;width:220px;">
+      <button class="btn btn-primary" id="btn-collective-building-ingest" th:disabled="${collectiveBuildingRunning}"
+              onclick="runCollectiveBuildingIngest()">테스트 수집</button>
+      <button class="btn btn-secondary" id="btn-collective-building-promote" th:disabled="${collectiveBuildingRunning}" disabled
+              onclick="runCollectiveBuildingPromote()">업무 테이블로 승격</button>
+    </div>
+    <p style="font-size:12px;color:#5b626d;margin-top:10px;">conn_svc_id가 없어 지금은 테스트 수집을 눌러도 바로 실패 메시지가 뜹니다 — 위 카드 설명 참고.</p>
+    <div id="collective-building-result" class="result-box" th:if="${lastCollectiveBuildingResult}" th:text="${lastCollectiveBuildingResult}"></div>
+    <div id="collective-building-result-js" class="result-box" style="display:none;"></div>
+    <pre id="collective-building-preview" class="result-box" style="display:none;"></pre>
+  </div>
+
+  <!-- 카드 1c: PNU 단건 API 계약 상태 — land_info/land_bldg_check 제외 17개 -->
+  <div class="card">
+    <div class="card-title">데이터셋 계약 상태 — PNU 단건 API 17개</div>
+    <p style="font-size:13px;color:#9aa2ad;margin-bottom:14px;">
+      아직 실제 파싱·적재 매퍼는 없습니다(land_info/land_bldg_check만 구현됨) — 이 표는 각 API가 나중에 어떤 업무 테이블로
       승격될지 미리 정리해 둔 것입니다. "테스트"로 실제 응답을 먼저 확인한 뒤 VERIFIED로 전환하세요.
     </p>
     <div style="overflow-x:auto;">
@@ -265,6 +436,76 @@ async function run(url, btnId) {
     promoteBtn.disabled = false;
   }
 }
+
+// PNU 단건 매퍼 카드(land-info, land-bldg-check, ...) 공용 — slug만 다르고 나머지는 동일한 패턴.
+const pnuItemIds = {};
+
+async function runPnuIngest(slug) {
+  const pnu = document.getElementById(slug + '-pnu').value.trim();
+  const ingestBtn = document.getElementById('btn-' + slug + '-ingest');
+  const promoteBtn = document.getElementById('btn-' + slug + '-promote');
+  const box = document.getElementById(slug + '-result-js');
+  const preview = document.getElementById(slug + '-preview');
+  ingestBtn.disabled = true;
+  promoteBtn.disabled = true;
+  box.style.display = 'block';
+  box.className = 'result-box';
+  box.textContent = '수집 중...';
+  preview.style.display = 'none';
+  try {
+    const res = await fetch('/kras-db/ingest/' + slug + '?pnu=' + encodeURIComponent(pnu), { method: 'POST' });
+    const data = await res.json();
+    box.textContent = data.message || JSON.stringify(data);
+    box.classList.add(data.success ? 'ok' : 'err');
+    if (data.success && data.preview) {
+      preview.style.display = 'block';
+      preview.textContent = JSON.stringify(data.preview, null, 2);
+    }
+    if (data.success && data.promotable) {
+      pnuItemIds[slug] = data.itemId;
+      promoteBtn.disabled = false;
+    } else {
+      pnuItemIds[slug] = null;
+    }
+  } catch (err) {
+    box.textContent = '요청 실패: ' + err;
+    box.classList.add('err');
+  } finally {
+    ingestBtn.disabled = false;
+  }
+}
+
+async function runPnuPromote(slug) {
+  const itemId = pnuItemIds[slug];
+  if (!itemId) return;
+  const ingestBtn = document.getElementById('btn-' + slug + '-ingest');
+  const promoteBtn = document.getElementById('btn-' + slug + '-promote');
+  ingestBtn.disabled = true;
+  promoteBtn.disabled = true;
+  const box = document.getElementById(slug + '-result-js');
+  box.style.display = 'block';
+  box.className = 'result-box';
+  box.textContent = '승격 중...';
+  try {
+    const res = await fetch('/kras-db/promote/' + slug + '?itemId=' + itemId, { method: 'POST' });
+    const data = await res.json();
+    box.textContent = data.message || JSON.stringify(data);
+    box.classList.add(data.success ? 'ok' : 'err');
+  } catch (err) {
+    box.textContent = '요청 실패: ' + err;
+    box.classList.add('err');
+  } finally {
+    ingestBtn.disabled = false;
+    promoteBtn.disabled = !pnuItemIds[slug];
+  }
+}
+
+function runLandInfoIngest() { return runPnuIngest('land-info'); }
+function runLandInfoPromote() { return runPnuPromote('land-info'); }
+function runLandBldgCheckIngest() { return runPnuIngest('land-bldg-check'); }
+function runLandBldgCheckPromote() { return runPnuPromote('land-bldg-check'); }
+function runCollectiveBuildingIngest() { return runPnuIngest('collective-building'); }
+function runCollectiveBuildingPromote() { return runPnuPromote('collective-building'); }
 </script>
 </th:block>
 </body>
