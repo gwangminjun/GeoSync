@@ -14,6 +14,7 @@
 | `docs/reference/2026-09-18/kras.md` | KRAS 연계 규격서(§1~16) |
 | **이 문서** | **위 설계 중 구현 완료된 부분의 실제 구조** |
 | `docs/reference/2026-09-22/kras-contract-verification-runbook.md` | 17개 데이터셋 계약 검증 절차(운영 런북) |
+| `docs/reference/2026-09-22/kras-service-catalog.md` | 서비스 ID 카탈로그 — 어떤 데이터가 어느 API에 있나 |
 
 설계 문서와 어긋나는 부분이 있으면 **이 문서가 맞다**(설계 문서는 구현 전 시점에 멈춰 있다).
 
