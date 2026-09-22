@@ -34,7 +34,7 @@ public class MockGatewayController {
 
     private static final Logger log = LoggerFactory.getLogger(MockGatewayController.class);
 
-    private static final String DEFAULT_PNU = "4687025625111190010";
+    private static final String DEFAULT_PNU = "1283025625111190010";
 
     public MockGatewayController() {
         log.warn("[MockGW] mock estateGateway 활성화 — 개발 환경 전용 (/mock/estateGateway)");

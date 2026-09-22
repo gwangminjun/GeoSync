@@ -60,7 +60,7 @@ public class SettingsController {
     @Value("${spring.config.location:conf/application.yml}")
     private String configLocation;
 
-    @Value("${kras.chk-pnu:4687025625111190010}")
+    @Value("${kras.chk-pnu:1283025625111190010}")
     private String defaultChkPnu;
 
     // ── GET /settings ────────────────────────────────────────────────────────
@@ -413,7 +413,7 @@ public class SettingsController {
           .append("ods:\n")
           .append("  schema: ").append(yaml(safe(p.get("ods_schema")).isEmpty() ? "ods" : p.get("ods_schema"))).append("\n\n")
           .append("sync:\n")
-          .append("  org-code: ").append(yaml(safe(p.get("sync_org_code")).isEmpty() ? "46870" : p.get("sync_org_code"))).append("\n\n")
+          .append("  org-code: ").append(yaml(safe(p.get("sync_org_code")).isEmpty() ? "12830" : p.get("sync_org_code"))).append("\n\n")
           .append("targets:\n");
 
         for (int i = 0; i < count; i++) {

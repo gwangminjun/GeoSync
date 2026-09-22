@@ -36,6 +36,15 @@ public class KrasHistoryController {
         }
     }
 
+    @GetMapping("/operations/{operationId}")
+    public Map<String, Object> operation(@PathVariable long operationId) {
+        try {
+            return history.operation(targets.getConfiguredTargets().get(0).jdbc(), settings.orgCode(), operationId);
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
+        }
+    }
+
     @GetMapping("/readiness")
     public Map<String, Object> readiness(@RequestParam String dataset) {
         var reasons = history.readiness(targets.getConfiguredTargets().get(0).jdbc(), dataset);

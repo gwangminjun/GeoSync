@@ -24,9 +24,9 @@ class KrasHistoryServiceTest {
 
     @Test
     void rejectsItemOutsideCurrentOrganization() {
-        when(jdbc.queryForList(contains("si.item_id=? AND si.org_cd=?"), eq(44L), eq("46870")))
+        when(jdbc.queryForList(contains("si.item_id=? AND si.org_cd=?"), eq(44L), eq("12830")))
                 .thenReturn(List.of());
-        assertThatThrownBy(() -> service.preview(jdbc, "46870", 44L))
+        assertThatThrownBy(() -> service.preview(jdbc, "12830", 44L))
                 .isInstanceOf(IllegalArgumentException.class);
         verify(jdbc, never()).query(contains("stage_"), any(org.springframework.jdbc.core.RowMapper.class), any(Object[].class));
     }
@@ -34,34 +34,34 @@ class KrasHistoryServiceTest {
     @Test
     void listsOnlyCurrentOrganizationWithBoundedLimit() {
         when(jdbc.queryForObject(contains("to_regclass"), eq(String.class))).thenReturn(null);
-        service.history(jdbc, "46870", "land_info", 9999);
-        verify(jdbc).queryForList(contains("si.org_cd=?"), eq("46870"), eq("land_info"), eq("land_info"), eq(100));
+        service.history(jdbc, "12830", "land_info", 9999);
+        verify(jdbc).queryForList(contains("si.org_cd=?"), eq("12830"), eq("land_info"), eq("land_info"), eq(100));
     }
 
     @Test
     void failedItemCannotBeResumed() {
-        when(jdbc.queryForList(contains("si.item_id=? AND si.org_cd=?"), eq(44L), eq("46870")))
+        when(jdbc.queryForList(contains("si.item_id=? AND si.org_cd=?"), eq(44L), eq("12830")))
                 .thenReturn(List.of(Map.of("item_id", 44L, "dataset_code", "land_info", "status", "FAILED")));
         when(jdbc.queryForList(contains("sync_dataset"), eq("land_info"))).thenReturn(List.of(
                 Map.of("contract_status", "VERIFIED", "enabled", true, "service_code", "KRAS000002")));
-        assertThat(service.preview(jdbc, "46870", 44L)).containsEntry("promotable", false);
+        assertThat(service.preview(jdbc, "12830", 44L)).containsEntry("promotable", false);
     }
 
     @Test
     void rejectsPnuFromDifferentOrganizationBeforeGatewayCall() {
-        assertThatThrownBy(() -> service.requirePnuInput("46870", "1111025021100010000", "land_info", Map.of()))
+        assertThatThrownBy(() -> service.requirePnuInput("12830", "1111025021100010000", "land_info", Map.of()))
                 .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("기관");
     }
 
     @Test
     void requiresBuildingIdentifierForDrilldown() {
-        assertThatThrownBy(() -> service.requirePnuInput("46870", "4687025021100010000", "bldg_ho_info", Map.of()))
+        assertThatThrownBy(() -> service.requirePnuInput("12830", "1283025021100010000", "bldg_ho_info", Map.of()))
                 .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("bldg_gbn_no");
     }
 
     @Test
     void requiresNineteenDigitPnu() {
-        assertThatThrownBy(() -> service.requirePnuInput("46870", "not-a-pnu", "land_info", Map.of()))
+        assertThatThrownBy(() -> service.requirePnuInput("12830", "not-a-pnu", "land_info", Map.of()))
                 .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("19");
     }
 }

@@ -17,7 +17,7 @@ class KrasPromotionGuardTest {
     void pnuPromotionRequiresMatchingDatasetInDatabaseLookup() throws Exception {
         JdbcTemplate jdbc = transactionWithNoMatchingItem();
         var service = new KrasPnuIngestService(null, null, new KrasStagePromotionService(), null);
-        assertThatThrownBy(() -> service.promote(jdbc, "46870", new LandInfoMapper(), 99L))
+        assertThatThrownBy(() -> service.promote(jdbc, "12830", new LandInfoMapper(), 99L))
                 .isInstanceOf(IllegalStateException.class);
     }
 

@@ -40,7 +40,7 @@ class KrasIntegrationViewTest {
             context.setVariable(prefix + "Running", false);
         }
         context.setVariable("currentPage", "kras-db");
-        context.setVariable("orgCode", "46870");
+        context.setVariable("orgCode", "12830");
         context.setVariable("ingestRunning", false);
         context.setVariable("usezoneRunning", false);
         context.setVariable("recentRuns", List.of());

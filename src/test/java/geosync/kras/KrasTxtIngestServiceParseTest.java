@@ -45,12 +45,12 @@ class KrasTxtIngestServiceParseTest {
     @Test
     void fallsBackToPipeWhenAscii11Absent() throws Exception {
         // 기존 KrasTxtLoaderService가 다루던 파이프 구분 형식도 그대로 읽혀야 한다
-        String text = "4687025625|2026|123456|01|Y\n4687025626|2026|654321|01|N";
+        String text = "1283025625|2026|123456|01|Y\n1283025626|2026|654321|01|N";
 
         List<String[]> rows = parse(text, 5);
 
         assertThat(rows).hasSize(2);
-        assertThat(rows.get(0)).containsExactly("4687025625", "2026", "123456", "01", "Y");
+        assertThat(rows.get(0)).containsExactly("1283025625", "2026", "123456", "01", "Y");
     }
 
     @Test

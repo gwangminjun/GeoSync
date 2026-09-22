@@ -33,7 +33,7 @@ public class RuntimeSettingsService {
     @Value("${kras.conn-sys-id:}")
     private String defaultKrasConnSysId;
 
-    @Value("${kras.chk-pnu:4687025625111190010}")
+    @Value("${kras.chk-pnu:1283025625111190010}")
     private String defaultKrasChkPnu;
 
     @Value("${kras.config:conf/kras/base-tables.xml}")
@@ -63,7 +63,7 @@ public class RuntimeSettingsService {
     @Value("${ods.schema:ods}")
     private String defaultOdsSchema;
 
-    @Value("${sync.org-code:46870}")
+    @Value("${sync.org-code:12830}")
     private String defaultOrgCode;
 
     @Value("${sync.enabled:true}")

@@ -17,7 +17,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  */
 class KrasSpecMapperTest {
 
-    private static final String PNU = "4687025625102000001";
+    private static final String PNU = "1283025625102000001";
 
     private static Document parse(String xml) throws Exception {
         return XmlUtil.parse(xml.getBytes(StandardCharsets.UTF_8));

@@ -1470,7 +1470,12 @@ async function runUsezoneAction(url, method) {
   layersBox.style.display = 'none';
   try {
     const res = await krasRequest(url, { method: method || 'POST' });
-    const data = await res.json();
+    let data = await res.json();
+    if (data.status === 'RUNNING' && data.operationId) {
+      data = await krasPollOperation(data.operationId, (row, elapsedSec) => {
+        box.textContent = '백그라운드에서 실행 중... (' + elapsedSec + '초 경과)';
+      });
+    }
     box.textContent = krasResultMessage(data);
     box.classList.add(krasResultClass(data));
     if (window.refreshKrasHistory) await window.refreshKrasHistory();
@@ -1526,7 +1531,12 @@ async function runTxtAction(slug, url) {
   box.textContent = '실행 중... (전체 파일이라 시간이 걸릴 수 있습니다)';
   try {
     const res = await krasRequest(url, { method: 'POST' });
-    const data = await res.json();
+    let data = await res.json();
+    if (data.status === 'RUNNING' && data.operationId) {
+      data = await krasPollOperation(data.operationId, (row, elapsedSec) => {
+        box.textContent = '백그라운드에서 실행 중... (' + elapsedSec + '초 경과, 전체 파일이라 시간이 걸릴 수 있습니다)';
+      });
+    }
     box.textContent = krasResultMessage(data);
     box.classList.add(krasResultClass(data));
     if (window.refreshKrasHistory) await window.refreshKrasHistory();

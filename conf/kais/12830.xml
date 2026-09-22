@@ -1,8 +1,8 @@
 ﻿<?xml version="1.0" encoding="UTF-8"?>
 <sync>
-	<sync-source name='kais46870' />
+	<sync-source name='kais12830' />
 	<sync-targets>
-		<target name='kais46870' enabled='true' />
+		<target name='kais12830' enabled='true' />
 	</sync-targets>
 	<sync-tables file='CONF_HOME/kais/base-tables.xml'></sync-tables>
 </sync>

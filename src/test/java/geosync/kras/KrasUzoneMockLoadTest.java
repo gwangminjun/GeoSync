@@ -61,6 +61,15 @@ class KrasUzoneMockLoadTest {
 
         // test 스키마 생성 (없으면)
         jdbc.execute("CREATE SCHEMA IF NOT EXISTS " + TEST_SCHEMA);
+        // replaceAllTo의 DELETE는 현재 org_cd 기준이라, 과거 다른 org_cd로 실행했을 때 남은 행은 안 지워진다
+        // (예: 이전 세션에서 org_cd=46870으로 쌓인 행). 이 테스트는 매번 이 3건만 있다고 가정하므로 먼저 비운다.
+        jdbc.execute("""
+            DO $$ BEGIN
+                IF to_regclass('test.lt_c_uzone') IS NOT NULL THEN
+                    EXECUTE 'TRUNCATE test.lt_c_uzone';
+                END IF;
+            END $$
+            """);
 
         // USEZONE: API가 5186으로 반환 → transform 없이 5186으로 직접 저장
         int storageEpsg = coordTransformer.getStorageEpsg();
@@ -97,7 +106,7 @@ class KrasUzoneMockLoadTest {
 
         // feature 1
         Map<String, Object> r1 = new LinkedHashMap<>();
-        r1.put("mnum",     "4687025625-UQ112-0001");
+        r1.put("mnum",     "1283025625-UQ112-0001");
         r1.put("ulyr",     "UQ112");
         r1.put("ucode",    "UQ0112");
         r1.put("uname",    "제2종일반주거지역");
@@ -108,7 +117,7 @@ class KrasUzoneMockLoadTest {
 
         // feature 2
         Map<String, Object> r2 = new LinkedHashMap<>();
-        r2.put("mnum",     "4687025625-UQ112-0002");
+        r2.put("mnum",     "1283025625-UQ112-0002");
         r2.put("ulyr",     "UQ112");
         r2.put("ucode",    "UQ0112");
         r2.put("uname",    "제2종일반주거지역");
@@ -119,7 +128,7 @@ class KrasUzoneMockLoadTest {
 
         // feature 3
         Map<String, Object> r3 = new LinkedHashMap<>();
-        r3.put("mnum",     "4687025625-UQ112-0003");
+        r3.put("mnum",     "1283025625-UQ112-0003");
         r3.put("ulyr",     "UQ112");
         r3.put("ucode",    "UQ0112");
         r3.put("uname",    "제2종일반주거지역");

@@ -443,14 +443,19 @@ public class KrasSchemaController {
         });
     }
 
-    /** 용도지역 §9.1 절차 1~4 — release 생성/seal + 레이어별 SHP 수집(레이어당 별도 트랜잭션, 부분 실패 허용). */
+    /**
+     * 용도지역 §9.1 절차 1~4 — release 생성/seal + 레이어별 SHP 수집(레이어당 별도 트랜잭션, 부분 실패 허용).
+     * 레이어가 수십 개면 KRAS를 그만큼 순차 호출해 오래 걸릴 수 있어 비동기로 돌린다(설계 §2차-1) —
+     * 즉시 operationId를 반환하고 화면은 GET /kras-db/operations/{id}를 폴링한다.
+     */
     @PostMapping("/kras-db/usezone/sweep")
     @ResponseBody
     public Map<String, Object> sweepUsezoneLayers(@RequestParam long catalogItemId) {
-        return executeOperation("usezone_file", "SWEEP", null, "catalog=" + catalogItemId, (targetJdbc, orgCd) -> {
-            if (!usezoneRunning.compareAndSet(false, true)) {
-                return Map.of("error", "이미 실행 중입니다.");
-            }
+        if (!usezoneRunning.compareAndSet(false, true)) {
+            return Map.of("error", "이미 실행 중입니다.");
+        }
+        Map<String, Object> response = executeOperationAsync("usezone_file", "SWEEP", null,
+                "catalog=" + catalogItemId, (targetJdbc, orgCd) -> {
             try {
                 KrasUsezoneIngestService.SweepResult result =
                         usezoneIngestService.runLayerSweep(targetJdbc, orgCd, catalogItemId, "UI");
@@ -468,6 +473,8 @@ public class KrasSchemaController {
                 usezoneRunning.set(false);
             }
         });
+        if (!"RUNNING".equals(response.get("status"))) usezoneRunning.set(false);
+        return response;
     }
 
     /** 용도지역 §9.1 절차 5 — publish_spatial_release()가 전체 완전성을 검증(부분 실패 시 여기서 막힘). */
@@ -506,14 +513,17 @@ public class KrasSchemaController {
         });
     }
 
-    /** 토지기본정보 전체 TXT(KRAS000040) 수집 — kras.stage_parcel/stage_land_basic까지만 채운다. */
+    /**
+     * 토지기본정보 전체 TXT(KRAS000040) 수집 — kras.stage_parcel/stage_land_basic까지만 채운다.
+     * 기관 전체 파일이라 오래 걸릴 수 있어 비동기로 돌린다(설계 §2차-1).
+     */
     @PostMapping("/kras-db/ingest/land-basic-file")
     @ResponseBody
     public Map<String, Object> ingestLandBasicFile() {
-        return executeOperation("land_basic_file", "INGEST", null, (targetJdbc, orgCd) -> {
-            if (!landBasicFileRunning.compareAndSet(false, true)) {
-                return Map.of("error", "이미 실행 중입니다.");
-            }
+        if (!landBasicFileRunning.compareAndSet(false, true)) {
+            return Map.of("error", "이미 실행 중입니다.");
+        }
+        Map<String, Object> response = executeOperationAsync("land_basic_file", "INGEST", null, "", (targetJdbc, orgCd) -> {
             try {
                 KrasTxtIngestService.IngestResult result =
                         txtIngestService.ingestLandBasic(targetJdbc, orgCd, "UI");
@@ -532,6 +542,8 @@ public class KrasSchemaController {
                 landBasicFileRunning.set(false);
             }
         });
+        if (!"RUNNING".equals(response.get("status"))) landBasicFileRunning.set(false);
+        return response;
     }
 
     /** 토지기본정보 승격 — kras.parcel/kras.land_basic 자연키 UPSERT. */
@@ -557,14 +569,17 @@ public class KrasSchemaController {
         });
     }
 
-    /** 공시지가 전체 TXT(KRAS000039) 수집 — kras.land_price_file_row 직행이라 승격 단계가 없다. */
+    /**
+     * 공시지가 전체 TXT(KRAS000039) 수집 — kras.land_price_file_row 직행이라 승격 단계가 없다.
+     * 기관 전체 파일이라 오래 걸릴 수 있어 비동기로 돌린다(설계 §2차-1).
+     */
     @PostMapping("/kras-db/ingest/land-price-file")
     @ResponseBody
     public Map<String, Object> ingestLandPriceFile() {
-        return executeOperation("land_price_file", "INGEST", null, (targetJdbc, orgCd) -> {
-            if (!landPriceFileRunning.compareAndSet(false, true)) {
-                return Map.of("error", "이미 실행 중입니다.");
-            }
+        if (!landPriceFileRunning.compareAndSet(false, true)) {
+            return Map.of("error", "이미 실행 중입니다.");
+        }
+        Map<String, Object> response = executeOperationAsync("land_price_file", "INGEST", null, "", (targetJdbc, orgCd) -> {
             try {
                 KrasTxtIngestService.IngestResult result =
                         txtIngestService.ingestLandPrice(targetJdbc, orgCd, "UI");
@@ -583,6 +598,8 @@ public class KrasSchemaController {
                 landPriceFileRunning.set(false);
             }
         });
+        if (!"RUNNING".equals(response.get("status"))) landPriceFileRunning.set(false);
+        return response;
     }
 
     /**
@@ -844,6 +861,50 @@ public class KrasSchemaController {
         } finally {
             lock.set(false);
         }
+    }
+
+    /**
+     * executeOperation()과 같은 락·이력·사전점검 흐름을 쓰지만, 실제 작업(operation)은 백그라운드
+     * 스레드(KrasOperationLogService.runAsync, @Async)에 넘기고 즉시 operationId를 반환한다 —
+     * 전체 TXT 수집·레이어 순회처럼 오래 걸리는 작업이 HTTP 요청을 붙잡지 않게 하기 위함(설계 §2차-1).
+     * 화면은 이 operationId로 GET /kras-db/operations/{id}를 폴링해 진행 상태를 확인한다.
+     * 락은 백그라운드 작업이 끝난 뒤(runAsync의 onComplete)에만 풀린다 — 동시에 같은 데이터셋을 또
+     * 실행할 수 없다는 보장은 동기 버전과 동일하다.
+     */
+    private Map<String, Object> executeOperationAsync(String dataset, String action, Long itemId,
+                                                        String requestSummary, Operation operation) {
+        String orgCd = settings.orgCode();
+        AtomicBoolean lock = operationLocks.computeIfAbsent(orgCd + ":" + dataset, key -> new AtomicBoolean());
+        if (!lock.compareAndSet(false, true)) {
+            return Map.of("success", false, "message", "같은 연계의 작업이 이미 실행 중입니다.");
+        }
+        JdbcTemplate targetJdbc;
+        Long operationId;
+        try {
+            targetJdbc = jdbc();
+            operationId = operationLog.startOperation(targetJdbc, orgCd, dataset, action, itemId, requestSummary);
+        } catch (Exception e) {
+            lock.set(false);
+            log.error("[KrasSchema] 비동기 작업 준비 실패", e);
+            return Map.of("success", false,
+                    "message", "실행 이력을 저장할 수 없어 작업을 시작하지 않았습니다. DB 연결과 kras 스키마 쓰기 권한을 확인하세요.");
+        }
+        JdbcTemplate finalJdbc = targetJdbc;
+        operationLog.runAsync(finalJdbc, orgCd, dataset, action, operationId, itemId, () -> {
+            historyService.requireReady(finalJdbc, dataset);
+            if ("SWEEP".equals(action)) historyService.requireReady(finalJdbc, "layer_list");
+            if (itemId != null) {
+                List<String> statuses = finalJdbc.query(
+                        "SELECT status FROM kras.sync_item WHERE item_id=? AND org_cd=? AND dataset_code=?",
+                        (rs, rowNum) -> rs.getString(1), itemId, orgCd, dataset);
+                if (statuses.isEmpty() || !"SUCCESS".equals(statuses.get(0))) {
+                    throw new IllegalArgumentException("현재 기관·데이터셋의 검증된 수집 건만 반영할 수 있습니다.");
+                }
+            }
+            return operation.run(finalJdbc, orgCd);
+        }, () -> lock.set(false));
+        return Map.of("success", true, "status", "RUNNING", "operationId", operationId, "datasetCode", dataset,
+                "message", "백그라운드에서 실행 중입니다 — 진행 상태를 조회하세요.");
     }
 
     private JdbcTemplate jdbc() {

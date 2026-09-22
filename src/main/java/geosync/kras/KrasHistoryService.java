@@ -115,6 +115,19 @@ public class KrasHistoryService {
         return Map.of("items", items, "operations", operations, "hasOperationLog", hasLog);
     }
 
+    /** 비동기 실행(전체 TXT 수집, 용도지역 레이어 순회)의 진행 상태 폴링용. */
+    public Map<String, Object> operation(JdbcTemplate jdbc, String orgCd, long operationId) {
+        boolean hasLog = jdbc.queryForObject("SELECT to_regclass('kras.ui_operation_log')::text", String.class) != null;
+        if (!hasLog) throw new IllegalArgumentException("실행 기록이 없습니다.");
+        List<Map<String, Object>> rows = jdbc.queryForList("""
+            SELECT operation_id, dataset_code, action, status, item_id, release_id,
+                   started_at, ended_at, request_summary, message, details::text AS details
+            FROM kras.ui_operation_log WHERE operation_id=? AND org_cd=?
+            """, operationId, orgCd);
+        if (rows.isEmpty()) throw new IllegalArgumentException("현재 기관에서 해당 실행 기록을 찾을 수 없습니다.");
+        return rows.get(0);
+    }
+
     public Map<String, Object> preview(JdbcTemplate jdbc, String orgCd, long itemId) {
         List<Map<String, Object>> rows = jdbc.queryForList("""
             SELECT si.item_id, si.dataset_code, si.status, si.scope_key, si.rows_valid, si.rows_rejected,

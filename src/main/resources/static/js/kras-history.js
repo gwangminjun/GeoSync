@@ -16,6 +16,37 @@ async function krasRequest(url, options) {
   return response;
 }
 
+/**
+ * 비동기 실행(전체 TXT 수집, 용도지역 레이어 순회)의 진행 상태를 폴링한다.
+ * 서버는 총 처리량을 미리 알 수 없어 퍼센트 진행률 대신 경과 시간만 준다(onTick으로 매 조회마다 전달).
+ * 종료 상태에 도달하면 기존 동기 결과(success/outcome/message/...)와 같은 모양으로 맞춰 반환한다 —
+ * 호출부(runTxtAction/runUsezoneAction)가 동기/비동기 경로를 같은 코드로 처리할 수 있게 하기 위함.
+ */
+async function krasPollOperation(operationId, onTick) {
+  const terminal = new Set(['SUCCESS', 'FAILED', 'PARTIAL', 'WARNING']);
+  const startedAt = Date.now();
+  for (;;) {
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    const row = await (await krasRequest('/kras-db/operations/' + encodeURIComponent(operationId))).json();
+    const elapsedSec = Math.round((Date.now() - startedAt) / 1000);
+    if (onTick) onTick(row, elapsedSec);
+    if (terminal.has(row.status)) {
+      let layers = null;
+      try { layers = JSON.parse(row.details || '{}').layers; } catch (_) { /* 이전 형식은 무시 */ }
+      return {
+        success: row.status !== 'FAILED',
+        outcome: row.status,
+        promotable: row.status === 'SUCCESS',
+        message: row.message,
+        itemId: row.item_id,
+        releaseId: row.release_id,
+        operationId: row.operation_id,
+        layers,
+      };
+    }
+  }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   const byId = id => document.getElementById(id);
   const filter = byId('history-dataset');
