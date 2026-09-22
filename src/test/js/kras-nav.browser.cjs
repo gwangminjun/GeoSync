@@ -1,5 +1,5 @@
 // Run after KrasIntegrationViewTest; PLAYWRIGHT_MODULE points to an installed playwright package.
-// 목록·상세 사이드바(검색/상태필터/포커스)와 반영 전 비교 패널을 검증한다 — 기존 카드 HTML/JS는 건드리지 않았는지도
+// 목록·상세 사이드바(검색/상태필터/팝업)와 반영 전 비교 패널을 검증한다 — 기존 카드 HTML/JS는 건드리지 않았는지도
 // 간접 확인한다(카드 버튼이 여전히 동작하는지는 kras-history.browser.cjs가 이미 검증한다).
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const fs = require('node:fs');
@@ -49,11 +49,37 @@ const assert = require('node:assert/strict');
     await page.locator('#dataset-nav-status').selectOption('');
     assert.equal(await navItem.isVisible(), true, '필터 해제 후 다시 보여야 함');
 
-    // 목록 클릭 → 해당 카드로 이동 + 잠깐 하이라이트.
+    // 목록 클릭 → 팝업에 해당 카드가 뜬다(카드 자체를 옮긴 것이므로 버튼 id/onclick도 그대로 살아있다).
     await navItem.locator('a').click();
-    await page.waitForFunction(() => document.getElementById('card-use-zone').classList.contains('card-highlight'));
-    await page.waitForFunction(() => !document.getElementById('card-use-zone').classList.contains('card-highlight'),
-      { timeout: 5000 });
+    await page.locator('#dataset-modal-backdrop:not([hidden])').waitFor();
+    assert.equal(await page.locator('#dataset-modal-body #card-use-zone').isVisible(), true,
+      '팝업 안에 실제 카드 노드가 들어가야 함');
+    assert.equal(await page.locator('#card-use-zone').count(), 1, '카드는 복제가 아니라 이동이어야 함(중복 없음)');
+    await page.locator('#dataset-modal-close').click();
+    await page.locator('#dataset-modal-backdrop[hidden]').waitFor({ state: 'attached' });
+    assert.equal(await page.locator('#dataset-modal-body #card-use-zone').count(), 0,
+      '닫으면 카드가 팝업 밖으로(원래 자리로) 돌아와야 함');
+    assert.equal(await page.locator('#card-use-zone').isVisible(), false,
+      '닫으면 카드는 다시 기본 숨김(kras-hide) 상태여야 함 — 스크롤 화면에 노출되면 안 됨');
+
+    // 백드롭 클릭으로도 닫힌다.
+    await navItem.locator('a').click();
+    await page.locator('#dataset-modal-backdrop:not([hidden])').waitFor();
+    await page.locator('#dataset-modal-backdrop').click({ position: { x: 5, y: 5 } });
+    await page.locator('#dataset-modal-backdrop[hidden]').waitFor({ state: 'attached' });
+
+    // companion 카드가 있는 데이터셋(land_info: 계약상태 카드 + PNU 테스트 카드)은 둘 다 같이 옮겨져야 한다.
+    await page.evaluate(() => krasOpenDatasetModal('land-info', 'land_info'));
+    await page.locator('#dataset-modal-backdrop:not([hidden])').waitFor();
+    assert.equal(await page.locator('#dataset-modal-body #card-land-info').count(), 1, '주 카드가 팝업에 있어야 함');
+    assert.equal(await page.locator('#dataset-modal-body [data-companion-of="land-info"]').count(), 1,
+      'companion 카드도 같이 옮겨져야 함');
+    await page.locator('#dataset-modal-close').click();
+    await page.locator('#dataset-modal-backdrop[hidden]').waitFor({ state: 'attached' });
+    assert.equal(await page.locator('#dataset-modal-body [data-companion-of="land-info"]').count(), 0,
+      '닫으면 companion 카드도 팝업 밖으로 돌아와야 함');
+    assert.equal(await page.locator('[data-companion-of="land-info"]').isVisible(), false,
+      '닫으면 companion 카드도 다시 기본 숨김 상태여야 함');
 
     // 반영 전 비교 패널 — 수집 건 선택 시 서버가 준 비교 정보를 그대로 보여준다.
     await page.locator('#history-items button').click();
@@ -64,6 +90,6 @@ const assert = require('node:assert/strict');
     assert.match(comparisonText, /kras\.land_owner.*INSERT 예상/);
 
     assert.deepEqual(errors, [], '브라우저 JavaScript 오류 없음');
-    console.log('PASS: dataset nav search/status filter, focus highlight, comparison panel.');
+    console.log('PASS: dataset nav search/status filter, popup open/close/backdrop, comparison panel.');
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

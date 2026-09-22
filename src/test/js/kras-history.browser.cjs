@@ -47,7 +47,11 @@ const assert = require('node:assert/strict');
     });
     await page.goto('http://geosync.test/kras-db');
     await page.locator('#history-items button').waitFor();
+    // 데이터셋 카드는 이제 기본적으로 숨겨져 있고 팝업을 열어야 나타난다(kras-hide).
+    await page.evaluate(() => krasOpenDatasetModal('land-basic-file', 'land_basic_file'));
     assert.equal(await page.locator('#btn-land-basic-file-promote').isDisabled(), true, '수집 전 반영 버튼은 비활성');
+    await page.evaluate(() => krasDatasetModal.close());
+
     await page.locator('#history-items button').click();
     await page.locator('#history-detail:not([hidden])').waitFor();
     assert.equal(await page.locator('#history-promote').isEnabled(), true);
@@ -58,6 +62,8 @@ const assert = require('node:assert/strict');
     await page.waitForFunction(() => document.getElementById('history-message').textContent.includes('반영 완료'));
     assert.deepEqual(promotions, ['44'], '새로고침 후 DB 이력에서 선택한 item 반영');
 
+    await page.evaluate(() => krasOpenDatasetModal('usezone-file', 'usezone_file'));
+    await page.locator('#btn-usezone-catalog').waitFor({ state: 'visible' });
     await page.locator('#btn-usezone-catalog').click();
     await page.waitForFunction(() => !document.getElementById('btn-usezone-sweep').disabled);
     await page.locator('#btn-usezone-sweep').click();
@@ -65,12 +71,16 @@ const assert = require('node:assert/strict');
     assert.match(await page.locator('#usezone-layers-js').textContent(), /다운로드 실패/);
     await page.waitForFunction(() => document.getElementById('usezone-counts').textContent.includes('9 (SEALED)'));
     assert.equal(await page.locator('#btn-usezone-publish').isDisabled(), true);
+    await page.evaluate(() => krasDatasetModal.close());
 
+    await page.evaluate(() => krasOpenDatasetModal('land-basic-file', 'land_basic_file'));
+    await page.locator('#btn-land-basic-file-ingest').waitFor({ state: 'visible' });
     await page.locator('#btn-land-basic-file-ingest').click();
     await page.waitForFunction(() => !document.getElementById('btn-land-basic-file-promote').disabled);
     await page.locator('#btn-land-basic-file-ingest').click();
     await page.waitForFunction(() => document.getElementById('land-basic-file-result-js').textContent.includes('재수집 실패'));
     assert.equal(await page.locator('#btn-land-basic-file-promote').isDisabled(), true, '재수집 실패 후 이전 item 반영 차단');
+    await page.evaluate(() => krasDatasetModal.close());
 
     await page.locator('#integration-history details').nth(1).evaluate(el => { el.open = true; });
     await page.locator('#integration-history').scrollIntoViewIfNeeded();

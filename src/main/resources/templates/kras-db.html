@@ -66,7 +66,25 @@
   .dataset-nav-item .dot.on{background:#3dddd4;}
   .dataset-nav-item .dot.running{background:#e0b963;}
   .dataset-nav-empty{color:#69707b;font-size:12.5px;}
+  /* 데이터셋별 카드는 기본적으로 숨기고, 목록에서 클릭했을 때만 팝업 안에서 보여준다(스크롤로 다 훑어야 했던
+     기존 방식 대신). 팝업으로 옮길 때 JS가 이 클래스를 잠깐 떼어낸다. */
+  .kras-hide{display:none;}
+  /* 기존 스크롤 이동 + 하이라이트 방식(팝업으로 교체됨) — 참고용으로 남겨둔다.
   .card.card-highlight{outline:2px solid #5fa8e8;outline-offset:2px;}
+  */
+  .dataset-modal-backdrop{position:fixed;inset:0;background:rgba(10,12,16,.72);z-index:50;
+    display:flex;align-items:flex-start;justify-content:center;padding:5vh 16px;overflow-y:auto;}
+  .dataset-modal-backdrop[hidden]{display:none;}
+  .dataset-modal{background:#101319;border:1px solid #2e3640;border-radius:14px;width:100%;max-width:820px;
+    max-height:90vh;overflow-y:auto;padding:20px 22px 28px;position:relative;}
+  .dataset-modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;
+    position:sticky;top:-20px;background:#101319;padding:20px 0 10px;margin-top:-20px;z-index:1;}
+  .dataset-modal-header h3{font-size:15px;color:#e7eaee;margin:0;}
+  .dataset-modal-close{background:#1e242c;color:#9aa2ad;border:1px solid #2e3640;border-radius:8px;
+    padding:6px 12px;font-size:13px;cursor:pointer;font-family:inherit;}
+  .dataset-modal-close:hover{border-color:#5fa8e8;color:#7aafe8;}
+  .dataset-modal-body .card{margin-bottom:14px;}
+  .dataset-modal-body .card:last-child{margin-bottom:0;}
   .verify-fields{margin-bottom:12px;}
   .verify-fields label{display:block;font-size:11px;color:#69707b;margin-bottom:4px;}
   .verify-fields .verify-fields-row{display:flex;gap:10px;margin-bottom:8px;}
@@ -107,12 +125,22 @@
           <span class="dot" th:classappend="${d.running} ? 'running' : (${d.status == 'VERIFIED' and d.enabled} ? 'on' : '')"></span>
           <a th:href="'#card-' + ${d.slug}" th:text="${d.datasetCode} + ' · ' + ${d.label}"
              th:title="${d.lastVerifiedAt != null} ? ('마지막 검증: ' + ${d.lastVerifiedAt} + ' · ' + (${d.lastVerifiedBy} ?: '담당자 미기록')) : '검증 근거 없음'"
-             th:attr="onclick=|krasFocusDataset('${d.slug}');return true;|"></a>
+             th:attr="onclick=|krasOpenDatasetModal('${d.slug}', '${d.datasetCode} · ${d.label}');return false;|"></a>
         </div>
       </div>
     </div>
     <div class="dataset-nav-empty" id="dataset-nav-empty" hidden>조건에 맞는 연계가 없습니다.</div>
   </nav>
+
+  <div class="dataset-modal-backdrop" id="dataset-modal-backdrop" hidden>
+    <div class="dataset-modal" role="dialog" aria-modal="true" aria-labelledby="dataset-modal-title">
+      <div class="dataset-modal-header">
+        <h3 id="dataset-modal-title"></h3>
+        <button type="button" class="dataset-modal-close" id="dataset-modal-close">닫기 ✕</button>
+      </div>
+      <div class="dataset-modal-body" id="dataset-modal-body"></div>
+    </div>
+  </div>
 
   <section class="card" id="integration-history" aria-labelledby="history-title">
     <h2 class="card-title" id="history-title">전체 연계 작업 이력</h2>
@@ -150,7 +178,7 @@
   </section>
 
   <!-- 카드 1: 데이터셋 계약 상태 -->
-  <div class="card" id="card-cadastral-file">
+  <div class="card kras-hide" id="card-cadastral-file">
     <div class="card-title">
       데이터셋 계약 상태 — cadastral_file
       <span th:if="${datasetStatus == 'VERIFIED' and datasetEnabled}" class="badge badge-on">VERIFIED · enabled</span>
@@ -199,7 +227,7 @@
   </div>
 
   <!-- 카드 1b: 데이터셋 계약 상태 — land_info -->
-  <div class="card" id="card-land-info">
+  <div class="card kras-hide" id="card-land-info">
     <div class="card-title">
       데이터셋 계약 상태 — land_info
       <span th:if="${landInfoStatus == 'VERIFIED' and landInfoEnabled}" class="badge badge-on">VERIFIED · enabled</span>
@@ -278,7 +306,7 @@
   </div>
 
   <!-- 카드 1b-2: land_info PNU 테스트 수집/승격 -->
-  <div class="card">
+  <div class="card kras-hide" data-companion-of="land-info">
     <div class="card-title">
       land_info PNU 테스트 수집/승격
       <span th:if="${landInfoRunning}" class="badge badge-warn">실행 중</span>
@@ -303,7 +331,7 @@
   </div>
 
   <!-- 카드 1b-3: 데이터셋 계약 상태 — land_bldg_check -->
-  <div class="card" id="card-land-bldg-check">
+  <div class="card kras-hide" id="card-land-bldg-check">
     <div class="card-title">
       데이터셋 계약 상태 — land_bldg_check
       <span th:if="${landBldgCheckStatus == 'VERIFIED' and landBldgCheckEnabled}" class="badge badge-on">VERIFIED · enabled</span>
@@ -373,7 +401,7 @@
   </div>
 
   <!-- 카드 1b-4: land_bldg_check PNU 테스트 수집/승격 -->
-  <div class="card">
+  <div class="card kras-hide" data-companion-of="land-bldg-check">
     <div class="card-title">
       land_bldg_check PNU 테스트 수집/승격
       <span th:if="${landBldgCheckRunning}" class="badge badge-warn">실행 중</span>
@@ -392,7 +420,7 @@
   </div>
 
   <!-- 카드 1b-5: 데이터셋 계약 상태 — collective_building -->
-  <div class="card" id="card-collective-building">
+  <div class="card kras-hide" id="card-collective-building">
     <div class="card-title">
       데이터셋 계약 상태 — collective_building
       <span th:if="${collectiveBuildingStatus == 'VERIFIED' and collectiveBuildingEnabled}" class="badge badge-on">VERIFIED · enabled</span>
@@ -463,7 +491,7 @@
   </div>
 
   <!-- 카드 1b-6: collective_building PNU 테스트 수집/승격 -->
-  <div class="card">
+  <div class="card kras-hide" data-companion-of="collective-building">
     <div class="card-title">
       collective_building PNU 테스트 수집/승격
       <span th:if="${collectiveBuildingRunning}" class="badge badge-warn">실행 중</span>
@@ -483,7 +511,7 @@
   </div>
 
   <!-- 카드 1b-7: 데이터셋 계약 상태 — shr_ymb -->
-  <div class="card" id="card-shr-ymb">
+  <div class="card kras-hide" id="card-shr-ymb">
     <div class="card-title">
       데이터셋 계약 상태 — shr_ymb
       <span th:if="${shrYmbStatus == 'VERIFIED' and shrYmbEnabled}" class="badge badge-on">VERIFIED · enabled</span>
@@ -556,7 +584,7 @@
   </div>
 
   <!-- 카드 1b-8: shr_ymb PNU 테스트 수집/승격 -->
-  <div class="card">
+  <div class="card kras-hide" data-companion-of="shr-ymb">
     <div class="card-title">
       shr_ymb PNU 테스트 수집/승격
       <span th:if="${shrYmbRunning}" class="badge badge-warn">실행 중</span>
@@ -575,7 +603,7 @@
   </div>
 
   <!-- 카드 1b-9: 데이터셋 계약 상태 — own_rgt_hist -->
-  <div class="card" id="card-own-rgt-hist">
+  <div class="card kras-hide" id="card-own-rgt-hist">
     <div class="card-title">
       데이터셋 계약 상태 — own_rgt_hist
       <span th:if="${ownRgtHistStatus == 'VERIFIED' and ownRgtHistEnabled}" class="badge badge-on">VERIFIED · enabled</span>
@@ -645,7 +673,7 @@
   </div>
 
   <!-- 카드 1b-10: own_rgt_hist PNU 테스트 수집/승격 -->
-  <div class="card">
+  <div class="card kras-hide" data-companion-of="own-rgt-hist">
     <div class="card-title">
       own_rgt_hist PNU 테스트 수집/승격
       <span th:if="${ownRgtHistRunning}" class="badge badge-warn">실행 중</span>
@@ -664,7 +692,7 @@
   </div>
 
   <!-- 카드 1b-11: 데이터셋 계약 상태 — land_mov_hist -->
-  <div class="card" id="card-land-mov-hist">
+  <div class="card kras-hide" id="card-land-mov-hist">
     <div class="card-title">
       데이터셋 계약 상태 — land_mov_hist
       <span th:if="${landMovHistStatus == 'VERIFIED' and landMovHistEnabled}" class="badge badge-on">VERIFIED · enabled</span>
@@ -738,7 +766,7 @@
   </div>
 
   <!-- 카드 1b-12: land_mov_hist PNU 테스트 수집/승격 -->
-  <div class="card">
+  <div class="card kras-hide" data-companion-of="land-mov-hist">
     <div class="card-title">
       land_mov_hist PNU 테스트 수집/승격
       <span th:if="${landMovHistRunning}" class="badge badge-warn">실행 중</span>
@@ -757,7 +785,7 @@
   </div>
 
   <!-- 카드 1b-13: 데이터셋 계약 상태 — collective_unit -->
-  <div class="card" id="card-collective-unit">
+  <div class="card kras-hide" id="card-collective-unit">
     <div class="card-title">
       데이터셋 계약 상태 — collective_unit
       <span th:if="${collectiveUnitStatus == 'VERIFIED' and collectiveUnitEnabled}" class="badge badge-on">VERIFIED · enabled</span>
@@ -822,7 +850,7 @@
   </div>
 
   <!-- 카드 1b-14: collective_unit PNU 테스트 수집/승격 -->
-  <div class="card">
+  <div class="card kras-hide" data-companion-of="collective-unit">
     <div class="card-title">
       collective_unit PNU 테스트 수집/승격
       <span th:if="${collectiveUnitRunning}" class="badge badge-warn">실행 중</span>
@@ -845,7 +873,7 @@
   </div>
 
   <!-- 카드 1b-15: 데이터셋 계약 상태 + 테스트 — land_right -->
-  <div class="card" id="card-land-right">
+  <div class="card kras-hide" id="card-land-right">
     <div class="card-title">
       데이터셋 계약 상태 — land_right
       <span th:if="${landRightStatus == 'VERIFIED' and landRightEnabled}" class="badge badge-on">VERIFIED · enabled</span>
@@ -911,7 +939,7 @@
   </div>
 
   <!-- 카드 1b-16: 데이터셋 계약 상태 + 테스트 — unit_ownership_history -->
-  <div class="card" id="card-unit-ownership-history">
+  <div class="card kras-hide" id="card-unit-ownership-history">
     <div class="card-title">
       데이터셋 계약 상태 — unit_ownership_history
       <span th:if="${unitOwnershipHistoryStatus == 'VERIFIED' and unitOwnershipHistoryEnabled}" class="badge badge-on">VERIFIED · enabled</span>
@@ -978,7 +1006,7 @@
   </div>
 
   <!-- 카드 1b-17: 데이터셋 계약 상태 + 테스트 — integrated_building -->
-  <div class="card" id="card-integrated-building">
+  <div class="card kras-hide" id="card-integrated-building">
     <div class="card-title">
       데이터셋 계약 상태 — integrated_building
       <span th:if="${integratedBuildingStatus == 'VERIFIED' and integratedBuildingEnabled}" class="badge badge-on">VERIFIED · enabled</span>
@@ -1040,7 +1068,7 @@
   </div>
 
   <!-- 카드 1b-17b: 데이터셋 계약 상태 + 테스트 — building_image (§14, 응답이 파일) -->
-  <div class="card" id="card-building-image">
+  <div class="card kras-hide" id="card-building-image">
     <div class="card-title">
       데이터셋 계약 상태 — building_image
       <span th:if="${buildingImageStatus == 'VERIFIED' and buildingImageEnabled}" class="badge badge-on">VERIFIED · enabled</span>
@@ -1107,7 +1135,7 @@
   </div>
 
   <!-- 카드 1b-18: 데이터셋 계약 상태 + 테스트 — land_change (기간 조회, PNU 아님) -->
-  <div class="card" id="card-land-change">
+  <div class="card kras-hide" id="card-land-change">
     <div class="card-title">
       데이터셋 계약 상태 — land_change
       <span th:if="${landChangeStatus == 'VERIFIED' and landChangeEnabled}" class="badge badge-on">VERIFIED · enabled</span>
@@ -1193,7 +1221,7 @@
     </p>
   </div>
 
-  <div class="card" th:each="d : ${specServices}" th:id="'card-' + ${d.slug}">
+  <div class="card kras-hide" th:each="d : ${specServices}" th:id="'card-' + ${d.slug}">
     <div class="card-title">
       <span th:text="${d.datasetCode} + ' — ' + ${d.label}"></span>
       <span th:if="${d.status == 'VERIFIED' and d.enabled}" class="badge badge-on">VERIFIED · enabled</span>
@@ -1248,7 +1276,7 @@
   </div>
 
   <!-- 카드 2: kras ↔ public 건수 비교 -->
-  <div class="card">
+  <div class="card kras-hide" data-companion-of="cadastral-file">
     <div class="card-title">kras ↔ public 건수 비교</div>
     <div class="stat-row">
       <div class="stat-box">
@@ -1263,7 +1291,7 @@
   </div>
 
   <!-- 카드 3: 실행 -->
-  <div class="card">
+  <div class="card kras-hide" data-companion-of="cadastral-file">
     <div class="card-title">
       실행
       <span th:if="${ingestRunning}" class="badge badge-warn">실행 중</span>
@@ -1280,7 +1308,7 @@
   </div>
 
   <!-- 카드 4: 최근 실행 이력 -->
-  <div class="card">
+  <div class="card kras-hide" data-companion-of="cadastral-file">
     <div class="card-title">최근 실행 이력 (cadastral_file)</div>
     <table class="hist-table" th:if="${not #lists.isEmpty(recentRuns)}">
       <thead><tr><th>item_id</th><th>status</th><th>rows_valid</th><th>rows_rejected</th><th>started_at</th></tr></thead>
@@ -1298,7 +1326,7 @@
   </div>
 
   <!-- 카드 5a: 데이터셋 계약 상태 — layer_list -->
-  <div class="card" id="card-layer-list">
+  <div class="card kras-hide" id="card-layer-list">
     <div class="card-title">
       데이터셋 계약 상태 — layer_list
       <span th:if="${layerListStatus == 'VERIFIED' and layerListEnabled}" class="badge badge-on">VERIFIED · enabled</span>
@@ -1345,7 +1373,7 @@
   </div>
 
   <!-- 카드 5b: 데이터셋 계약 상태 — usezone_file -->
-  <div class="card" id="card-usezone-file">
+  <div class="card kras-hide" id="card-usezone-file">
     <div class="card-title">
       데이터셋 계약 상태 — usezone_file
       <span th:if="${usezoneFileStatus == 'VERIFIED' and usezoneFileEnabled}" class="badge badge-on">VERIFIED · enabled</span>
@@ -1393,7 +1421,7 @@
   </div>
 
   <!-- 카드 5c: 용도지역 릴리즈 진행상태 (설계 §9.2) -->
-  <div class="card">
+  <div class="card kras-hide" data-companion-of="usezone-file">
     <div class="card-title">
       용도지역 릴리즈 진행상태
       <span th:if="${usezoneRunning}" class="badge badge-warn">실행 중</span>
@@ -1448,7 +1476,7 @@
   </div>
 
   <!-- 카드 6a: 전체 TXT — land_basic_file (KRAS000040) -->
-  <div class="card" id="card-land-basic-file">
+  <div class="card kras-hide" id="card-land-basic-file">
     <div class="card-title">
       데이터셋 계약 상태 + 수집 — land_basic_file (토지기본정보 전체 TXT)
       <span th:if="${landBasicFileStatus == 'VERIFIED' and landBasicFileEnabled}" class="badge badge-on">VERIFIED · enabled</span>
@@ -1530,7 +1558,7 @@
   </div>
 
   <!-- 카드 6b: 전체 TXT — land_price_file (KRAS000039) -->
-  <div class="card" id="card-land-price-file">
+  <div class="card kras-hide" id="card-land-price-file">
     <div class="card-title">
       데이터셋 계약 상태 + 수집 — land_price_file (공시지가 전체 TXT)
       <span th:if="${landPriceFileStatus == 'VERIFIED' and landPriceFileEnabled}" class="badge badge-on">VERIFIED · enabled</span>
@@ -1905,7 +1933,7 @@ function runLandBasicFilePromote() {
 }
 function runLandPriceFileIngest() { return runTxtAction('land-price-file', '/kras-db/ingest/land-price-file'); }
 
-/** 목록 항목을 클릭하면 해당 카드로 이동한 뒤 잠깐 하이라이트한다. 상세 카드 자체는 건드리지 않는다. */
+/* 기존 스크롤 이동 + 하이라이트 방식(팝업으로 교체됨) — 참고용으로 남겨둔다.
 function krasFocusDataset(slug) {
   const card = document.getElementById('card-' + slug);
   if (!card) return;
@@ -1913,6 +1941,54 @@ function krasFocusDataset(slug) {
   card.classList.add('card-highlight');
   setTimeout(() => card.classList.remove('card-highlight'), 2000);
 }
+*/
+
+/**
+ * 목록 항목을 클릭하면 해당 데이터셋의 카드(+companion 카드)를 팝업으로 보여준다.
+ * 카드를 복제하지 않고 실제 DOM 노드를 모달로 옮긴다 — 그래야 카드 내부의 id 참조 버튼/폼이
+ * (runPnuIngest 등) 그대로 동작한다. 닫으면 원래 있던 자리(placeholder)로 되돌린다.
+ */
+const krasDatasetModal = (() => {
+  const backdrop = document.getElementById('dataset-modal-backdrop');
+  const body = document.getElementById('dataset-modal-body');
+  const title = document.getElementById('dataset-modal-title');
+  let moved = null; // [{ node, placeholder }]
+
+  function close() {
+    if (!moved) return;
+    moved.forEach(({ node, placeholder }) => {
+      node.classList.add('kras-hide');
+      placeholder.parentNode.replaceChild(node, placeholder);
+    });
+    moved = null;
+    backdrop.hidden = true;
+    body.replaceChildren();
+  }
+
+  function open(slug, label) {
+    close();
+    const primary = document.getElementById('card-' + slug);
+    if (!primary) return;
+    const cards = [primary, ...document.querySelectorAll('[data-companion-of="' + slug + '"]')];
+    moved = cards.map(node => {
+      const placeholder = document.createComment('dataset-modal-placeholder-' + slug);
+      node.parentNode.insertBefore(placeholder, node);
+      return { node, placeholder };
+    });
+    moved.forEach(({ node }) => { node.classList.remove('kras-hide'); body.appendChild(node); });
+    title.textContent = label || slug;
+    backdrop.hidden = false;
+  }
+
+  if (backdrop) {
+    document.getElementById('dataset-modal-close').addEventListener('click', close);
+    backdrop.addEventListener('click', e => { if (e.target === backdrop) close(); });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
+  }
+  return { open, close };
+})();
+
+function krasOpenDatasetModal(slug, label) { krasDatasetModal.open(slug, label); }
 
 (function initDatasetNav() {
   const search = document.getElementById('dataset-nav-search');
