@@ -755,6 +755,57 @@
     <pre id="integrated-building-preview" class="result-box" style="display:none;"></pre>
   </div>
 
+  <!-- 카드 1b-18: 데이터셋 계약 상태 + 테스트 — land_change (기간 조회, PNU 아님) -->
+  <div class="card">
+    <div class="card-title">
+      데이터셋 계약 상태 — land_change
+      <span th:if="${landChangeStatus == 'VERIFIED' and landChangeEnabled}" class="badge badge-on">VERIFIED · enabled</span>
+      <span th:unless="${landChangeStatus == 'VERIFIED' and landChangeEnabled}" class="badge badge-warn"
+            th:text="${landChangeStatus} + ' · ' + (${landChangeEnabled} ? 'enabled' : 'disabled')"></span>
+      <span class="badge" style="background:#3a1f1f;color:#e88a82;">conn_svc_id 미확인</span>
+      <span th:if="${landChangeRunning}" class="badge badge-warn">실행 중</span>
+    </div>
+    <p style="font-size:13px;color:#9aa2ad;margin-bottom:14px;">
+      "토지이동 변동내역" — <b>PNU 단건이 아니라 기간(날짜 범위) 조회</b>입니다(docs/reference/kras.md §10).
+      최대 10일까지만 조회됩니다(kras.sync_dataset.max_query_days). 응답 개수만큼 새 사건으로
+      <code>kras.land_change_event</code>에 그냥 INSERT되고(패턴 D), 원본 전체는
+      <code>kras.sync_record</code>에도 같이 보존됩니다. 실제 요청 파라미터(시작일/종료일 필드명)는
+      문서에 없어 "추가 파라미터"에 운영자가 직접 입력합니다.<br>
+      <b>kras.md §11(소유권변동내역)·§12(집합건물소유권변동내역)는 문서 자체가 §10 내용을 그대로
+      복사해놔서(필드명·샘플까지 동일) 만들지 않았습니다</b> — 실제 응답을 봐야 진행 가능합니다.
+    </p>
+    <div th:unless="${landChangeStatus == 'VERIFIED' and landChangeEnabled}">
+      <form method="post" action="/kras-db/verify-dataset" id="verify-form-land-change">
+        <input type="hidden" name="datasetCode" value="land_change">
+        <div class="confirm-row">
+          <input type="checkbox" id="verify-confirm-land-change" onchange="document.getElementById('verify-submit-land-change').disabled = !this.checked;">
+          <label for="verify-confirm-land-change">실제 운영 응답으로 land_change 계약을 확인했음</label>
+        </div>
+        <input type="hidden" name="confirmed" id="verify-confirmed-land-change" value="false">
+        <button type="submit" id="verify-submit-land-change" class="btn btn-primary" disabled
+                onclick="document.getElementById('verify-confirmed-land-change').value='true';">계약 확인 → VERIFIED로 전환</button>
+      </form>
+    </div>
+    <form th:if="${landChangeStatus == 'VERIFIED' and landChangeEnabled}" method="post" action="/kras-db/revert-dataset"
+          onsubmit="return confirm('land_change 검증을 원복하시겠습니까?');">
+      <input type="hidden" name="datasetCode" value="land_change">
+      <button type="submit" class="btn btn-secondary">검증 원복</button>
+    </form>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:14px;">
+      <input type="date" id="land-change-start" style="padding:8px 12px;border-radius:8px;border:1px solid #2e3640;background:#14171c;color:#e7eaee;font-family:'JetBrains Mono',monospace;">
+      <input type="date" id="land-change-end" style="padding:8px 12px;border-radius:8px;border:1px solid #2e3640;background:#14171c;color:#e7eaee;font-family:'JetBrains Mono',monospace;">
+      <input type="text" id="land-change-extra-params" placeholder='추가 파라미터(JSON), 예: {"strt_ymd":"20260101","end_ymd":"20260110"}'
+             style="padding:8px 12px;border-radius:8px;border:1px solid #2e3640;background:#14171c;color:#e7eaee;font-family:'JetBrains Mono',monospace;flex:1;min-width:320px;">
+    </div>
+    <div style="display:flex;gap:10px;margin-top:10px;">
+      <button class="btn btn-primary" id="btn-land-change-ingest" th:disabled="${landChangeRunning}" onclick="runLandChangeIngest()">테스트 수집</button>
+      <button class="btn btn-secondary" id="btn-land-change-promote" th:disabled="${landChangeRunning}" disabled onclick="runLandChangePromote()">업무 테이블로 승격</button>
+    </div>
+    <div id="land-change-result" class="result-box" th:if="${lastLandChangeResult}" th:text="${lastLandChangeResult}"></div>
+    <div id="land-change-result-js" class="result-box" style="display:none;"></div>
+    <pre id="land-change-preview" class="result-box" style="display:none;"></pre>
+  </div>
+
   <!-- 카드 1c: PNU 단건 API 계약 상태 — land_info/land_bldg_check/shr_ymb/own_rgt_hist/land_mov_hist 제외 14개 -->
   <div class="card">
     <div class="card-title">데이터셋 계약 상태 — PNU 단건 API 14개</div>
@@ -941,6 +992,77 @@ async function runPnuPromote(slug) {
     promoteBtn.disabled = !pnuItemIds[slug];
   }
 }
+
+// 기간(날짜 범위) 매퍼 공용 — PNU 대신 시작일/종료일을 쓴다.
+const rangeItemIds = {};
+
+async function runDateRangeIngest(slug) {
+  const start = document.getElementById(slug + '-start').value;
+  const end = document.getElementById(slug + '-end').value;
+  const ingestBtn = document.getElementById('btn-' + slug + '-ingest');
+  const promoteBtn = document.getElementById('btn-' + slug + '-promote');
+  const box = document.getElementById(slug + '-result-js');
+  const preview = document.getElementById(slug + '-preview');
+  ingestBtn.disabled = true;
+  promoteBtn.disabled = true;
+  box.style.display = 'block';
+  box.className = 'result-box';
+  box.textContent = '수집 중...';
+  preview.style.display = 'none';
+  const extraParamsEl = document.getElementById(slug + '-extra-params');
+  const extraParams = extraParamsEl ? extraParamsEl.value.trim() : '';
+  try {
+    let url = '/kras-db/ingest-range/' + slug + '?startDate=' + encodeURIComponent(start) + '&endDate=' + encodeURIComponent(end);
+    if (extraParams) url += '&extraParamsJson=' + encodeURIComponent(extraParams);
+    const res = await fetch(url, { method: 'POST' });
+    const data = await res.json();
+    box.textContent = data.message || JSON.stringify(data);
+    box.classList.add(data.success ? 'ok' : 'err');
+    if (data.success && data.preview) {
+      preview.style.display = 'block';
+      preview.textContent = JSON.stringify(data.preview, null, 2);
+    }
+    if (data.success && data.promotable) {
+      rangeItemIds[slug] = data.itemId;
+      promoteBtn.disabled = false;
+    } else {
+      rangeItemIds[slug] = null;
+    }
+  } catch (err) {
+    box.textContent = '요청 실패: ' + err;
+    box.classList.add('err');
+  } finally {
+    ingestBtn.disabled = false;
+  }
+}
+
+async function runDateRangePromote(slug) {
+  const itemId = rangeItemIds[slug];
+  if (!itemId) return;
+  const ingestBtn = document.getElementById('btn-' + slug + '-ingest');
+  const promoteBtn = document.getElementById('btn-' + slug + '-promote');
+  ingestBtn.disabled = true;
+  promoteBtn.disabled = true;
+  const box = document.getElementById(slug + '-result-js');
+  box.style.display = 'block';
+  box.className = 'result-box';
+  box.textContent = '승격 중...';
+  try {
+    const res = await fetch('/kras-db/promote-range/' + slug + '?itemId=' + itemId, { method: 'POST' });
+    const data = await res.json();
+    box.textContent = data.message || JSON.stringify(data);
+    box.classList.add(data.success ? 'ok' : 'err');
+  } catch (err) {
+    box.textContent = '요청 실패: ' + err;
+    box.classList.add('err');
+  } finally {
+    ingestBtn.disabled = false;
+    promoteBtn.disabled = !rangeItemIds[slug];
+  }
+}
+
+function runLandChangeIngest() { return runDateRangeIngest('land-change'); }
+function runLandChangePromote() { return runDateRangePromote('land-change'); }
 
 function runLandInfoIngest() { return runPnuIngest('land-info'); }
 function runLandInfoPromote() { return runPnuPromote('land-info'); }

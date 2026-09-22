@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.nio.file.Path;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -64,6 +65,13 @@ public class KrasSchemaController {
         new ImplementedService("integrated-building", "integrated_building", "integratedBuilding")
     );
 
+    /** 기간(날짜 범위) 조회 서비스(§10~12 계열) — PNU 단건과 최상위 식별자가 달라 별도 레지스트리. */
+    private record DateRangeService(String slug, String datasetCode, String modelPrefix) {}
+
+    private static final List<DateRangeService> DATE_RANGE_SERVICES = List.of(
+        new DateRangeService("land-change", "land_change", "landChange")
+    );
+
     /**
      * PNU 단건 API 중 IMPLEMENTED_SERVICES를 제외한 14개. dataset_code/service_code/api-test 딥링크 id/
      * 승격 대상 업무 테이블은 kras.business_dataset(설계 원본)과 api-test.html의 APIS 목록에서 그대로
@@ -89,10 +97,12 @@ public class KrasSchemaController {
     );
 
     /** verify/revert-dataset이 건드릴 수 있는 dataset_code 화이트리스트 — 임의 문자열로 다른 데이터셋을 켜지 못하게 막는다. */
-    private static final Set<String> VERIFIABLE_DATASETS = Stream.concat(
-            Stream.concat(Stream.of("cadastral_file"), IMPLEMENTED_SERVICES.stream().map(ImplementedService::datasetCode)),
+    private static final Set<String> VERIFIABLE_DATASETS = Stream.of(
+            Stream.of("cadastral_file"),
+            IMPLEMENTED_SERVICES.stream().map(ImplementedService::datasetCode),
+            DATE_RANGE_SERVICES.stream().map(DateRangeService::datasetCode),
             PNU_APIS.stream().map(PnuApiInfo::datasetCode)
-    ).collect(Collectors.toUnmodifiableSet());
+    ).flatMap(s -> s).collect(Collectors.toUnmodifiableSet());
 
     private final TargetDbService targetDbService;
     private final RuntimeSettingsService settings;
@@ -101,8 +111,11 @@ public class KrasSchemaController {
     private final TableMapper tableMapper;
     private final KrasCadastralIngestService cadastralIngestService;
     private final KrasPnuIngestService pnuIngestService;
+    private final KrasDateRangeIngestService dateRangeIngestService;
     private final Map<String, String> slugToDatasetCode;
     private final Map<String, KrasXmlServiceMapper> mappersByDatasetCode;
+    private final Map<String, String> dateRangeSlugToDatasetCode;
+    private final Map<String, KrasDateRangeServiceMapper> dateRangeMappersByDatasetCode;
 
     /** 기존 SyncScheduler의 krasLoadRunning과 별개 — 신규 탭 전용 실행 상태(design §5.2). */
     private final AtomicBoolean cadastralRunning = new AtomicBoolean(false);
@@ -113,7 +126,9 @@ public class KrasSchemaController {
     public KrasSchemaController(TargetDbService targetDbService, RuntimeSettingsService settings,
                                  KrasApiClient krasApiClient, KrasWorkspaceScanner workspaceScanner,
                                  TableMapper tableMapper, KrasCadastralIngestService cadastralIngestService,
-                                 KrasPnuIngestService pnuIngestService, List<KrasXmlServiceMapper> mappers) {
+                                 KrasPnuIngestService pnuIngestService, List<KrasXmlServiceMapper> mappers,
+                                 KrasDateRangeIngestService dateRangeIngestService,
+                                 List<KrasDateRangeServiceMapper> dateRangeMappers) {
         this.targetDbService = targetDbService;
         this.settings = settings;
         this.krasApiClient = krasApiClient;
@@ -121,11 +136,19 @@ public class KrasSchemaController {
         this.tableMapper = tableMapper;
         this.cadastralIngestService = cadastralIngestService;
         this.pnuIngestService = pnuIngestService;
+        this.dateRangeIngestService = dateRangeIngestService;
         this.mappersByDatasetCode = mappers.stream()
                 .collect(Collectors.toUnmodifiableMap(KrasXmlServiceMapper::datasetCode, m -> m));
         this.slugToDatasetCode = IMPLEMENTED_SERVICES.stream()
                 .collect(Collectors.toUnmodifiableMap(ImplementedService::slug, ImplementedService::datasetCode));
+        this.dateRangeMappersByDatasetCode = dateRangeMappers.stream()
+                .collect(Collectors.toUnmodifiableMap(KrasDateRangeServiceMapper::datasetCode, m -> m));
+        this.dateRangeSlugToDatasetCode = DATE_RANGE_SERVICES.stream()
+                .collect(Collectors.toUnmodifiableMap(DateRangeService::slug, DateRangeService::datasetCode));
         for (ImplementedService svc : IMPLEMENTED_SERVICES) {
+            runningByDatasetCode.put(svc.datasetCode(), new AtomicBoolean(false));
+        }
+        for (DateRangeService svc : DATE_RANGE_SERVICES) {
             runningByDatasetCode.put(svc.datasetCode(), new AtomicBoolean(false));
         }
     }
@@ -148,6 +171,17 @@ public class KrasSchemaController {
                 IMPLEMENTED_SERVICES.stream().map(ImplementedService::datasetCode).toList());
         for (ImplementedService svc : IMPLEMENTED_SERVICES) {
             Map<String, Object> st = statusByCode.get(svc.datasetCode());
+            model.addAttribute(svc.modelPrefix() + "Status", st != null ? st.get("contract_status") : "UNVERIFIED");
+            model.addAttribute(svc.modelPrefix() + "Enabled", st != null && Boolean.TRUE.equals(st.get("enabled")));
+            model.addAttribute(svc.modelPrefix() + "Running", runningByDatasetCode.get(svc.datasetCode()).get());
+            model.addAttribute("last" + capitalize(svc.modelPrefix()) + "Result",
+                    lastResultByDatasetCode.get(svc.datasetCode()));
+        }
+
+        Map<String, Map<String, Object>> rangeStatusByCode = batchDatasetStatus(jdbc,
+                DATE_RANGE_SERVICES.stream().map(DateRangeService::datasetCode).toList());
+        for (DateRangeService svc : DATE_RANGE_SERVICES) {
+            Map<String, Object> st = rangeStatusByCode.get(svc.datasetCode());
             model.addAttribute(svc.modelPrefix() + "Status", st != null ? st.get("contract_status") : "UNVERIFIED");
             model.addAttribute(svc.modelPrefix() + "Enabled", st != null && Boolean.TRUE.equals(st.get("enabled")));
             model.addAttribute(svc.modelPrefix() + "Running", runningByDatasetCode.get(svc.datasetCode()).get());
@@ -323,6 +357,76 @@ public class KrasSchemaController {
         KrasXmlServiceMapper mapper = mappersByDatasetCode.get(datasetCode);
         try {
             KrasPnuIngestService.PromoteResult result = pnuIngestService.promote(jdbc(), settings.orgCode(), mapper, itemId);
+            String msg = "승격 성공: item_id=%d".formatted(result.itemId());
+            lastResultByDatasetCode.put(datasetCode, msg);
+            return Map.of("success", true, "itemId", result.itemId(), "message", msg);
+        } catch (Exception e) {
+            log.error("[KrasSchema] {} 승격 실패: {}", datasetCode, e.getMessage(), e);
+            String msg = "승격 실패: " + e.getMessage();
+            lastResultByDatasetCode.put(datasetCode, msg);
+            return Map.of("success", false, "message", msg);
+        }
+    }
+
+    /**
+     * 기간(날짜 범위) 매퍼 공용 테스트 수집(land_change 등). startDate/endDate는 YYYY-MM-DD.
+     * extraParamsJson은 실제 KRAS 요청 파라미터(시작일/종료일 등 실제 필드명이 미확인이라 운영자가
+     * 직접 채운다) — startDate/endDate 자체는 우리 쪽 window/scope_key 계산용으로 별도로 쓴다.
+     */
+    @PostMapping("/kras-db/ingest-range/{slug}")
+    @ResponseBody
+    public Map<String, Object> ingestDateRangeMapper(@PathVariable String slug,
+                                                       @RequestParam String startDate,
+                                                       @RequestParam String endDate,
+                                                       @RequestParam(required = false) String extraParamsJson) {
+        String datasetCode = dateRangeSlugToDatasetCode.get(slug);
+        if (datasetCode == null) {
+            return Map.of("success", false, "message", "알 수 없는 서비스: " + slug);
+        }
+        Map<String, String> extraParams;
+        try {
+            extraParams = parseExtraParams(extraParamsJson);
+        } catch (Exception e) {
+            return Map.of("success", false, "message", "추가 파라미터 JSON 형식 오류: " + e.getMessage());
+        }
+        KrasDateRangeServiceMapper mapper = dateRangeMappersByDatasetCode.get(datasetCode);
+        AtomicBoolean running = runningByDatasetCode.get(datasetCode);
+        if (!running.compareAndSet(false, true)) {
+            return Map.of("error", "이미 실행 중입니다.");
+        }
+        try {
+            LocalDate start = LocalDate.parse(startDate);
+            LocalDate end = LocalDate.parse(endDate);
+            KrasDateRangeIngestService.IngestResult result =
+                    dateRangeIngestService.ingest(jdbc(), settings.orgCode(), mapper, start, end, extraParams, "UI");
+            String msg = result.promotable()
+                    ? "수집 성공: item_id=%d(%d건) — 값을 확인한 뒤 승격하세요.".formatted(result.itemId(), result.preview().size())
+                    : "수집됨(item_id=%d), 단 필드 파싱 경고로 승격 보류: %s".formatted(result.itemId(), result.warnings());
+            lastResultByDatasetCode.put(datasetCode, msg);
+            return Map.of("success", true, "itemId", result.itemId(), "promotable", result.promotable(),
+                    "warnings", result.warnings(), "preview", result.preview(), "message", msg);
+        } catch (Exception e) {
+            log.error("[KrasSchema] {} 수집 실패: {}", datasetCode, e.getMessage(), e);
+            String msg = "수집 실패: " + e.getMessage();
+            lastResultByDatasetCode.put(datasetCode, msg);
+            return Map.of("success", false, "message", msg);
+        } finally {
+            running.set(false);
+        }
+    }
+
+    /** 기간(날짜 범위) 매퍼 공용 승격만. */
+    @PostMapping("/kras-db/promote-range/{slug}")
+    @ResponseBody
+    public Map<String, Object> promoteDateRangeMapper(@PathVariable String slug, @RequestParam long itemId) {
+        String datasetCode = dateRangeSlugToDatasetCode.get(slug);
+        if (datasetCode == null) {
+            return Map.of("success", false, "message", "알 수 없는 서비스: " + slug);
+        }
+        KrasDateRangeServiceMapper mapper = dateRangeMappersByDatasetCode.get(datasetCode);
+        try {
+            KrasDateRangeIngestService.PromoteResult result =
+                    dateRangeIngestService.promote(jdbc(), settings.orgCode(), mapper, itemId);
             String msg = "승격 성공: item_id=%d".formatted(result.itemId());
             lastResultByDatasetCode.put(datasetCode, msg);
             return Map.of("success", true, "itemId", result.itemId(), "message", msg);

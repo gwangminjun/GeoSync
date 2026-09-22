@@ -16,14 +16,15 @@ import java.util.Map;
  * — land_mov_hist(LAND_MOV_HIST 반복 안에 RELJIBUN이 또 반복)가 이 모양이라 추가했다.
  * 드릴다운(부모를 먼저 조회해야 자식을 조회할 수 있는 집합건물 계열)은 PARENT_LOOKUP_IDENTITY_MATCH_UPSERT —
  * 이미 승격된 부모 테이블에서 서로게이트 ID를 찾아 자식 신원 매칭에 쓴다.
- * D(순수 append)는 그 패턴이 실제로 필요한 첫 서비스를 붙일 때 §8.5 SQL을 그대로 옮겨 추가한다.
+ * D(순수 append, §8.5) — land_change_event처럼 매 수집이 새 사건이라 그냥 INSERT만 하는 경우.
+ * UNIQUE(source_item_id,record_no)가 중복을 막는다.
  */
 @Service
 public class KrasStagePromotionService {
 
     public enum PromotionPattern {
         NATURAL_KEY_UPSERT, IDENTITY_MATCH_UPSERT, SCOPE_REPLACE, SCOPE_REPLACE_WITH_CHILDREN,
-        PARENT_LOOKUP_IDENTITY_MATCH_UPSERT
+        PARENT_LOOKUP_IDENTITY_MATCH_UPSERT, APPEND_ONLY
     }
 
     /**
@@ -96,6 +97,12 @@ public class KrasStagePromotionService {
             return new StagePromotionSpec(stageTable, businessTable, PromotionPattern.PARENT_LOOKUP_IDENTITY_MATCH_UPSERT,
                     naturalKeyColumns, copyColumns, surrogateIdColumn, null, null, parentLookup);
         }
+
+        public static StagePromotionSpec appendOnly(String stageTable, String businessTable,
+                                                      List<String> copyColumns) {
+            return new StagePromotionSpec(stageTable, businessTable, PromotionPattern.APPEND_ONLY,
+                    List.of(), copyColumns, null, null, null, null);
+        }
     }
 
     /** 호출자가 부모→자식 순서를 보장한 spec 목록을 그 순서 그대로 승격한다. */
@@ -107,8 +114,17 @@ public class KrasStagePromotionService {
                 case SCOPE_REPLACE -> promoteScopeReplace(tx, itemId, spec);
                 case SCOPE_REPLACE_WITH_CHILDREN -> promoteScopeReplaceWithChildren(tx, itemId, spec);
                 case PARENT_LOOKUP_IDENTITY_MATCH_UPSERT -> promoteParentLookupIdentityMatchUpsert(tx, itemId, spec);
+                case APPEND_ONLY -> promoteAppendOnly(tx, itemId, spec);
             }
         }
+    }
+
+    /** 패턴 D(§8.5) — stage 전체를 그대로 INSERT. UNIQUE(source_item_id,record_no)가 재수집 중복을 막는다. */
+    private void promoteAppendOnly(JdbcTemplate tx, long itemId, StagePromotionSpec spec) {
+        String colList = String.join(",", spec.copyColumns());
+        String sql = "INSERT INTO " + spec.businessTable() + "(" + colList + ", source_item_id) "
+                + "SELECT " + colList + ", ? FROM " + spec.stageTable() + " WHERE item_id=?";
+        tx.update(sql, itemId, itemId);
     }
 
     /**
