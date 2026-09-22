@@ -104,6 +104,14 @@ document.addEventListener('DOMContentLoaded', () => {
       byId('history-detail-reasons').textContent = data.reasons.length ? data.reasons.join('\n') : '수집 검증 완료. 내용을 확인한 뒤 반영하세요.';
       byId('history-detail-reasons').className = 'result-box ' + (data.promotable ? 'ok' : 'warn');
       byId('history-preview').textContent = JSON.stringify(data.preview, null, 2);
+      const comparisonBox = byId('history-comparison');
+      if (data.comparison && data.comparison.length) {
+        comparisonBox.hidden = false;
+        comparisonBox.textContent = '반영 전 비교(참고용 — 조회 실패가 반영을 막지 않습니다)\n' +
+          data.comparison.map(c => '- ' + c.businessTable + ' [' + c.pattern + '] stage ' + c.stageCount + '건 — ' + c.note).join('\n');
+      } else {
+        comparisonBox.hidden = true;
+      }
       promoteButton.disabled = !data.promotable;
       showMessage('선택한 수집 건의 상세를 아래에서 확인하세요.');
     } catch (error) {

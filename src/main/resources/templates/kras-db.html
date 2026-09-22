@@ -49,6 +49,32 @@
   .flash-banner{padding:10px 16px;border-radius:8px;background:#14171c;border:1px solid #232a34;color:#c8cdd4;
     font-size:13px;margin-bottom:20px;}
   .confirm-row{display:flex;align-items:center;gap:8px;margin-bottom:12px;font-size:13px;color:#9aa2ad;}
+  .dataset-nav{position:sticky;top:0;z-index:5;background:#14171c;border:1px solid #232a34;border-radius:12px;
+    padding:14px 16px;margin-bottom:20px;}
+  .dataset-nav-toolbar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;}
+  .dataset-nav-toolbar input[type=search]{flex:1;min-width:160px;background:#1b2029;color:#e7eaee;
+    border:1px solid #2e3640;border-radius:8px;padding:7px 10px;font-size:13px;}
+  .dataset-nav-toolbar select{background:#1b2029;color:#e7eaee;border:1px solid #2e3640;border-radius:8px;
+    padding:7px 10px;font-size:13px;}
+  .dataset-nav-groups{display:flex;flex-wrap:wrap;gap:10px 18px;max-height:220px;overflow-y:auto;}
+  .dataset-nav-group{min-width:200px;}
+  .dataset-nav-group h4{font-size:11px;color:#69707b;text-transform:uppercase;letter-spacing:.04em;margin:6px 0 4px;}
+  .dataset-nav-item{display:flex;align-items:center;gap:6px;padding:3px 0;font-size:12.5px;}
+  .dataset-nav-item a{color:#c8cdd4;text-decoration:none;}
+  .dataset-nav-item a:hover{color:#5fa8e8;}
+  .dataset-nav-item .dot{width:7px;height:7px;border-radius:50%;flex:none;background:#69707b;}
+  .dataset-nav-item .dot.on{background:#3dddd4;}
+  .dataset-nav-item .dot.running{background:#e0b963;}
+  .dataset-nav-empty{color:#69707b;font-size:12.5px;}
+  .card.card-highlight{outline:2px solid #5fa8e8;outline-offset:2px;}
+  .verify-fields{margin-bottom:12px;}
+  .verify-fields label{display:block;font-size:11px;color:#69707b;margin-bottom:4px;}
+  .verify-fields .verify-fields-row{display:flex;gap:10px;margin-bottom:8px;}
+  .verify-fields .verify-fields-row > div{flex:1;}
+  .verify-fields input[type=text],.verify-fields textarea{width:100%;background:#14171c;color:#c8cdd4;
+    border:1px solid #2e3640;border-radius:6px;padding:6px 8px;font-size:12.5px;font-family:inherit;box-sizing:border-box;}
+  .verify-fields textarea{font-family:'JetBrains Mono',monospace;resize:vertical;}
+  .verify-fields .verify-hint{font-size:11px;color:#69707b;margin:-2px 0 8px;}
 </style>
 </th:block>
 </head>
@@ -63,6 +89,30 @@
   </div>
 
   <div th:if="${message}" class="flash-banner" th:text="${message}"></div>
+
+  <nav class="dataset-nav" aria-label="연계 목록">
+    <div class="dataset-nav-toolbar">
+      <input type="search" id="dataset-nav-search" placeholder="연계 코드·이름 검색 (예: land_info, 용도지역)">
+      <select id="dataset-nav-status">
+        <option value="">전체 상태</option>
+        <option value="VERIFIED">VERIFIED만</option>
+        <option value="UNVERIFIED">UNVERIFIED만</option>
+      </select>
+    </div>
+    <div class="dataset-nav-groups" id="dataset-nav-groups">
+      <div class="dataset-nav-group" th:each="g : ${datasetGroups}" th:attr="data-group=${g}">
+        <h4 th:text="${g}"></h4>
+        <div class="dataset-nav-item" th:each="d : ${datasetIndex}" th:if="${d.group == g}"
+             th:attr="data-slug=${d.slug},data-dataset-code=${d.datasetCode},data-label=${d.label},data-status=${d.status},data-running=${d.running}">
+          <span class="dot" th:classappend="${d.running} ? 'running' : (${d.status == 'VERIFIED' and d.enabled} ? 'on' : '')"></span>
+          <a th:href="'#card-' + ${d.slug}" th:text="${d.datasetCode} + ' · ' + ${d.label}"
+             th:title="${d.lastVerifiedAt != null} ? ('마지막 검증: ' + ${d.lastVerifiedAt} + ' · ' + (${d.lastVerifiedBy} ?: '담당자 미기록')) : '검증 근거 없음'"
+             th:attr="onclick=|krasFocusDataset('${d.slug}');return true;|"></a>
+        </div>
+      </div>
+    </div>
+    <div class="dataset-nav-empty" id="dataset-nav-empty" hidden>조건에 맞는 연계가 없습니다.</div>
+  </nav>
 
   <section class="card" id="integration-history" aria-labelledby="history-title">
     <h2 class="card-title" id="history-title">전체 연계 작업 이력</h2>
@@ -93,13 +143,14 @@
       <h3 id="history-detail-title" class="card-title"></h3>
       <p class="history-help">테이블별 최대 100행의 미리보기입니다. 이전 수집 건을 반영하면 최신 업무 데이터가 과거 값으로 바뀔 수 있으므로 대상과 시점을 확인하세요.</p>
       <div id="history-detail-reasons" class="result-box"></div>
+      <div id="history-comparison" class="result-box" hidden></div>
       <pre id="history-preview" class="result-box"></pre>
       <button type="button" id="history-promote" class="btn btn-primary" disabled>선택한 수집 건 업무 테이블 반영</button>
     </div>
   </section>
 
   <!-- 카드 1: 데이터셋 계약 상태 -->
-  <div class="card">
+  <div class="card" id="card-cadastral-file">
     <div class="card-title">
       데이터셋 계약 상태 — cadastral_file
       <span th:if="${datasetStatus == 'VERIFIED' and datasetEnabled}" class="badge badge-on">VERIFIED · enabled</span>
@@ -119,6 +170,23 @@
           <label for="verify-confirm">실제 운영 응답으로 cadastral_file 계약을 확인했음</label>
         </div>
         <input type="hidden" name="confirmed" id="verify-confirmed" value="false">
+        <div class="verify-fields">
+          <div class="verify-fields-row">
+            <div>
+              <label for="verify-by-cadastral">담당자</label>
+              <input type="text" name="verifiedBy" id="verify-by-cadastral">
+            </div>
+            <div>
+              <label for="verify-mapver-cadastral">매퍼 버전(수동 입력)</label>
+              <input type="text" name="mapperVersion" id="verify-mapver-cadastral" placeholder="예: git 커밋 앞자리">
+            </div>
+          </div>
+          <label for="verify-sample-cadastral">응답 샘플</label>
+          <div class="verify-hint">개인정보(OWNER_NM/OWNER_ADDR 등)는 저장 전 서버에서 자동 마스킹됩니다.</div>
+          <textarea name="responseSample" id="verify-sample-cadastral" rows="4"></textarea>
+          <label for="verify-note-cadastral" style="margin-top:8px;">비고</label>
+          <input type="text" name="note" id="verify-note-cadastral">
+        </div>
         <button type="submit" id="verify-submit" class="btn btn-primary" disabled
                 onclick="document.getElementById('verify-confirmed').value='true';">계약 확인 → VERIFIED로 전환</button>
       </form>
@@ -131,7 +199,7 @@
   </div>
 
   <!-- 카드 1b: 데이터셋 계약 상태 — land_info -->
-  <div class="card">
+  <div class="card" id="card-land-info">
     <div class="card-title">
       데이터셋 계약 상태 — land_info
       <span th:if="${landInfoStatus == 'VERIFIED' and landInfoEnabled}" class="badge badge-on">VERIFIED · enabled</span>
@@ -181,6 +249,23 @@
           <label for="verify-confirm-land-info">실제 운영 응답으로 land_info 계약을 확인했음</label>
         </div>
         <input type="hidden" name="confirmed" id="verify-confirmed-land-info" value="false">
+        <div class="verify-fields">
+          <div class="verify-fields-row">
+            <div>
+              <label for="verify-by-land-info">담당자</label>
+              <input type="text" name="verifiedBy" id="verify-by-land-info">
+            </div>
+            <div>
+              <label for="verify-mapver-land-info">매퍼 버전(수동 입력)</label>
+              <input type="text" name="mapperVersion" id="verify-mapver-land-info" placeholder="예: git 커밋 앞자리">
+            </div>
+          </div>
+          <label for="verify-sample-land-info">응답 샘플</label>
+          <div class="verify-hint">개인정보(OWNER_NM/OWNER_ADDR 등)는 저장 전 서버에서 자동 마스킹됩니다.</div>
+          <textarea name="responseSample" id="verify-sample-land-info" rows="4"></textarea>
+          <label for="verify-note-land-info" style="margin-top:8px;">비고</label>
+          <input type="text" name="note" id="verify-note-land-info">
+        </div>
         <button type="submit" id="verify-submit-land-info" class="btn btn-primary" disabled
                 onclick="document.getElementById('verify-confirmed-land-info').value='true';">계약 확인 → VERIFIED로 전환</button>
       </form>
@@ -218,7 +303,7 @@
   </div>
 
   <!-- 카드 1b-3: 데이터셋 계약 상태 — land_bldg_check -->
-  <div class="card">
+  <div class="card" id="card-land-bldg-check">
     <div class="card-title">
       데이터셋 계약 상태 — land_bldg_check
       <span th:if="${landBldgCheckStatus == 'VERIFIED' and landBldgCheckEnabled}" class="badge badge-on">VERIFIED · enabled</span>
@@ -259,6 +344,23 @@
           <label for="verify-confirm-land-bldg-check">실제 운영 응답으로 land_bldg_check 계약을 확인했음</label>
         </div>
         <input type="hidden" name="confirmed" id="verify-confirmed-land-bldg-check" value="false">
+        <div class="verify-fields">
+          <div class="verify-fields-row">
+            <div>
+              <label for="verify-by-land-bldg-check">담당자</label>
+              <input type="text" name="verifiedBy" id="verify-by-land-bldg-check">
+            </div>
+            <div>
+              <label for="verify-mapver-land-bldg-check">매퍼 버전(수동 입력)</label>
+              <input type="text" name="mapperVersion" id="verify-mapver-land-bldg-check" placeholder="예: git 커밋 앞자리">
+            </div>
+          </div>
+          <label for="verify-sample-land-bldg-check">응답 샘플</label>
+          <div class="verify-hint">개인정보(OWNER_NM/OWNER_ADDR 등)는 저장 전 서버에서 자동 마스킹됩니다.</div>
+          <textarea name="responseSample" id="verify-sample-land-bldg-check" rows="4"></textarea>
+          <label for="verify-note-land-bldg-check" style="margin-top:8px;">비고</label>
+          <input type="text" name="note" id="verify-note-land-bldg-check">
+        </div>
         <button type="submit" id="verify-submit-land-bldg-check" class="btn btn-primary" disabled
                 onclick="document.getElementById('verify-confirmed-land-bldg-check').value='true';">계약 확인 → VERIFIED로 전환</button>
       </form>
@@ -290,7 +392,7 @@
   </div>
 
   <!-- 카드 1b-5: 데이터셋 계약 상태 — collective_building -->
-  <div class="card">
+  <div class="card" id="card-collective-building">
     <div class="card-title">
       데이터셋 계약 상태 — collective_building
       <span th:if="${collectiveBuildingStatus == 'VERIFIED' and collectiveBuildingEnabled}" class="badge badge-on">VERIFIED · enabled</span>
@@ -332,6 +434,23 @@
           <label for="verify-confirm-collective-building">실제 운영 응답으로 collective_building 계약을 확인했음</label>
         </div>
         <input type="hidden" name="confirmed" id="verify-confirmed-collective-building" value="false">
+        <div class="verify-fields">
+          <div class="verify-fields-row">
+            <div>
+              <label for="verify-by-collective-building">담당자</label>
+              <input type="text" name="verifiedBy" id="verify-by-collective-building">
+            </div>
+            <div>
+              <label for="verify-mapver-collective-building">매퍼 버전(수동 입력)</label>
+              <input type="text" name="mapperVersion" id="verify-mapver-collective-building" placeholder="예: git 커밋 앞자리">
+            </div>
+          </div>
+          <label for="verify-sample-collective-building">응답 샘플</label>
+          <div class="verify-hint">개인정보(OWNER_NM/OWNER_ADDR 등)는 저장 전 서버에서 자동 마스킹됩니다.</div>
+          <textarea name="responseSample" id="verify-sample-collective-building" rows="4"></textarea>
+          <label for="verify-note-collective-building" style="margin-top:8px;">비고</label>
+          <input type="text" name="note" id="verify-note-collective-building">
+        </div>
         <button type="submit" id="verify-submit-collective-building" class="btn btn-primary" disabled
                 onclick="document.getElementById('verify-confirmed-collective-building').value='true';">계약 확인 → VERIFIED로 전환</button>
       </form>
@@ -364,7 +483,7 @@
   </div>
 
   <!-- 카드 1b-7: 데이터셋 계약 상태 — shr_ymb -->
-  <div class="card">
+  <div class="card" id="card-shr-ymb">
     <div class="card-title">
       데이터셋 계약 상태 — shr_ymb
       <span th:if="${shrYmbStatus == 'VERIFIED' and shrYmbEnabled}" class="badge badge-on">VERIFIED · enabled</span>
@@ -408,6 +527,23 @@
           <label for="verify-confirm-shr-ymb">실제 운영 응답으로 shr_ymb 계약을 확인했음</label>
         </div>
         <input type="hidden" name="confirmed" id="verify-confirmed-shr-ymb" value="false">
+        <div class="verify-fields">
+          <div class="verify-fields-row">
+            <div>
+              <label for="verify-by-shr-ymb">담당자</label>
+              <input type="text" name="verifiedBy" id="verify-by-shr-ymb">
+            </div>
+            <div>
+              <label for="verify-mapver-shr-ymb">매퍼 버전(수동 입력)</label>
+              <input type="text" name="mapperVersion" id="verify-mapver-shr-ymb" placeholder="예: git 커밋 앞자리">
+            </div>
+          </div>
+          <label for="verify-sample-shr-ymb">응답 샘플</label>
+          <div class="verify-hint">개인정보(OWNER_NM/OWNER_ADDR 등)는 저장 전 서버에서 자동 마스킹됩니다.</div>
+          <textarea name="responseSample" id="verify-sample-shr-ymb" rows="4"></textarea>
+          <label for="verify-note-shr-ymb" style="margin-top:8px;">비고</label>
+          <input type="text" name="note" id="verify-note-shr-ymb">
+        </div>
         <button type="submit" id="verify-submit-shr-ymb" class="btn btn-primary" disabled
                 onclick="document.getElementById('verify-confirmed-shr-ymb').value='true';">계약 확인 → VERIFIED로 전환</button>
       </form>
@@ -439,7 +575,7 @@
   </div>
 
   <!-- 카드 1b-9: 데이터셋 계약 상태 — own_rgt_hist -->
-  <div class="card">
+  <div class="card" id="card-own-rgt-hist">
     <div class="card-title">
       데이터셋 계약 상태 — own_rgt_hist
       <span th:if="${ownRgtHistStatus == 'VERIFIED' and ownRgtHistEnabled}" class="badge badge-on">VERIFIED · enabled</span>
@@ -480,6 +616,23 @@
           <label for="verify-confirm-own-rgt-hist">실제 운영 응답으로 own_rgt_hist 계약을 확인했음</label>
         </div>
         <input type="hidden" name="confirmed" id="verify-confirmed-own-rgt-hist" value="false">
+        <div class="verify-fields">
+          <div class="verify-fields-row">
+            <div>
+              <label for="verify-by-own-rgt-hist">담당자</label>
+              <input type="text" name="verifiedBy" id="verify-by-own-rgt-hist">
+            </div>
+            <div>
+              <label for="verify-mapver-own-rgt-hist">매퍼 버전(수동 입력)</label>
+              <input type="text" name="mapperVersion" id="verify-mapver-own-rgt-hist" placeholder="예: git 커밋 앞자리">
+            </div>
+          </div>
+          <label for="verify-sample-own-rgt-hist">응답 샘플</label>
+          <div class="verify-hint">개인정보(OWNER_NM/OWNER_ADDR 등)는 저장 전 서버에서 자동 마스킹됩니다.</div>
+          <textarea name="responseSample" id="verify-sample-own-rgt-hist" rows="4"></textarea>
+          <label for="verify-note-own-rgt-hist" style="margin-top:8px;">비고</label>
+          <input type="text" name="note" id="verify-note-own-rgt-hist">
+        </div>
         <button type="submit" id="verify-submit-own-rgt-hist" class="btn btn-primary" disabled
                 onclick="document.getElementById('verify-confirmed-own-rgt-hist').value='true';">계약 확인 → VERIFIED로 전환</button>
       </form>
@@ -511,7 +664,7 @@
   </div>
 
   <!-- 카드 1b-11: 데이터셋 계약 상태 — land_mov_hist -->
-  <div class="card">
+  <div class="card" id="card-land-mov-hist">
     <div class="card-title">
       데이터셋 계약 상태 — land_mov_hist
       <span th:if="${landMovHistStatus == 'VERIFIED' and landMovHistEnabled}" class="badge badge-on">VERIFIED · enabled</span>
@@ -556,6 +709,23 @@
           <label for="verify-confirm-land-mov-hist">실제 운영 응답으로 land_mov_hist 계약을 확인했음</label>
         </div>
         <input type="hidden" name="confirmed" id="verify-confirmed-land-mov-hist" value="false">
+        <div class="verify-fields">
+          <div class="verify-fields-row">
+            <div>
+              <label for="verify-by-land-mov-hist">담당자</label>
+              <input type="text" name="verifiedBy" id="verify-by-land-mov-hist">
+            </div>
+            <div>
+              <label for="verify-mapver-land-mov-hist">매퍼 버전(수동 입력)</label>
+              <input type="text" name="mapperVersion" id="verify-mapver-land-mov-hist" placeholder="예: git 커밋 앞자리">
+            </div>
+          </div>
+          <label for="verify-sample-land-mov-hist">응답 샘플</label>
+          <div class="verify-hint">개인정보(OWNER_NM/OWNER_ADDR 등)는 저장 전 서버에서 자동 마스킹됩니다.</div>
+          <textarea name="responseSample" id="verify-sample-land-mov-hist" rows="4"></textarea>
+          <label for="verify-note-land-mov-hist" style="margin-top:8px;">비고</label>
+          <input type="text" name="note" id="verify-note-land-mov-hist">
+        </div>
         <button type="submit" id="verify-submit-land-mov-hist" class="btn btn-primary" disabled
                 onclick="document.getElementById('verify-confirmed-land-mov-hist').value='true';">계약 확인 → VERIFIED로 전환</button>
       </form>
@@ -587,7 +757,7 @@
   </div>
 
   <!-- 카드 1b-13: 데이터셋 계약 상태 — collective_unit -->
-  <div class="card">
+  <div class="card" id="card-collective-unit">
     <div class="card-title">
       데이터셋 계약 상태 — collective_unit
       <span th:if="${collectiveUnitStatus == 'VERIFIED' and collectiveUnitEnabled}" class="badge badge-on">VERIFIED · enabled</span>
@@ -623,6 +793,23 @@
           <label for="verify-confirm-collective-unit">실제 운영 응답으로 collective_unit 계약을 확인했음</label>
         </div>
         <input type="hidden" name="confirmed" id="verify-confirmed-collective-unit" value="false">
+        <div class="verify-fields">
+          <div class="verify-fields-row">
+            <div>
+              <label for="verify-by-collective-unit">담당자</label>
+              <input type="text" name="verifiedBy" id="verify-by-collective-unit">
+            </div>
+            <div>
+              <label for="verify-mapver-collective-unit">매퍼 버전(수동 입력)</label>
+              <input type="text" name="mapperVersion" id="verify-mapver-collective-unit" placeholder="예: git 커밋 앞자리">
+            </div>
+          </div>
+          <label for="verify-sample-collective-unit">응답 샘플</label>
+          <div class="verify-hint">개인정보(OWNER_NM/OWNER_ADDR 등)는 저장 전 서버에서 자동 마스킹됩니다.</div>
+          <textarea name="responseSample" id="verify-sample-collective-unit" rows="4"></textarea>
+          <label for="verify-note-collective-unit" style="margin-top:8px;">비고</label>
+          <input type="text" name="note" id="verify-note-collective-unit">
+        </div>
         <button type="submit" id="verify-submit-collective-unit" class="btn btn-primary" disabled
                 onclick="document.getElementById('verify-confirmed-collective-unit').value='true';">계약 확인 → VERIFIED로 전환</button>
       </form>
@@ -658,7 +845,7 @@
   </div>
 
   <!-- 카드 1b-15: 데이터셋 계약 상태 + 테스트 — land_right -->
-  <div class="card">
+  <div class="card" id="card-land-right">
     <div class="card-title">
       데이터셋 계약 상태 — land_right
       <span th:if="${landRightStatus == 'VERIFIED' and landRightEnabled}" class="badge badge-on">VERIFIED · enabled</span>
@@ -682,6 +869,23 @@
           <label for="verify-confirm-land-right">실제 운영 응답으로 land_right 계약을 확인했음</label>
         </div>
         <input type="hidden" name="confirmed" id="verify-confirmed-land-right" value="false">
+        <div class="verify-fields">
+          <div class="verify-fields-row">
+            <div>
+              <label for="verify-by-land-right">담당자</label>
+              <input type="text" name="verifiedBy" id="verify-by-land-right">
+            </div>
+            <div>
+              <label for="verify-mapver-land-right">매퍼 버전(수동 입력)</label>
+              <input type="text" name="mapperVersion" id="verify-mapver-land-right" placeholder="예: git 커밋 앞자리">
+            </div>
+          </div>
+          <label for="verify-sample-land-right">응답 샘플</label>
+          <div class="verify-hint">개인정보(OWNER_NM/OWNER_ADDR 등)는 저장 전 서버에서 자동 마스킹됩니다.</div>
+          <textarea name="responseSample" id="verify-sample-land-right" rows="4"></textarea>
+          <label for="verify-note-land-right" style="margin-top:8px;">비고</label>
+          <input type="text" name="note" id="verify-note-land-right">
+        </div>
         <button type="submit" id="verify-submit-land-right" class="btn btn-primary" disabled
                 onclick="document.getElementById('verify-confirmed-land-right').value='true';">계약 확인 → VERIFIED로 전환</button>
       </form>
@@ -707,7 +911,7 @@
   </div>
 
   <!-- 카드 1b-16: 데이터셋 계약 상태 + 테스트 — unit_ownership_history -->
-  <div class="card">
+  <div class="card" id="card-unit-ownership-history">
     <div class="card-title">
       데이터셋 계약 상태 — unit_ownership_history
       <span th:if="${unitOwnershipHistoryStatus == 'VERIFIED' and unitOwnershipHistoryEnabled}" class="badge badge-on">VERIFIED · enabled</span>
@@ -732,6 +936,23 @@
           <label for="verify-confirm-unit-ownership-history">실제 운영 응답으로 unit_ownership_history 계약을 확인했음</label>
         </div>
         <input type="hidden" name="confirmed" id="verify-confirmed-unit-ownership-history" value="false">
+        <div class="verify-fields">
+          <div class="verify-fields-row">
+            <div>
+              <label for="verify-by-unit-ownership-history">담당자</label>
+              <input type="text" name="verifiedBy" id="verify-by-unit-ownership-history">
+            </div>
+            <div>
+              <label for="verify-mapver-unit-ownership-history">매퍼 버전(수동 입력)</label>
+              <input type="text" name="mapperVersion" id="verify-mapver-unit-ownership-history" placeholder="예: git 커밋 앞자리">
+            </div>
+          </div>
+          <label for="verify-sample-unit-ownership-history">응답 샘플</label>
+          <div class="verify-hint">개인정보(OWNER_NM/OWNER_ADDR 등)는 저장 전 서버에서 자동 마스킹됩니다.</div>
+          <textarea name="responseSample" id="verify-sample-unit-ownership-history" rows="4"></textarea>
+          <label for="verify-note-unit-ownership-history" style="margin-top:8px;">비고</label>
+          <input type="text" name="note" id="verify-note-unit-ownership-history">
+        </div>
         <button type="submit" id="verify-submit-unit-ownership-history" class="btn btn-primary" disabled
                 onclick="document.getElementById('verify-confirmed-unit-ownership-history').value='true';">계약 확인 → VERIFIED로 전환</button>
       </form>
@@ -757,7 +978,7 @@
   </div>
 
   <!-- 카드 1b-17: 데이터셋 계약 상태 + 테스트 — integrated_building -->
-  <div class="card">
+  <div class="card" id="card-integrated-building">
     <div class="card-title">
       데이터셋 계약 상태 — integrated_building
       <span th:if="${integratedBuildingStatus == 'VERIFIED' and integratedBuildingEnabled}" class="badge badge-on">VERIFIED · enabled</span>
@@ -781,6 +1002,23 @@
           <label for="verify-confirm-integrated-building">실제 운영 응답으로 integrated_building 계약을 확인했음</label>
         </div>
         <input type="hidden" name="confirmed" id="verify-confirmed-integrated-building" value="false">
+        <div class="verify-fields">
+          <div class="verify-fields-row">
+            <div>
+              <label for="verify-by-integrated-building">담당자</label>
+              <input type="text" name="verifiedBy" id="verify-by-integrated-building">
+            </div>
+            <div>
+              <label for="verify-mapver-integrated-building">매퍼 버전(수동 입력)</label>
+              <input type="text" name="mapperVersion" id="verify-mapver-integrated-building" placeholder="예: git 커밋 앞자리">
+            </div>
+          </div>
+          <label for="verify-sample-integrated-building">응답 샘플</label>
+          <div class="verify-hint">개인정보(OWNER_NM/OWNER_ADDR 등)는 저장 전 서버에서 자동 마스킹됩니다.</div>
+          <textarea name="responseSample" id="verify-sample-integrated-building" rows="4"></textarea>
+          <label for="verify-note-integrated-building" style="margin-top:8px;">비고</label>
+          <input type="text" name="note" id="verify-note-integrated-building">
+        </div>
         <button type="submit" id="verify-submit-integrated-building" class="btn btn-primary" disabled
                 onclick="document.getElementById('verify-confirmed-integrated-building').value='true';">계약 확인 → VERIFIED로 전환</button>
       </form>
@@ -802,7 +1040,7 @@
   </div>
 
   <!-- 카드 1b-17b: 데이터셋 계약 상태 + 테스트 — building_image (§14, 응답이 파일) -->
-  <div class="card">
+  <div class="card" id="card-building-image">
     <div class="card-title">
       데이터셋 계약 상태 — building_image
       <span th:if="${buildingImageStatus == 'VERIFIED' and buildingImageEnabled}" class="badge badge-on">VERIFIED · enabled</span>
@@ -829,6 +1067,23 @@
           <label for="verify-confirm-building-image">실제 운영 응답으로 building_image 계약을 확인했음</label>
         </div>
         <input type="hidden" name="confirmed" id="verify-confirmed-building-image" value="false">
+        <div class="verify-fields">
+          <div class="verify-fields-row">
+            <div>
+              <label for="verify-by-building-image">담당자</label>
+              <input type="text" name="verifiedBy" id="verify-by-building-image">
+            </div>
+            <div>
+              <label for="verify-mapver-building-image">매퍼 버전(수동 입력)</label>
+              <input type="text" name="mapperVersion" id="verify-mapver-building-image" placeholder="예: git 커밋 앞자리">
+            </div>
+          </div>
+          <label for="verify-sample-building-image">응답 샘플</label>
+          <div class="verify-hint">개인정보(OWNER_NM/OWNER_ADDR 등)는 저장 전 서버에서 자동 마스킹됩니다.</div>
+          <textarea name="responseSample" id="verify-sample-building-image" rows="4"></textarea>
+          <label for="verify-note-building-image" style="margin-top:8px;">비고</label>
+          <input type="text" name="note" id="verify-note-building-image">
+        </div>
         <button type="submit" id="verify-submit-building-image" class="btn btn-primary" disabled
                 onclick="document.getElementById('verify-confirmed-building-image').value='true';">계약 확인 → VERIFIED로 전환</button>
       </form>
@@ -852,7 +1107,7 @@
   </div>
 
   <!-- 카드 1b-18: 데이터셋 계약 상태 + 테스트 — land_change (기간 조회, PNU 아님) -->
-  <div class="card">
+  <div class="card" id="card-land-change">
     <div class="card-title">
       데이터셋 계약 상태 — land_change
       <span th:if="${landChangeStatus == 'VERIFIED' and landChangeEnabled}" class="badge badge-on">VERIFIED · enabled</span>
@@ -878,6 +1133,23 @@
           <label for="verify-confirm-land-change">실제 운영 응답으로 land_change 계약을 확인했음</label>
         </div>
         <input type="hidden" name="confirmed" id="verify-confirmed-land-change" value="false">
+        <div class="verify-fields">
+          <div class="verify-fields-row">
+            <div>
+              <label for="verify-by-land-change">담당자</label>
+              <input type="text" name="verifiedBy" id="verify-by-land-change">
+            </div>
+            <div>
+              <label for="verify-mapver-land-change">매퍼 버전(수동 입력)</label>
+              <input type="text" name="mapperVersion" id="verify-mapver-land-change" placeholder="예: git 커밋 앞자리">
+            </div>
+          </div>
+          <label for="verify-sample-land-change">응답 샘플</label>
+          <div class="verify-hint">개인정보(OWNER_NM/OWNER_ADDR 등)는 저장 전 서버에서 자동 마스킹됩니다.</div>
+          <textarea name="responseSample" id="verify-sample-land-change" rows="4"></textarea>
+          <label for="verify-note-land-change" style="margin-top:8px;">비고</label>
+          <input type="text" name="note" id="verify-note-land-change">
+        </div>
         <button type="submit" id="verify-submit-land-change" class="btn btn-primary" disabled
                 onclick="document.getElementById('verify-confirmed-land-change').value='true';">계약 확인 → VERIFIED로 전환</button>
       </form>
@@ -921,7 +1193,7 @@
     </p>
   </div>
 
-  <div class="card" th:each="d : ${specServices}">
+  <div class="card" th:each="d : ${specServices}" th:id="'card-' + ${d.slug}">
     <div class="card-title">
       <span th:text="${d.datasetCode} + ' — ' + ${d.label}"></span>
       <span th:if="${d.status == 'VERIFIED' and d.enabled}" class="badge badge-on">VERIFIED · enabled</span>
@@ -938,9 +1210,16 @@
     </p>
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px;">
       <a th:href="'/api-test?api=' + ${d.apiTestId}" target="_blank" class="btn btn-secondary">응답 확인</a>
-      <form th:unless="${d.status == 'VERIFIED' and d.enabled}" method="post" action="/kras-db/verify-dataset" style="display:inline;">
+      <form th:unless="${d.status == 'VERIFIED' and d.enabled}" method="post" action="/kras-db/verify-dataset"
+            style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
         <input type="hidden" name="datasetCode" th:value="${d.datasetCode}">
         <input type="hidden" name="confirmed" value="true">
+        <input type="text" name="verifiedBy" placeholder="담당자"
+               style="padding:7px 10px;border-radius:8px;border:1px solid #2e3640;background:#14171c;color:#c8cdd4;font-size:12.5px;width:110px;">
+        <input type="text" name="mapperVersion" placeholder="매퍼 버전(수동)"
+               style="padding:7px 10px;border-radius:8px;border:1px solid #2e3640;background:#14171c;color:#c8cdd4;font-size:12.5px;width:150px;">
+        <input type="text" name="responseSample" placeholder="응답 샘플(PII 자동 마스킹)"
+               style="padding:7px 10px;border-radius:8px;border:1px solid #2e3640;background:#14171c;color:#c8cdd4;font-size:12.5px;flex:1;min-width:180px;">
         <button type="submit" class="btn btn-secondary"
                 th:attr="onclick=|return confirm('실제 운영 응답으로 ${d.datasetCode} 태그명까지 확인했습니까?')|">VERIFIED로 전환</button>
       </form>
@@ -1019,7 +1298,7 @@
   </div>
 
   <!-- 카드 5a: 데이터셋 계약 상태 — layer_list -->
-  <div class="card">
+  <div class="card" id="card-layer-list">
     <div class="card-title">
       데이터셋 계약 상태 — layer_list
       <span th:if="${layerListStatus == 'VERIFIED' and layerListEnabled}" class="badge badge-on">VERIFIED · enabled</span>
@@ -1037,6 +1316,23 @@
           <label for="verify-confirm-layer-list">실제 운영 응답으로 layer_list 계약을 확인했음</label>
         </div>
         <input type="hidden" name="confirmed" id="verify-confirmed-layer-list" value="false">
+        <div class="verify-fields">
+          <div class="verify-fields-row">
+            <div>
+              <label for="verify-by-layer-list">담당자</label>
+              <input type="text" name="verifiedBy" id="verify-by-layer-list">
+            </div>
+            <div>
+              <label for="verify-mapver-layer-list">매퍼 버전(수동 입력)</label>
+              <input type="text" name="mapperVersion" id="verify-mapver-layer-list" placeholder="예: git 커밋 앞자리">
+            </div>
+          </div>
+          <label for="verify-sample-layer-list">응답 샘플</label>
+          <div class="verify-hint">개인정보(OWNER_NM/OWNER_ADDR 등)는 저장 전 서버에서 자동 마스킹됩니다.</div>
+          <textarea name="responseSample" id="verify-sample-layer-list" rows="4"></textarea>
+          <label for="verify-note-layer-list" style="margin-top:8px;">비고</label>
+          <input type="text" name="note" id="verify-note-layer-list">
+        </div>
         <button type="submit" id="verify-submit-layer-list" class="btn btn-primary" disabled
                 onclick="document.getElementById('verify-confirmed-layer-list').value='true';">계약 확인 → VERIFIED로 전환</button>
       </form>
@@ -1049,7 +1345,7 @@
   </div>
 
   <!-- 카드 5b: 데이터셋 계약 상태 — usezone_file -->
-  <div class="card">
+  <div class="card" id="card-usezone-file">
     <div class="card-title">
       데이터셋 계약 상태 — usezone_file
       <span th:if="${usezoneFileStatus == 'VERIFIED' and usezoneFileEnabled}" class="badge badge-on">VERIFIED · enabled</span>
@@ -1068,6 +1364,23 @@
           <label for="verify-confirm-usezone-file">실제 운영 응답으로 usezone_file 계약을 확인했음</label>
         </div>
         <input type="hidden" name="confirmed" id="verify-confirmed-usezone-file" value="false">
+        <div class="verify-fields">
+          <div class="verify-fields-row">
+            <div>
+              <label for="verify-by-usezone-file">담당자</label>
+              <input type="text" name="verifiedBy" id="verify-by-usezone-file">
+            </div>
+            <div>
+              <label for="verify-mapver-usezone-file">매퍼 버전(수동 입력)</label>
+              <input type="text" name="mapperVersion" id="verify-mapver-usezone-file" placeholder="예: git 커밋 앞자리">
+            </div>
+          </div>
+          <label for="verify-sample-usezone-file">응답 샘플</label>
+          <div class="verify-hint">개인정보(OWNER_NM/OWNER_ADDR 등)는 저장 전 서버에서 자동 마스킹됩니다.</div>
+          <textarea name="responseSample" id="verify-sample-usezone-file" rows="4"></textarea>
+          <label for="verify-note-usezone-file" style="margin-top:8px;">비고</label>
+          <input type="text" name="note" id="verify-note-usezone-file">
+        </div>
         <button type="submit" id="verify-submit-usezone-file" class="btn btn-primary" disabled
                 onclick="document.getElementById('verify-confirmed-usezone-file').value='true';">계약 확인 → VERIFIED로 전환</button>
       </form>
@@ -1135,7 +1448,7 @@
   </div>
 
   <!-- 카드 6a: 전체 TXT — land_basic_file (KRAS000040) -->
-  <div class="card">
+  <div class="card" id="card-land-basic-file">
     <div class="card-title">
       데이터셋 계약 상태 + 수집 — land_basic_file (토지기본정보 전체 TXT)
       <span th:if="${landBasicFileStatus == 'VERIFIED' and landBasicFileEnabled}" class="badge badge-on">VERIFIED · enabled</span>
@@ -1174,6 +1487,23 @@
           <label for="verify-confirm-land-basic-file">실제 운영 파일로 land_basic_file 계약을 확인했음</label>
         </div>
         <input type="hidden" name="confirmed" id="verify-confirmed-land-basic-file" value="false">
+        <div class="verify-fields">
+          <div class="verify-fields-row">
+            <div>
+              <label for="verify-by-land-basic-file">담당자</label>
+              <input type="text" name="verifiedBy" id="verify-by-land-basic-file">
+            </div>
+            <div>
+              <label for="verify-mapver-land-basic-file">매퍼 버전(수동 입력)</label>
+              <input type="text" name="mapperVersion" id="verify-mapver-land-basic-file" placeholder="예: git 커밋 앞자리">
+            </div>
+          </div>
+          <label for="verify-sample-land-basic-file">응답 샘플</label>
+          <div class="verify-hint">개인정보(OWNER_NM/OWNER_ADDR 등)는 저장 전 서버에서 자동 마스킹됩니다.</div>
+          <textarea name="responseSample" id="verify-sample-land-basic-file" rows="4"></textarea>
+          <label for="verify-note-land-basic-file" style="margin-top:8px;">비고</label>
+          <input type="text" name="note" id="verify-note-land-basic-file">
+        </div>
         <button type="submit" id="verify-submit-land-basic-file" class="btn btn-primary" disabled
                 onclick="document.getElementById('verify-confirmed-land-basic-file').value='true';">계약 확인 → VERIFIED로 전환</button>
       </form>
@@ -1200,7 +1530,7 @@
   </div>
 
   <!-- 카드 6b: 전체 TXT — land_price_file (KRAS000039) -->
-  <div class="card">
+  <div class="card" id="card-land-price-file">
     <div class="card-title">
       데이터셋 계약 상태 + 수집 — land_price_file (공시지가 전체 TXT)
       <span th:if="${landPriceFileStatus == 'VERIFIED' and landPriceFileEnabled}" class="badge badge-on">VERIFIED · enabled</span>
@@ -1224,6 +1554,23 @@
           <label for="verify-confirm-land-price-file">실제 운영 파일로 land_price_file 계약을 확인했음</label>
         </div>
         <input type="hidden" name="confirmed" id="verify-confirmed-land-price-file" value="false">
+        <div class="verify-fields">
+          <div class="verify-fields-row">
+            <div>
+              <label for="verify-by-land-price-file">담당자</label>
+              <input type="text" name="verifiedBy" id="verify-by-land-price-file">
+            </div>
+            <div>
+              <label for="verify-mapver-land-price-file">매퍼 버전(수동 입력)</label>
+              <input type="text" name="mapperVersion" id="verify-mapver-land-price-file" placeholder="예: git 커밋 앞자리">
+            </div>
+          </div>
+          <label for="verify-sample-land-price-file">응답 샘플</label>
+          <div class="verify-hint">개인정보(OWNER_NM/OWNER_ADDR 등)는 저장 전 서버에서 자동 마스킹됩니다.</div>
+          <textarea name="responseSample" id="verify-sample-land-price-file" rows="4"></textarea>
+          <label for="verify-note-land-price-file" style="margin-top:8px;">비고</label>
+          <input type="text" name="note" id="verify-note-land-price-file">
+        </div>
         <button type="submit" id="verify-submit-land-price-file" class="btn btn-primary" disabled
                 onclick="document.getElementById('verify-confirmed-land-price-file').value='true';">계약 확인 → VERIFIED로 전환</button>
       </form>
@@ -1557,6 +1904,46 @@ function runLandBasicFilePromote() {
   return runTxtAction('land-basic-file', '/kras-db/promote/land-basic-file?itemId=' + itemId);
 }
 function runLandPriceFileIngest() { return runTxtAction('land-price-file', '/kras-db/ingest/land-price-file'); }
+
+/** 목록 항목을 클릭하면 해당 카드로 이동한 뒤 잠깐 하이라이트한다. 상세 카드 자체는 건드리지 않는다. */
+function krasFocusDataset(slug) {
+  const card = document.getElementById('card-' + slug);
+  if (!card) return;
+  card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  card.classList.add('card-highlight');
+  setTimeout(() => card.classList.remove('card-highlight'), 2000);
+}
+
+(function initDatasetNav() {
+  const search = document.getElementById('dataset-nav-search');
+  const statusFilter = document.getElementById('dataset-nav-status');
+  const groupsRoot = document.getElementById('dataset-nav-groups');
+  const empty = document.getElementById('dataset-nav-empty');
+  if (!search || !groupsRoot) return;
+
+  function applyFilter() {
+    const term = search.value.trim().toLowerCase();
+    const status = statusFilter.value;
+    let visibleCount = 0;
+    groupsRoot.querySelectorAll('.dataset-nav-group').forEach(group => {
+      let groupVisible = 0;
+      group.querySelectorAll('.dataset-nav-item').forEach(item => {
+        const text = (item.dataset.datasetCode + ' ' + item.dataset.label).toLowerCase();
+        const matchesTerm = !term || text.includes(term);
+        const matchesStatus = !status || item.dataset.status === status;
+        const visible = matchesTerm && matchesStatus;
+        item.style.display = visible ? '' : 'none';
+        if (visible) groupVisible++;
+      });
+      group.style.display = groupVisible ? '' : 'none';
+      visibleCount += groupVisible;
+    });
+    empty.hidden = visibleCount > 0;
+  }
+
+  search.addEventListener('input', applyFilter);
+  statusFilter.addEventListener('change', applyFilter);
+})();
 </script>
 </th:block>
 </body>

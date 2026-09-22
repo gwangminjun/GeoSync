@@ -14,9 +14,11 @@ import java.util.function.Supplier;
 
 @Service
 public class KrasHistoryService {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(KrasHistoryService.class);
     private final Map<String, List<String>> stageTables = new LinkedHashMap<>();
     private final Map<String, Supplier<String>> serviceCodes = new LinkedHashMap<>();
     private final Map<String, String> promotePaths = new LinkedHashMap<>();
+    private final Map<String, List<KrasStagePromotionService.StagePromotionSpec>> promotionSpecsByDataset = new LinkedHashMap<>();
     private final ObjectMapper json = new ObjectMapper();
     private static final Set<String> FILE_DATASETS = Set.of(
             "cadastral_file", "layer_list", "usezone_file", "land_basic_file", "land_price_file");
@@ -45,6 +47,7 @@ public class KrasHistoryService {
         stageTables.put(dataset, List.copyOf(tables));
         serviceCodes.put(dataset, code);
         promotePaths.put(dataset, prefix + dataset.replace('_', '-'));
+        promotionSpecsByDataset.put(dataset, specs);
     }
 
     public List<String> readiness(JdbcTemplate jdbc, String dataset) {
@@ -158,6 +161,68 @@ public class KrasHistoryService {
         result.put("promotable", reasons.isEmpty());
         result.put("reasons", reasons);
         result.put("promotePath", promotePath);
+        // 반영 버튼 옆 참고 정보다 — 비교 조회가 실패해도 반영 자체는 막지 않는다(§2차-3 실패 조건).
+        if (promotePath != null) result.put("comparison", comparePreview(jdbc, itemId, dataset));
         return result;
+    }
+
+    /**
+     * 반영 전 건수 비교 — 패턴마다 "증감"의 의미가 달라 공통 로직 하나로 만들지 않고
+     * StagePromotionSpec.pattern()으로 분기한다(§2차-3 결정). 자식 테이블(ChildSpec)은 다루지 않는다 —
+     * 부모 수준 비교만으로 반영 판단에 충분하다.
+     */
+    private List<Map<String, Object>> comparePreview(JdbcTemplate jdbc, long itemId, String dataset) {
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (var spec : promotionSpecsByDataset.getOrDefault(dataset, List.of())) {
+            try {
+                out.add(compareSpec(jdbc, itemId, spec));
+            } catch (Exception e) {
+                log.warn("[KrasHistory] 반영 전 비교 실패 dataset={} table={}: {}", dataset, spec.businessTable(), e.getMessage());
+                Map<String, Object> failed = new LinkedHashMap<>();
+                failed.put("businessTable", spec.businessTable());
+                failed.put("pattern", spec.pattern().name());
+                failed.put("note", "비교 정보를 계산할 수 없습니다(참고용 정보일 뿐 반영 자체는 막지 않습니다).");
+                out.add(failed);
+            }
+        }
+        return out;
+    }
+
+    private Map<String, Object> compareSpec(JdbcTemplate jdbc, long itemId, KrasStagePromotionService.StagePromotionSpec spec) {
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("businessTable", spec.businessTable());
+        out.put("pattern", spec.pattern().name());
+        Long stageCount = jdbc.queryForObject(
+                "SELECT count(*) FROM " + spec.stageTable() + " WHERE item_id=?", Long.class, itemId);
+        out.put("stageCount", stageCount);
+
+        switch (spec.pattern()) {
+            case NATURAL_KEY_UPSERT -> {
+                if (spec.naturalKeyColumns().isEmpty()) break;
+                Map<String, Object> stageRow = jdbc.queryForMap("SELECT " + String.join(",", spec.naturalKeyColumns())
+                        + " FROM " + spec.stageTable() + " WHERE item_id=? AND row_no=1", itemId);
+                String where = spec.naturalKeyColumns().stream().map(c -> c + "=?").reduce((a, b) -> a + " AND " + b).orElseThrow();
+                Object[] args = spec.naturalKeyColumns().stream().map(stageRow::get).toArray();
+                Long exists = jdbc.queryForObject("SELECT count(*) FROM " + spec.businessTable() + " WHERE " + where, Long.class, args);
+                boolean existing = exists != null && exists > 0;
+                out.put("note", existing ? "기존 행 UPDATE 예상(자연키 일치)" : "신규 행 INSERT 예상(자연키 불일치)");
+            }
+            case IDENTITY_MATCH_UPSERT, PARENT_LOOKUP_IDENTITY_MATCH_UPSERT -> out.put("note",
+                    "행별 자연키 신원 매칭 — 있으면 UPDATE, 없으면 INSERT (건별 결과는 반영 후 업무 테이블에서 확인)");
+            case SCOPE_REPLACE, SCOPE_REPLACE_WITH_CHILDREN -> {
+                if (spec.scopeColumn() == null) break;
+                Object scopeValue = jdbc.queryForObject("SELECT " + spec.scopeColumn() + " FROM " + spec.stageTable()
+                        + " WHERE item_id=? AND row_no=1", Object.class, itemId);
+                Long currentCount = jdbc.queryForObject("SELECT count(*) FROM " + spec.businessTable()
+                        + " WHERE " + spec.scopeColumn() + "=?", Long.class, scopeValue);
+                out.put("scopeColumn", spec.scopeColumn());
+                out.put("scopeValue", scopeValue);
+                out.put("currentCount", currentCount);
+                out.put("note", "이 범위(%s=%s)의 기존 %d건을 전체 삭제 후 %d건으로 교체"
+                        .formatted(spec.scopeColumn(), scopeValue, currentCount, stageCount));
+            }
+            case APPEND_ONLY -> out.put("note", "추가 전용 — 이번 반영으로 최대 %d건 추가(재수집분은 중복 제외)".formatted(stageCount));
+        }
+        return out;
     }
 }

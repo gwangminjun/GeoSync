@@ -20,6 +20,7 @@ import java.nio.file.Path;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -50,27 +51,27 @@ public class KrasSchemaController {
      * 접두어는 landInfoStatus/landInfoEnabled/landInfoRunning/lastLandInfoResult 형태로 조립된다 —
      * 기존 템플릿 변수명과 그대로 맞아 템플릿은 안 건드려도 된다.
      */
-    private record ImplementedService(String slug, String datasetCode, String modelPrefix) {}
+    private record ImplementedService(String slug, String datasetCode, String modelPrefix, String group) {}
 
     private static final List<ImplementedService> IMPLEMENTED_SERVICES = List.of(
-        new ImplementedService("land-info", "land_info", "landInfo"),
-        new ImplementedService("land-bldg-check", "land_bldg_check", "landBldgCheck"),
-        new ImplementedService("collective-building", "collective_building", "collectiveBuilding"),
-        new ImplementedService("shr-ymb", "shr_ymb", "shrYmb"),
-        new ImplementedService("own-rgt-hist", "own_rgt_hist", "ownRgtHist"),
-        new ImplementedService("land-mov-hist", "land_mov_hist", "landMovHist"),
-        new ImplementedService("collective-unit", "collective_unit", "collectiveUnit"),
-        new ImplementedService("land-right", "land_right", "landRight"),
-        new ImplementedService("unit-ownership-history", "unit_ownership_history", "unitOwnershipHistory"),
-        new ImplementedService("integrated-building", "integrated_building", "integratedBuilding"),
-        new ImplementedService("building-image", "building_image", "buildingImage")
+        new ImplementedService("land-info", "land_info", "landInfo", "토지"),
+        new ImplementedService("land-bldg-check", "land_bldg_check", "landBldgCheck", "토지"),
+        new ImplementedService("collective-building", "collective_building", "collectiveBuilding", "건물"),
+        new ImplementedService("shr-ymb", "shr_ymb", "shrYmb", "건물"),
+        new ImplementedService("own-rgt-hist", "own_rgt_hist", "ownRgtHist", "토지"),
+        new ImplementedService("land-mov-hist", "land_mov_hist", "landMovHist", "토지"),
+        new ImplementedService("collective-unit", "collective_unit", "collectiveUnit", "건물"),
+        new ImplementedService("land-right", "land_right", "landRight", "토지"),
+        new ImplementedService("unit-ownership-history", "unit_ownership_history", "unitOwnershipHistory", "건물"),
+        new ImplementedService("integrated-building", "integrated_building", "integratedBuilding", "건물"),
+        new ImplementedService("building-image", "building_image", "buildingImage", "건물")
     );
 
     /** 기간(날짜 범위) 조회 서비스(§10~12 계열) — PNU 단건과 최상위 식별자가 달라 별도 레지스트리. */
-    private record DateRangeService(String slug, String datasetCode, String modelPrefix) {}
+    private record DateRangeService(String slug, String datasetCode, String modelPrefix, String group) {}
 
     private static final List<DateRangeService> DATE_RANGE_SERVICES = List.of(
-        new DateRangeService("land-change", "land_change", "landChange")
+        new DateRangeService("land-change", "land_change", "landChange", "기간조회")
     );
 
     /**
@@ -82,39 +83,50 @@ public class KrasSchemaController {
      * @param dependsOn 이 서비스보다 먼저 승격돼 있어야 하는 데이터셋(FK/드릴다운 부모). 없으면 빈 문자열.
      */
     private record SpecService(String slug, String datasetCode, String serviceCode, String label,
-                                String businessTables, boolean needsBno, String dependsOn) {}
+                                String businessTables, boolean needsBno, String dependsOn, String group) {}
 
     private static final List<SpecService> SPEC_SERVICES = List.of(
         new SpecService("use-zone", "use_zone", "KRAS000027", "용도지역지구",
-            "kras.land_use_zone", false, ""),
+            "kras.land_use_zone", false, "", "토지"),
         new SpecService("land-use-plan-attr", "land_use_plan_attr", "KRAS000025", "토지이용계획 속성",
-            "kras.land_use_attribute", false, ""),
+            "kras.land_use_attribute", false, "", "토지"),
         new SpecService("land-use-plan-info", "land_use_plan_info", "KRAS000026", "토지이용계획 + 행위제한",
-            "kras.land_use_plan, kras.land_use_restriction", false, ""),
+            "kras.land_use_plan, kras.land_use_restriction", false, "", "토지"),
         new SpecService("bldg-dong-info", "bldg_dong_info", "KRAS000102", "건물 동 정보 (건물 계열의 관문)",
-            "kras.building_register", false, ""),
+            "kras.building_register", false, "", "건물"),
         new SpecService("bldg-ledg-gen-hds-info", "bldg_ledg_gen_hds_info", "KRAS000017", "건축물대장 총괄표제부",
-            "kras.building_summary", false, ""),
+            "kras.building_summary", false, "", "건물"),
         new SpecService("bldg-ho-info", "bldg_ho_info", "KRAS000103", "건물 호(전유) 정보",
-            "kras.building_unit", true, ""),
+            "kras.building_unit", true, "", "건물"),
         new SpecService("bldg-hds-info", "bldg_hds_info", "KRAS000014", "건축물대장 표제부 + 층별/소유자/변동",
             "kras.building_title, kras.building_floor, kras.building_title_owner, kras.building_title_change",
-            true, "bldg_dong_info"),
+            true, "bldg_dong_info", "건물"),
         new SpecService("cbldg-hds-info", "cbldg_hds_info", "KRAS000015", "집합건물 표제부",
-            "kras.building_title", true, "bldg_dong_info"),
+            "kras.building_title", true, "bldg_dong_info", "건물"),
         new SpecService("cbldg-dfhs-info", "cbldg_dfhs_info", "KRAS000016", "집합건물 전유부 + 면적/소유자/가격",
             "kras.building_exclusive, kras.building_exclusive_area, kras.building_exclusive_owner, kras.building_exclusive_price",
-            true, "bldg_ho_info"),
+            true, "bldg_ho_info", "건물"),
         new SpecService("land-jiga", "land_jiga", "KOREPS00011", "공시지가 (KOREPS)",
-            "kras.koreps_land_price", false, ""),
+            "kras.koreps_land_price", false, "", "가격"),
         new SpecService("house-info", "house_info", "KOREPS00033", "개별주택가격 (KOREPS)",
-            "kras.house_price", false, ""),
+            "kras.house_price", false, "", "가격"),
         new SpecService("fin-dec-jiga", "fin_dec_jiga", "KOREPS00034", "공시결정지가 (KOREPS)",
-            "kras.final_land_price", false, ""),
+            "kras.final_land_price", false, "", "가격"),
         new SpecService("read-dec-jiga", "read_dec_jiga", "KOREPS00035", "열람결정지가 (KOREPS)",
-            "kras.read_land_price", false, ""),
+            "kras.read_land_price", false, "", "가격"),
         new SpecService("land-attr", "land_attr", "KOREPS00047", "토지속성 (KOREPS)",
-            "kras.land_attribute", false, "")
+            "kras.land_attribute", false, "", "토지")
+    );
+
+    /** 개별 매퍼가 없는 고정 데이터셋(SHP/전체 TXT) — 목록·상세 사이드바 분류용. */
+    private record FixedDataset(String slug, String datasetCode, String label, String group) {}
+
+    private static final List<FixedDataset> FIXED_DATASETS = List.of(
+        new FixedDataset("cadastral-file", "cadastral_file", "연속지적 (SHP)", "공간(SHP)"),
+        new FixedDataset("layer-list", "layer_list", "용도지역 레이어 목록", "공간(SHP)"),
+        new FixedDataset("usezone-file", "usezone_file", "용도지역 (SHP)", "공간(SHP)"),
+        new FixedDataset("land-basic-file", "land_basic_file", "토지기본정보 전체 TXT", "전체TXT"),
+        new FixedDataset("land-price-file", "land_price_file", "공시지가 전체 TXT", "전체TXT")
     );
 
     /** verify/revert-dataset이 건드릴 수 있는 dataset_code 화이트리스트 — 임의 문자열로 다른 데이터셋을 켜지 못하게 막는다. */
@@ -127,6 +139,7 @@ public class KrasSchemaController {
 
     private final KrasOperationLogService operationLog;
     private final KrasHistoryService historyService;
+    private final KrasVerificationEvidenceService verificationEvidenceService;
     private final Map<String, AtomicBoolean> operationLocks = new ConcurrentHashMap<>();
     private final TargetDbService targetDbService;
     private final RuntimeSettingsService settings;
@@ -166,9 +179,11 @@ public class KrasSchemaController {
                                  List<KrasDateRangeServiceMapper> dateRangeMappers,
                                  KrasUsezoneIngestService usezoneIngestService,
                                  KrasTxtIngestService txtIngestService,
-                                 KrasOperationLogService operationLog, KrasHistoryService historyService) {
+                                 KrasOperationLogService operationLog, KrasHistoryService historyService,
+                                 KrasVerificationEvidenceService verificationEvidenceService) {
         this.operationLog = operationLog;
         this.historyService = historyService;
+        this.verificationEvidenceService = verificationEvidenceService;
         this.targetDbService = targetDbService;
         this.settings = settings;
         this.krasApiClient = krasApiClient;
@@ -237,6 +252,8 @@ public class KrasSchemaController {
         }
 
         model.addAttribute("specServices", loadSpecServiceRows(jdbc));
+        model.addAttribute("datasetIndex", buildDatasetIndex(jdbc));
+        model.addAttribute("datasetGroups", List.of("토지", "건물", "공간(SHP)", "가격", "전체TXT", "기간조회"));
 
         Long krasCount = jdbc.queryForObject("SELECT count(*) FROM kras.lp_pa_cbnd", Long.class);
         Long publicCount = jdbc.queryForObject("SELECT count(*) FROM public.lp_pa_cbnd", Long.class);
@@ -328,6 +345,10 @@ public class KrasSchemaController {
     @PostMapping("/kras-db/verify-dataset")
     public String verifyDataset(@RequestParam String datasetCode,
                                  @RequestParam(defaultValue = "false") boolean confirmed,
+                                 @RequestParam(required = false) String verifiedBy,
+                                 @RequestParam(required = false) String mapperVersion,
+                                 @RequestParam(required = false) String responseSample,
+                                 @RequestParam(required = false) String note,
                                  RedirectAttributes ra) {
         if (!VERIFIABLE_DATASETS.contains(datasetCode)) {
             ra.addFlashAttribute("message", "알 수 없는 dataset_code입니다: " + datasetCode);
@@ -341,7 +362,16 @@ public class KrasSchemaController {
             UPDATE kras.sync_dataset SET contract_status='VERIFIED', enabled=true
             WHERE dataset_code=?
             """, datasetCode);
-        ra.addFlashAttribute("message", datasetCode + " 데이터셋을 VERIFIED로 전환했습니다.");
+        String message = datasetCode + " 데이터셋을 VERIFIED로 전환했습니다.";
+        // 근거 저장 실패가 검증 전환 자체를 막으면 안 된다 — 위 UPDATE는 이미 커밋됐다.
+        try {
+            verificationEvidenceService.save(jdbc(), settings.orgCode(), datasetCode,
+                    verifiedBy, mapperVersion, responseSample, note);
+        } catch (Exception e) {
+            log.error("[KrasSchema] {} 검증 근거 저장 실패: {}", datasetCode, e.getMessage(), e);
+            message += " (단, 검증 근거 저장에는 실패했습니다: " + e.getMessage() + ")";
+        }
+        ra.addFlashAttribute("message", message);
         return "redirect:/kras-db";
     }
 
@@ -814,6 +844,69 @@ public class KrasSchemaController {
             result.add(out);
         }
         return result;
+    }
+
+    /**
+     * 목록·상세 사이드바용 — 4개 레지스트리(IMPLEMENTED/DATE_RANGE/SPEC/FIXED)를 그룹·상태와 함께
+     * 하나의 목록으로 합친다. 새 레지스트리를 만들지 않고 기존 것을 그대로 합치기만 한다.
+     */
+    private List<Map<String, Object>> buildDatasetIndex(JdbcTemplate jdbc) {
+        List<String> allCodes = Stream.of(
+                IMPLEMENTED_SERVICES.stream().map(ImplementedService::datasetCode),
+                DATE_RANGE_SERVICES.stream().map(DateRangeService::datasetCode),
+                SPEC_SERVICES.stream().map(SpecService::datasetCode),
+                FIXED_DATASETS.stream().map(FixedDataset::datasetCode)
+        ).flatMap(s -> s).toList();
+        Map<String, Map<String, Object>> statusByCode = batchDatasetStatus(jdbc, allCodes);
+        Map<String, Map<String, Object>> evidenceByCode =
+                verificationEvidenceService.latestByDataset(jdbc, settings.orgCode(), allCodes);
+
+        List<Map<String, Object>> index = new ArrayList<>();
+        for (ImplementedService svc : IMPLEMENTED_SERVICES) {
+            index.add(datasetIndexRow(svc.slug(), svc.datasetCode(), svc.datasetCode(), svc.group(),
+                    statusByCode, evidenceByCode, runningByDatasetCode.get(svc.datasetCode()).get()));
+        }
+        for (DateRangeService svc : DATE_RANGE_SERVICES) {
+            index.add(datasetIndexRow(svc.slug(), svc.datasetCode(), svc.datasetCode(), svc.group(),
+                    statusByCode, evidenceByCode, runningByDatasetCode.get(svc.datasetCode()).get()));
+        }
+        for (SpecService svc : SPEC_SERVICES) {
+            index.add(datasetIndexRow(svc.slug(), svc.datasetCode(), svc.label(), svc.group(),
+                    statusByCode, evidenceByCode, runningByDatasetCode.get(svc.datasetCode()).get()));
+        }
+        boolean fixedRunning = cadastralRunning.get() || usezoneRunning.get()
+                || landBasicFileRunning.get() || landPriceFileRunning.get();
+        for (FixedDataset ds : FIXED_DATASETS) {
+            boolean running = switch (ds.datasetCode()) {
+                case "cadastral_file" -> cadastralRunning.get();
+                case "layer_list", "usezone_file" -> usezoneRunning.get();
+                case "land_basic_file" -> landBasicFileRunning.get();
+                case "land_price_file" -> landPriceFileRunning.get();
+                default -> fixedRunning;
+            };
+            index.add(datasetIndexRow(ds.slug(), ds.datasetCode(), ds.label(), ds.group(),
+                    statusByCode, evidenceByCode, running));
+        }
+        return index;
+    }
+
+    private Map<String, Object> datasetIndexRow(String slug, String datasetCode, String label, String group,
+                                                  Map<String, Map<String, Object>> statusByCode,
+                                                  Map<String, Map<String, Object>> evidenceByCode,
+                                                  boolean running) {
+        Map<String, Object> status = statusByCode.get(datasetCode);
+        Map<String, Object> evidence = evidenceByCode.get(datasetCode);
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("slug", slug);
+        out.put("datasetCode", datasetCode);
+        out.put("label", label);
+        out.put("group", group);
+        out.put("status", status != null ? status.get("contract_status") : "UNVERIFIED");
+        out.put("enabled", status != null && Boolean.TRUE.equals(status.get("enabled")));
+        out.put("running", running);
+        out.put("lastVerifiedAt", evidence != null ? evidence.get("verified_at") : null);
+        out.put("lastVerifiedBy", evidence != null ? evidence.get("verified_by") : null);
+        return out;
     }
 
     private SyncTableDef findCadastralDef() {

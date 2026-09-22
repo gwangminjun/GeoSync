@@ -52,10 +52,18 @@ class KrasIntegrationViewTest {
         spec.put("businessTables", "kras.land_use_zone");
         spec.put("lastResult", null);
         context.setVariable("specServices", List.of(spec));
+        context.setVariable("datasetGroups", List.of("토지", "건물", "공간(SHP)", "가격", "전체TXT", "기간조회"));
+        Map<String, Object> indexRow = new java.util.HashMap<>(Map.of(
+                "slug", "use-zone", "datasetCode", "use_zone", "label", "용도지역지구", "group", "토지",
+                "status", "UNVERIFIED", "enabled", false, "running", false));
+        indexRow.put("lastVerifiedAt", null);
+        indexRow.put("lastVerifiedBy", null);
+        context.setVariable("datasetIndex", List.of(indexRow));
         String html = engine.process("kras-db", context);
         Files.createDirectories(Path.of("build/kras-ui"));
         Files.writeString(Path.of("build/kras-ui/kras-db.html"), html);
         assertThat(html).contains("전체 연계 작업 이력", "data-slug=\"use-zone\"",
-                "onclick=\"runPnuIngest(this.dataset.slug)\"", "KRAS 연계 관리");
+                "onclick=\"runPnuIngest(this.dataset.slug)\"", "KRAS 연계 관리",
+                "id=\"dataset-nav-search\"", "href=\"#card-use-zone\"", "id=\"card-use-zone\"", ">토지<");
     }
 }

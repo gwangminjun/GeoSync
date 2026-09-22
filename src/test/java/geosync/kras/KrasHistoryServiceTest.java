@@ -64,4 +64,55 @@ class KrasHistoryServiceTest {
         assertThatThrownBy(() -> service.requirePnuInput("12830", "not-a-pnu", "land_info", Map.of()))
                 .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("19");
     }
+
+    @Test
+    void previewIncludesComparisonNotingExistingRowWillBeUpdated() {
+        when(jdbc.queryForList(contains("si.item_id=? AND si.org_cd=?"), eq(44L), eq("12830")))
+                .thenReturn(List.of(Map.of("item_id", 44L, "dataset_code", "land_info", "status", "SUCCESS")));
+        when(jdbc.queryForList(contains("sync_dataset"), eq("land_info"))).thenReturn(List.of(
+                Map.of("contract_status", "VERIFIED", "enabled", true, "service_code", "KRAS000002")));
+        when(jdbc.query(contains("row_to_json"), any(org.springframework.jdbc.core.RowMapper.class), eq(44L)))
+                .thenReturn(List.of());
+        when(jdbc.queryForObject(contains("count(*) FROM kras.stage_parcel"), eq(Long.class), eq(44L))).thenReturn(1L);
+        when(jdbc.queryForMap(contains("kras.stage_parcel"), eq(44L))).thenReturn(Map.of("pnu", "1283025021100010000"));
+        when(jdbc.queryForObject(contains("count(*) FROM kras.parcel"), eq(Long.class), eq("1283025021100010000")))
+                .thenReturn(1L);
+        // 나머지 두 spec(land_register/land_owner)은 아무 값이나 반환해도 이 테스트 목적(첫 spec 검증)엔 무관하다
+        when(jdbc.queryForObject(contains("count(*) FROM kras.stage_land_register"), eq(Long.class), eq(44L))).thenReturn(1L);
+        when(jdbc.queryForMap(contains("kras.stage_land_register"), eq(44L))).thenReturn(Map.of("pnu", "1283025021100010000"));
+        when(jdbc.queryForObject(contains("count(*) FROM kras.land_register"), eq(Long.class), eq("1283025021100010000")))
+                .thenReturn(0L);
+        when(jdbc.queryForObject(contains("count(*) FROM kras.stage_land_owner"), eq(Long.class), eq(44L))).thenReturn(1L);
+        when(jdbc.queryForMap(contains("kras.stage_land_owner"), eq(44L))).thenReturn(Map.of("pnu", "1283025021100010000"));
+        when(jdbc.queryForObject(contains("count(*) FROM kras.land_owner"), eq(Long.class), eq("1283025021100010000")))
+                .thenReturn(0L);
+
+        Map<String, Object> result = service.preview(jdbc, "12830", 44L);
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> comparison = (List<Map<String, Object>>) result.get("comparison");
+        assertThat(comparison).hasSize(3);
+        assertThat(comparison.get(0)).containsEntry("businessTable", "kras.parcel")
+                .containsEntry("note", "기존 행 UPDATE 예상(자연키 일치)");
+        assertThat(comparison.get(1)).containsEntry("note", "신규 행 INSERT 예상(자연키 불일치)");
+    }
+
+    @Test
+    void comparisonFailureDoesNotBreakPreview() {
+        when(jdbc.queryForList(contains("si.item_id=? AND si.org_cd=?"), eq(44L), eq("12830")))
+                .thenReturn(List.of(Map.of("item_id", 44L, "dataset_code", "land_info", "status", "SUCCESS")));
+        when(jdbc.queryForList(contains("sync_dataset"), eq("land_info"))).thenReturn(List.of(
+                Map.of("contract_status", "VERIFIED", "enabled", true, "service_code", "KRAS000002")));
+        when(jdbc.query(contains("row_to_json"), any(org.springframework.jdbc.core.RowMapper.class), eq(44L)))
+                .thenReturn(List.of());
+        when(jdbc.queryForObject(contains("count(*) FROM kras.stage_parcel"), eq(Long.class), eq(44L)))
+                .thenThrow(new org.springframework.dao.DataAccessResourceFailureException("연결 끊김"));
+
+        Map<String, Object> result = service.preview(jdbc, "12830", 44L);
+
+        assertThat(result).containsEntry("promotable", true);
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> comparison = (List<Map<String, Object>>) result.get("comparison");
+        assertThat(comparison.get(0).get("note").toString()).contains("계산할 수 없습니다");
+    }
 }
