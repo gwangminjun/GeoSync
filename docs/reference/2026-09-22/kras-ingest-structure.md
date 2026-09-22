@@ -13,6 +13,7 @@
 | `docs/database/2026-09-18/kras-schema-create.sql` | 실제 DDL — 가드 트리거·함수 포함 |
 | `docs/reference/2026-09-18/kras.md` | KRAS 연계 규격서(§1~16) |
 | **이 문서** | **위 설계 중 구현 완료된 부분의 실제 구조** |
+| `docs/reference/2026-09-22/kras-contract-verification-runbook.md` | 17개 데이터셋 계약 검증 절차(운영 런북) |
 
 설계 문서와 어긋나는 부분이 있으면 **이 문서가 맞다**(설계 문서는 구현 전 시점에 멈춰 있다).
 
