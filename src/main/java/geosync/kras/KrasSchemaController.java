@@ -60,7 +60,8 @@ public class KrasSchemaController {
         new ImplementedService("land-mov-hist", "land_mov_hist", "landMovHist"),
         new ImplementedService("collective-unit", "collective_unit", "collectiveUnit"),
         new ImplementedService("land-right", "land_right", "landRight"),
-        new ImplementedService("unit-ownership-history", "unit_ownership_history", "unitOwnershipHistory")
+        new ImplementedService("unit-ownership-history", "unit_ownership_history", "unitOwnershipHistory"),
+        new ImplementedService("integrated-building", "integrated_building", "integratedBuilding")
     );
 
     /**

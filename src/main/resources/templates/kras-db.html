@@ -710,11 +710,56 @@
     <pre id="unit-ownership-history-preview" class="result-box" style="display:none;"></pre>
   </div>
 
+  <!-- 카드 1b-17: 데이터셋 계약 상태 + 테스트 — integrated_building -->
+  <div class="card">
+    <div class="card-title">
+      데이터셋 계약 상태 — integrated_building
+      <span th:if="${integratedBuildingStatus == 'VERIFIED' and integratedBuildingEnabled}" class="badge badge-on">VERIFIED · enabled</span>
+      <span th:unless="${integratedBuildingStatus == 'VERIFIED' and integratedBuildingEnabled}" class="badge badge-warn"
+            th:text="${integratedBuildingStatus} + ' · ' + (${integratedBuildingEnabled} ? 'enabled' : 'disabled')"></span>
+      <span class="badge" style="background:#3a1f1f;color:#e88a82;">conn_svc_id 미확인</span>
+      <span th:if="${integratedBuildingRunning}" class="badge badge-warn">실행 중</span>
+    </div>
+    <p style="font-size:13px;color:#9aa2ad;margin-bottom:14px;">
+      "건물통합정보" — PNU만 있으면 됩니다(드릴다운 아님). land_mov_hist와 같은 모양의 중첩 반복
+      (docs/reference/kras.md §13): GIS_BLDG_INTERG_INFO(건물)가 반복되고, 그 안에 RELJIBUN(관련지번)이
+      또 반복됩니다. 건물 자신이 서 있는 필지(MAIN)는 요청 PNU로, 관련지번(RELATED)은 응답 그대로
+      <code>kras.building_parcel</code>에 같이 승격됩니다. LAREA/BAREA 등 면적 필드는 응답에 천단위
+      콤마가 붙어 있어 파싱 전에 제거합니다.
+    </p>
+    <div th:unless="${integratedBuildingStatus == 'VERIFIED' and integratedBuildingEnabled}">
+      <form method="post" action="/kras-db/verify-dataset" id="verify-form-integrated-building">
+        <input type="hidden" name="datasetCode" value="integrated_building">
+        <div class="confirm-row">
+          <input type="checkbox" id="verify-confirm-integrated-building" onchange="document.getElementById('verify-submit-integrated-building').disabled = !this.checked;">
+          <label for="verify-confirm-integrated-building">실제 운영 응답으로 integrated_building 계약을 확인했음</label>
+        </div>
+        <input type="hidden" name="confirmed" id="verify-confirmed-integrated-building" value="false">
+        <button type="submit" id="verify-submit-integrated-building" class="btn btn-primary" disabled
+                onclick="document.getElementById('verify-confirmed-integrated-building').value='true';">계약 확인 → VERIFIED로 전환</button>
+      </form>
+    </div>
+    <form th:if="${integratedBuildingStatus == 'VERIFIED' and integratedBuildingEnabled}" method="post" action="/kras-db/revert-dataset"
+          onsubmit="return confirm('integrated_building 검증을 원복하시겠습니까?');">
+      <input type="hidden" name="datasetCode" value="integrated_building">
+      <button type="submit" class="btn btn-secondary">검증 원복</button>
+    </form>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:14px;">
+      <input type="text" id="integrated-building-pnu" placeholder="PNU 19자리" maxlength="19"
+             style="padding:8px 12px;border-radius:8px;border:1px solid #2e3640;background:#14171c;color:#e7eaee;font-family:'JetBrains Mono',monospace;width:220px;">
+      <button class="btn btn-primary" id="btn-integrated-building-ingest" th:disabled="${integratedBuildingRunning}" onclick="runIntegratedBuildingIngest()">테스트 수집</button>
+      <button class="btn btn-secondary" id="btn-integrated-building-promote" th:disabled="${integratedBuildingRunning}" disabled onclick="runIntegratedBuildingPromote()">업무 테이블로 승격</button>
+    </div>
+    <div id="integrated-building-result" class="result-box" th:if="${lastIntegratedBuildingResult}" th:text="${lastIntegratedBuildingResult}"></div>
+    <div id="integrated-building-result-js" class="result-box" style="display:none;"></div>
+    <pre id="integrated-building-preview" class="result-box" style="display:none;"></pre>
+  </div>
+
   <!-- 카드 1c: PNU 단건 API 계약 상태 — land_info/land_bldg_check/shr_ymb/own_rgt_hist/land_mov_hist 제외 14개 -->
   <div class="card">
     <div class="card-title">데이터셋 계약 상태 — PNU 단건 API 14개</div>
     <p style="font-size:13px;color:#9aa2ad;margin-bottom:14px;">
-      아직 실제 파싱·적재 매퍼는 없습니다(land_info/land_bldg_check/collective_building/shr_ymb/own_rgt_hist/land_mov_hist/collective_unit/land_right/unit_ownership_history만 구현됨) — 이 표는 각 API가 나중에 어떤 업무 테이블로
+      아직 실제 파싱·적재 매퍼는 없습니다(land_info/land_bldg_check/collective_building/shr_ymb/own_rgt_hist/land_mov_hist/collective_unit/land_right/unit_ownership_history/integrated_building만 구현됨) — 이 표는 각 API가 나중에 어떤 업무 테이블로
       승격될지 미리 정리해 둔 것입니다. "테스트"로 실제 응답을 먼저 확인한 뒤 VERIFIED로 전환하세요.
     </p>
     <div style="overflow-x:auto;">
@@ -915,6 +960,8 @@ function runLandRightIngest() { return runPnuIngest('land-right'); }
 function runLandRightPromote() { return runPnuPromote('land-right'); }
 function runUnitOwnershipHistoryIngest() { return runPnuIngest('unit-ownership-history'); }
 function runUnitOwnershipHistoryPromote() { return runPnuPromote('unit-ownership-history'); }
+function runIntegratedBuildingIngest() { return runPnuIngest('integrated-building'); }
+function runIntegratedBuildingPromote() { return runPnuPromote('integrated-building'); }
 </script>
 </th:block>
 </body>
