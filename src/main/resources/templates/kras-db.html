@@ -755,6 +755,56 @@
     <pre id="integrated-building-preview" class="result-box" style="display:none;"></pre>
   </div>
 
+  <!-- 카드 1b-17b: 데이터셋 계약 상태 + 테스트 — building_image (§14, 응답이 파일) -->
+  <div class="card">
+    <div class="card-title">
+      데이터셋 계약 상태 — building_image
+      <span th:if="${buildingImageStatus == 'VERIFIED' and buildingImageEnabled}" class="badge badge-on">VERIFIED · enabled</span>
+      <span th:unless="${buildingImageStatus == 'VERIFIED' and buildingImageEnabled}" class="badge badge-warn"
+            th:text="${buildingImageStatus} + ' · ' + (${buildingImageEnabled} ? 'enabled' : 'disabled')"></span>
+      <span class="badge" style="background:#3a1f1f;color:#e88a82;">conn_svc_id 미확인</span>
+      <span th:if="${buildingImageRunning}" class="badge badge-warn">실행 중</span>
+    </div>
+    <p style="font-size:13px;color:#9aa2ad;margin-bottom:14px;">
+      "건물통합도면" — 다른 13개와 달리 응답이 태그 나열이 아니라 base64 인코딩된 파일 한 덩어리
+      (BLDG_INTERG_IMG, docs/reference/kras.md §14)입니다. 디코딩한 원본은 kras.work-dir 아래
+      files/building_image/에 저장하고 kras.sync_file → kras.building_image(file_id)로 참조를 남깁니다.
+      너비/높이/스케일은 선택 입력이며 실제 KRAS 쪽 파라미터명이 문서에 없어, 아래 "추가 파라미터(JSON)"에
+      <code>width</code>/<code>height</code>/<code>scale</code> 키로 넣은 값을 그대로 요청에 실으면서
+      같은 키로 업무 테이블에도 기록합니다(실제 필드명이 다르면 운영자가 두 키를 함께 넣어야 함).
+      mime_type은 실제 파일 포맷이 문서에 없어 NULL로 둡니다. conn_svc_id도 미확인이라 실제 호출은
+      막혀 있습니다.
+    </p>
+    <div th:unless="${buildingImageStatus == 'VERIFIED' and buildingImageEnabled}">
+      <form method="post" action="/kras-db/verify-dataset" id="verify-form-building-image">
+        <input type="hidden" name="datasetCode" value="building_image">
+        <div class="confirm-row">
+          <input type="checkbox" id="verify-confirm-building-image" onchange="document.getElementById('verify-submit-building-image').disabled = !this.checked;">
+          <label for="verify-confirm-building-image">실제 운영 응답으로 building_image 계약을 확인했음</label>
+        </div>
+        <input type="hidden" name="confirmed" id="verify-confirmed-building-image" value="false">
+        <button type="submit" id="verify-submit-building-image" class="btn btn-primary" disabled
+                onclick="document.getElementById('verify-confirmed-building-image').value='true';">계약 확인 → VERIFIED로 전환</button>
+      </form>
+    </div>
+    <form th:if="${buildingImageStatus == 'VERIFIED' and buildingImageEnabled}" method="post" action="/kras-db/revert-dataset"
+          onsubmit="return confirm('building_image 검증을 원복하시겠습니까?');">
+      <input type="hidden" name="datasetCode" value="building_image">
+      <button type="submit" class="btn btn-secondary">검증 원복</button>
+    </form>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:14px;">
+      <input type="text" id="building-image-pnu" placeholder="PNU 19자리" maxlength="19"
+             style="padding:8px 12px;border-radius:8px;border:1px solid #2e3640;background:#14171c;color:#e7eaee;font-family:'JetBrains Mono',monospace;width:220px;">
+      <input type="text" id="building-image-extra-params" placeholder='추가 파라미터(JSON), 예: {"width":"800","height":"600","scale":"1000"}'
+             style="padding:8px 12px;border-radius:8px;border:1px solid #2e3640;background:#14171c;color:#e7eaee;font-family:'JetBrains Mono',monospace;flex:1;min-width:260px;">
+      <button class="btn btn-primary" id="btn-building-image-ingest" th:disabled="${buildingImageRunning}" onclick="runBuildingImageIngest()">테스트 수집</button>
+      <button class="btn btn-secondary" id="btn-building-image-promote" th:disabled="${buildingImageRunning}" disabled onclick="runBuildingImagePromote()">업무 테이블로 승격</button>
+    </div>
+    <div id="building-image-result" class="result-box" th:if="${lastBuildingImageResult}" th:text="${lastBuildingImageResult}"></div>
+    <div id="building-image-result-js" class="result-box" style="display:none;"></div>
+    <pre id="building-image-preview" class="result-box" style="display:none;"></pre>
+  </div>
+
   <!-- 카드 1b-18: 데이터셋 계약 상태 + 테스트 — land_change (기간 조회, PNU 아님) -->
   <div class="card">
     <div class="card-title">
@@ -1084,6 +1134,8 @@ function runUnitOwnershipHistoryIngest() { return runPnuIngest('unit-ownership-h
 function runUnitOwnershipHistoryPromote() { return runPnuPromote('unit-ownership-history'); }
 function runIntegratedBuildingIngest() { return runPnuIngest('integrated-building'); }
 function runIntegratedBuildingPromote() { return runPnuPromote('integrated-building'); }
+function runBuildingImageIngest() { return runPnuIngest('building-image'); }
+function runBuildingImagePromote() { return runPnuPromote('building-image'); }
 </script>
 </th:block>
 </body>

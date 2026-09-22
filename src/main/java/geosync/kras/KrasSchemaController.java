@@ -62,7 +62,8 @@ public class KrasSchemaController {
         new ImplementedService("collective-unit", "collective_unit", "collectiveUnit"),
         new ImplementedService("land-right", "land_right", "landRight"),
         new ImplementedService("unit-ownership-history", "unit_ownership_history", "unitOwnershipHistory"),
-        new ImplementedService("integrated-building", "integrated_building", "integratedBuilding")
+        new ImplementedService("integrated-building", "integrated_building", "integratedBuilding"),
+        new ImplementedService("building-image", "building_image", "buildingImage")
     );
 
     /** 기간(날짜 범위) 조회 서비스(§10~12 계열) — PNU 단건과 최상위 식별자가 달라 별도 레지스트리. */

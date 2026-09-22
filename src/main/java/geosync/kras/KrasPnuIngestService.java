@@ -2,6 +2,7 @@ package geosync.kras;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import geosync.common.xml.XmlUtil;
+import geosync.settings.RuntimeSettingsService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.ConnectionCallback;
@@ -10,6 +11,9 @@ import org.springframework.jdbc.datasource.SingleConnectionDataSource;
 import org.springframework.stereotype.Service;
 import org.w3c.dom.Document;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -26,15 +30,18 @@ public class KrasPnuIngestService {
 
     private final KrasApiClient krasApiClient;
     private final KrasStagePromotionService promotionService;
+    private final RuntimeSettingsService settings;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public record IngestResult(long runId, long itemId, boolean promotable,
                                 List<String> warnings, Map<String, Object> preview) {}
     public record PromoteResult(long itemId) {}
 
-    public KrasPnuIngestService(KrasApiClient krasApiClient, KrasStagePromotionService promotionService) {
+    public KrasPnuIngestService(KrasApiClient krasApiClient, KrasStagePromotionService promotionService,
+                                 RuntimeSettingsService settings) {
         this.krasApiClient = krasApiClient;
         this.promotionService = promotionService;
+        this.settings = settings;
     }
 
     /** 설계 §6.3 절차 1~8, 하나의 트랜잭션. PNU만으로 되는 서비스용 — extraParams 없이 위임. */
@@ -105,7 +112,7 @@ public class KrasPnuIngestService {
         Map<String, List<Map<String, Object>>> columnsByTable = new java.util.LinkedHashMap<>();
         for (KrasXmlServiceMapper.StageRow row : mapped.rows()) {
             int rowNo = rowNoByTable.merge(row.stageTable(), 1, Integer::sum);
-            insertStageRow(tx, row, itemId, rowNo, pnu, extraParams);
+            insertStageRow(tx, row, itemId, rowNo, orgCd, mapper.datasetCode(), pnu, extraParams);
             columnsByTable.computeIfAbsent(row.stageTable(), k -> new ArrayList<>()).add(row.columns());
         }
         Map<String, Object> preview = new java.util.LinkedHashMap<>();
@@ -153,8 +160,9 @@ public class KrasPnuIngestService {
      */
     @SuppressWarnings("unchecked")
     private void insertStageRow(JdbcTemplate tx, KrasXmlServiceMapper.StageRow row, long itemId, int rowNo,
-                                 String pnu, Map<String, String> extraParams) {
+                                 String orgCd, String datasetCode, String pnu, Map<String, String> extraParams) {
         Map<String, Object> columns = new java.util.LinkedHashMap<>(row.columns());
+        resolveFileColumns(tx, columns, itemId, orgCd, datasetCode, pnu, extraParams);
         Map<String, Object> extra = (Map<String, Object>) columns.computeIfAbsent(
                 "extra_attributes", k -> new java.util.LinkedHashMap<String, Object>());
         extra.put("_pnu", pnu);
@@ -178,6 +186,45 @@ public class KrasPnuIngestService {
         String sql = "INSERT INTO " + row.stageTable() + "(" + String.join(",", names) + ") VALUES ("
                 + String.join(",", placeholders) + ")";
         tx.update(sql, values.toArray());
+    }
+
+    /**
+     * StageRow.columns()에 "_file_bytes"(byte[])가 있으면 building_image처럼 응답 자체가 파일인 서비스로
+     * 보고 kras.sync_file에 원본을 저장한 뒤 file_id/request_key를 채운다. 다른 매퍼는 이 키를 안 써서
+     * 그냥 조용히 리턴한다 — 기존 15개 매퍼는 영향 없음. 파일은 KrasWorkspaceScanner와 같은 워크스페이스
+     * 루트(kras.work-dir/{orgCd}/) 아래 files/{datasetCode}/에 저장한다.
+     */
+    private void resolveFileColumns(JdbcTemplate tx, Map<String, Object> columns, long itemId,
+                                     String orgCd, String datasetCode, String pnu, Map<String, String> extraParams) {
+        byte[] bytes = (byte[]) columns.remove("_file_bytes");
+        if (bytes == null) return;
+        String fileType = (String) columns.remove("_file_type");
+        if (fileType == null) fileType = datasetCode.toUpperCase();
+
+        Path dir = Path.of(settings.krasWorkDir(), orgCd, "files", datasetCode);
+        try {
+            Files.createDirectories(dir);
+        } catch (IOException e) {
+            throw new IllegalStateException("파일 저장 디렉토리 생성 실패: " + e.getMessage(), e);
+        }
+        Path filePath = dir.resolve(pnu + "_" + itemId + ".bin");
+        try {
+            Files.write(filePath, bytes);
+        } catch (IOException e) {
+            throw new IllegalStateException("파일 저장 실패: " + e.getMessage(), e);
+        }
+
+        Long fileId = tx.queryForObject("""
+            INSERT INTO kras.sync_file(item_id, file_type, storage_uri, sha256, byte_size)
+            VALUES (?, ?, ?, encode(sha256(?), 'hex')::kras.sha256, ?)
+            RETURNING file_id
+            """, Long.class, itemId, fileType, filePath.toString(), bytes, (long) bytes.length);
+        columns.put("file_id", fileId);
+
+        String requestKey = tx.queryForObject(
+                "SELECT kras.request_key(?, '1', ?, '', ?::jsonb)", String.class,
+                datasetCode, pnu, writeJson(extraParams));
+        columns.put("request_key", requestKey);
     }
 
     private String writeJson(Object value) {
