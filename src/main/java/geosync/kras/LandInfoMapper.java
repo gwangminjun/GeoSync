@@ -3,16 +3,15 @@ package geosync.kras;
 import org.springframework.stereotype.Component;
 import org.w3c.dom.Document;
 
-import java.math.BigDecimal;
-import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 import static geosync.common.xml.XmlUtil.textOf;
+import static geosync.kras.KrasFieldParsers.putDate;
+import static geosync.kras.KrasFieldParsers.putDecimal;
+import static geosync.kras.KrasFieldParsers.putInt;
 import static geosync.kras.KrasStagePromotionService.StagePromotionSpec;
 import static geosync.kras.KrasXmlServiceMapper.StageRow;
 
@@ -22,8 +21,6 @@ import static geosync.kras.KrasXmlServiceMapper.StageRow;
  */
 @Component
 public class LandInfoMapper implements KrasXmlServiceMapper {
-
-    private static final DateTimeFormatter YYYYMMDD = DateTimeFormatter.ofPattern("yyyyMMdd");
 
     @Override
     public String datasetCode() { return "land_info"; }
@@ -123,45 +120,5 @@ public class LandInfoMapper implements KrasXmlServiceMapper {
                 new StageRow("kras.stage_land_register", register),
                 new StageRow("kras.stage_land_owner", owner));
         return new MappingResult(rows, warnings);
-    }
-
-    /** YYYYMMDD/YYYY-MM-DD만 정상 날짜로 인정한다 — 그 외 형식을 NULL로 조용히 삼키지 않는다. */
-    private void putDate(Map<String, Object> row, String col, String raw, List<String> warnings) {
-        if (raw == null || raw.isBlank()) { row.put(col, null); return; }
-        String normalized = raw.length() == 10 ? raw.replace("-", "") : raw;
-        try {
-            row.put(col, LocalDate.parse(normalized, YYYYMMDD));
-        } catch (DateTimeParseException e) {
-            row.put(col, null);
-            markUnparsed(row, col, raw, warnings);
-        }
-    }
-
-    private void putDecimal(Map<String, Object> row, String col, String raw, List<String> warnings) {
-        if (raw == null || raw.isBlank()) { row.put(col, null); return; }
-        try {
-            row.put(col, new BigDecimal(raw.trim()));
-        } catch (NumberFormatException e) {
-            row.put(col, null);
-            markUnparsed(row, col, raw, warnings);
-        }
-    }
-
-    private void putInt(Map<String, Object> row, String col, String raw, List<String> warnings) {
-        if (raw == null || raw.isBlank()) { row.put(col, null); return; }
-        try {
-            row.put(col, Integer.parseInt(raw.trim()));
-        } catch (NumberFormatException e) {
-            row.put(col, null);
-            markUnparsed(row, col, raw, warnings);
-        }
-    }
-
-    @SuppressWarnings("unchecked")
-    private void markUnparsed(Map<String, Object> row, String col, String raw, List<String> warnings) {
-        Map<String, Object> extra = (Map<String, Object>) row.computeIfAbsent(
-                "extra_attributes", k -> new LinkedHashMap<String, Object>());
-        extra.put(col + "_raw", raw);
-        warnings.add(col + " 파싱 실패, 원문 보존: " + raw);
     }
 }

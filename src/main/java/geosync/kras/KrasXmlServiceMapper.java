@@ -26,6 +26,16 @@ public interface KrasXmlServiceMapper {
      */
     MappingResult map(Document xml, String pnu);
 
+    /**
+     * PNU만으로 안 되고 추가 요청 파라미터가 필요한 서비스(집합건물 드릴다운 등)가 오버라이드한다.
+     * 기본 구현은 extraParams를 무시하고 2-인자 map()을 호출 — 기존 매퍼는 안 건드려도 된다.
+     * extraParams의 실제 키 이름(KRAS 쪽 요청 필드명)은 이 인터페이스가 정하지 않는다 — 문서에
+     * 안 나와 있는 경우가 많아 운영자가 직접 입력한 값을 그대로 전달한다(추측 금지 원칙).
+     */
+    default MappingResult map(Document xml, String pnu, java.util.Map<String, String> extraParams) {
+        return map(xml, pnu);
+    }
+
     /** 이 매퍼가 쓰는 stage 테이블마다 승격 방법을 선언한다(설계 §8.6). 부모→자식 순서로 반환한다. */
     List<KrasStagePromotionService.StagePromotionSpec> promotionSpecs();
 

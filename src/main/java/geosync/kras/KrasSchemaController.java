@@ -10,6 +10,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
@@ -21,6 +22,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -29,6 +31,10 @@ import java.util.stream.Stream;
  * kras 스키마 신규 적재 화면(/kras-db). 기존 schedule.html/SyncController와 코드 레벨로 분리된
  * 새 컨트롤러다 — 기존 KrasWorker/SyncScheduler는 건드리지 않는다.
  * 설계: docs/superpowers/specs/2026-09-18-kras-ingest-implementation-design.md §5.
+ *
+ * PNU 단건 매퍼(land_info, land_bldg_check, ...)는 서비스가 늘어날 때마다 컨트롤러에 필드/엔드포인트
+ * 쌍을 복붙하지 않도록 {@link KrasXmlServiceMapper} 구현체를 Spring이 전부 주입받아 레지스트리로
+ * 관리한다 — 새 매퍼는 IMPLEMENTED_SERVICES에 한 줄만 추가하면 된다.
  */
 @Controller
 public class KrasSchemaController {
@@ -39,16 +45,30 @@ public class KrasSchemaController {
     private static final String CADASTRAL_TGT_TABLE = "ods.lp_pa_cbnd";
 
     /**
-     * PNU 단건 API 중 land_info/land_bldg_check를 제외한 17개. dataset_code/service_code/api-test 딥링크 id/
-     * 승격 대상 업무 테이블은 kras.business_dataset(설계 원본)과 api-test.html의 APIS 목록에서 그대로 가져온 것 —
-     * 이 17개는 아직 실제 파싱·적재 매퍼가 없고, 이 표는 검증 화면 안내용이다.
+     * URL/템플릿에 쓰는 slug(하이픈) → dataset_code(언더스코어) → 모델 속성 접두어(camelCase).
+     * 접두어는 landInfoStatus/landInfoEnabled/landInfoRunning/lastLandInfoResult 형태로 조립된다 —
+     * 기존 템플릿 변수명과 그대로 맞아 템플릿은 안 건드려도 된다.
+     */
+    private record ImplementedService(String slug, String datasetCode, String modelPrefix) {}
+
+    private static final List<ImplementedService> IMPLEMENTED_SERVICES = List.of(
+        new ImplementedService("land-info", "land_info", "landInfo"),
+        new ImplementedService("land-bldg-check", "land_bldg_check", "landBldgCheck"),
+        new ImplementedService("collective-building", "collective_building", "collectiveBuilding"),
+        new ImplementedService("shr-ymb", "shr_ymb", "shrYmb"),
+        new ImplementedService("own-rgt-hist", "own_rgt_hist", "ownRgtHist"),
+        new ImplementedService("land-mov-hist", "land_mov_hist", "landMovHist"),
+        new ImplementedService("collective-unit", "collective_unit", "collectiveUnit")
+    );
+
+    /**
+     * PNU 단건 API 중 IMPLEMENTED_SERVICES를 제외한 14개. dataset_code/service_code/api-test 딥링크 id/
+     * 승격 대상 업무 테이블은 kras.business_dataset(설계 원본)과 api-test.html의 APIS 목록에서 그대로
+     * 가져온 것 — 이 14개는 아직 실제 파싱·적재 매퍼가 없고, 이 표는 검증 화면 안내용이다.
      */
     private record PnuApiInfo(String datasetCode, String serviceCode, String apiTestId, String businessTables) {}
 
     private static final List<PnuApiInfo> PNU_APIS = List.of(
-        new PnuApiInfo("shr_ymb", "KRAS000003", "conn/shr_ymb", "kras.land_share"),
-        new PnuApiInfo("land_mov_hist", "KRAS000006", "conn/land_mov_hist", "kras.land_movement_history, kras.land_movement_relation"),
-        new PnuApiInfo("own_rgt_hist", "KRAS000007", "conn/own_rgt_hist", "kras.land_ownership_history"),
         new PnuApiInfo("bldg_hds_info", "KRAS000014", "conn/bldg_hds_info", "kras.building_title, kras.building_floor, kras.building_title_owner, kras.building_title_change"),
         new PnuApiInfo("cbldg_hds_info", "KRAS000015", "conn/cbldg_hds_info", "kras.building_title"),
         new PnuApiInfo("cbldg_dfhs_info", "KRAS000016", "conn/cbldg_dfhs_info", "kras.building_exclusive, kras.building_exclusive_area, kras.building_exclusive_owner, kras.building_exclusive_price"),
@@ -67,7 +87,7 @@ public class KrasSchemaController {
 
     /** verify/revert-dataset이 건드릴 수 있는 dataset_code 화이트리스트 — 임의 문자열로 다른 데이터셋을 켜지 못하게 막는다. */
     private static final Set<String> VERIFIABLE_DATASETS = Stream.concat(
-            Stream.of("cadastral_file", "land_info", "land_bldg_check", "collective_building"),
+            Stream.concat(Stream.of("cadastral_file"), IMPLEMENTED_SERVICES.stream().map(ImplementedService::datasetCode)),
             PNU_APIS.stream().map(PnuApiInfo::datasetCode)
     ).collect(Collectors.toUnmodifiableSet());
 
@@ -78,26 +98,19 @@ public class KrasSchemaController {
     private final TableMapper tableMapper;
     private final KrasCadastralIngestService cadastralIngestService;
     private final KrasPnuIngestService pnuIngestService;
-    private final LandInfoMapper landInfoMapper;
-    private final LandBldgCheckMapper landBldgCheckMapper;
-    private final CollectiveBuildingMapper collectiveBuildingMapper;
+    private final Map<String, String> slugToDatasetCode;
+    private final Map<String, KrasXmlServiceMapper> mappersByDatasetCode;
 
     /** 기존 SyncScheduler의 krasLoadRunning과 별개 — 신규 탭 전용 실행 상태(design §5.2). */
     private final AtomicBoolean cadastralRunning = new AtomicBoolean(false);
     private volatile String lastCadastralResult;
-    private final AtomicBoolean landInfoRunning = new AtomicBoolean(false);
-    private volatile String lastLandInfoResult;
-    private final AtomicBoolean landBldgCheckRunning = new AtomicBoolean(false);
-    private volatile String lastLandBldgCheckResult;
-    private final AtomicBoolean collectiveBuildingRunning = new AtomicBoolean(false);
-    private volatile String lastCollectiveBuildingResult;
+    private final Map<String, AtomicBoolean> runningByDatasetCode = new ConcurrentHashMap<>();
+    private final Map<String, String> lastResultByDatasetCode = new ConcurrentHashMap<>();
 
     public KrasSchemaController(TargetDbService targetDbService, RuntimeSettingsService settings,
                                  KrasApiClient krasApiClient, KrasWorkspaceScanner workspaceScanner,
                                  TableMapper tableMapper, KrasCadastralIngestService cadastralIngestService,
-                                 KrasPnuIngestService pnuIngestService, LandInfoMapper landInfoMapper,
-                                 LandBldgCheckMapper landBldgCheckMapper,
-                                 CollectiveBuildingMapper collectiveBuildingMapper) {
+                                 KrasPnuIngestService pnuIngestService, List<KrasXmlServiceMapper> mappers) {
         this.targetDbService = targetDbService;
         this.settings = settings;
         this.krasApiClient = krasApiClient;
@@ -105,9 +118,13 @@ public class KrasSchemaController {
         this.tableMapper = tableMapper;
         this.cadastralIngestService = cadastralIngestService;
         this.pnuIngestService = pnuIngestService;
-        this.landInfoMapper = landInfoMapper;
-        this.landBldgCheckMapper = landBldgCheckMapper;
-        this.collectiveBuildingMapper = collectiveBuildingMapper;
+        this.mappersByDatasetCode = mappers.stream()
+                .collect(Collectors.toUnmodifiableMap(KrasXmlServiceMapper::datasetCode, m -> m));
+        this.slugToDatasetCode = IMPLEMENTED_SERVICES.stream()
+                .collect(Collectors.toUnmodifiableMap(ImplementedService::slug, ImplementedService::datasetCode));
+        for (ImplementedService svc : IMPLEMENTED_SERVICES) {
+            runningByDatasetCode.put(svc.datasetCode(), new AtomicBoolean(false));
+        }
     }
 
     @GetMapping("/kras-db")
@@ -124,29 +141,16 @@ public class KrasSchemaController {
         model.addAttribute("datasetStatus", dataset.get("contract_status"));
         model.addAttribute("datasetEnabled", Boolean.TRUE.equals(dataset.get("enabled")));
 
-        Map<String, Object> landInfoDataset = jdbc.queryForMap("""
-            SELECT contract_status, enabled FROM kras.sync_dataset WHERE dataset_code='land_info'
-            """);
-        model.addAttribute("landInfoStatus", landInfoDataset.get("contract_status"));
-        model.addAttribute("landInfoEnabled", Boolean.TRUE.equals(landInfoDataset.get("enabled")));
-        model.addAttribute("landInfoRunning", landInfoRunning.get());
-        model.addAttribute("lastLandInfoResult", lastLandInfoResult);
-
-        Map<String, Object> landBldgCheckDataset = jdbc.queryForMap("""
-            SELECT contract_status, enabled FROM kras.sync_dataset WHERE dataset_code='land_bldg_check'
-            """);
-        model.addAttribute("landBldgCheckStatus", landBldgCheckDataset.get("contract_status"));
-        model.addAttribute("landBldgCheckEnabled", Boolean.TRUE.equals(landBldgCheckDataset.get("enabled")));
-        model.addAttribute("landBldgCheckRunning", landBldgCheckRunning.get());
-        model.addAttribute("lastLandBldgCheckResult", lastLandBldgCheckResult);
-
-        Map<String, Object> collectiveBuildingDataset = jdbc.queryForMap("""
-            SELECT contract_status, enabled FROM kras.sync_dataset WHERE dataset_code='collective_building'
-            """);
-        model.addAttribute("collectiveBuildingStatus", collectiveBuildingDataset.get("contract_status"));
-        model.addAttribute("collectiveBuildingEnabled", Boolean.TRUE.equals(collectiveBuildingDataset.get("enabled")));
-        model.addAttribute("collectiveBuildingRunning", collectiveBuildingRunning.get());
-        model.addAttribute("lastCollectiveBuildingResult", lastCollectiveBuildingResult);
+        Map<String, Map<String, Object>> statusByCode = batchDatasetStatus(jdbc,
+                IMPLEMENTED_SERVICES.stream().map(ImplementedService::datasetCode).toList());
+        for (ImplementedService svc : IMPLEMENTED_SERVICES) {
+            Map<String, Object> st = statusByCode.get(svc.datasetCode());
+            model.addAttribute(svc.modelPrefix() + "Status", st != null ? st.get("contract_status") : "UNVERIFIED");
+            model.addAttribute(svc.modelPrefix() + "Enabled", st != null && Boolean.TRUE.equals(st.get("enabled")));
+            model.addAttribute(svc.modelPrefix() + "Running", runningByDatasetCode.get(svc.datasetCode()).get());
+            model.addAttribute("last" + capitalize(svc.modelPrefix()) + "Result",
+                    lastResultByDatasetCode.get(svc.datasetCode()));
+        }
 
         model.addAttribute("pnuDatasets", loadPnuDatasetRows(jdbc));
 
@@ -262,147 +266,104 @@ public class KrasSchemaController {
     }
 
     /**
-     * PNU 테스트 수집(설계 절차 1~8). 실제 KRAS 응답을 받아 kras.stage_* 3개 테이블에 적재한다.
-     * 필드 파싱 경고가 하나라도 있으면 item을 SUCCESS로 올리지 않는다 — 승격 버튼은 그때 비활성 상태로 둔다.
+     * PNU 단건 매퍼 공용 테스트 수집(설계 절차 1~8). slug(land-info 등)는 IMPLEMENTED_SERVICES에
+     * 등록된 것만 허용 — datasetCode는 이 slug로부터 서버에서 조회하고, 클라이언트가 임의 dataset_code로
+     * 다른 매퍼를 부르지 못하게 한다. extraParamsJson은 PNU만으로 안 되는 드릴다운 서비스(collective_unit
+     * 등)용 — 운영자가 직접 입력한 key:value를 그대로 KRAS 요청에 전달한다(파라미터명 추측 안 함).
      */
-    @PostMapping("/kras-db/ingest/land-info")
+    @PostMapping("/kras-db/ingest/{slug}")
     @ResponseBody
-    public Map<String, Object> ingestLandInfo(@RequestParam String pnu) {
-        if (!landInfoRunning.compareAndSet(false, true)) {
+    public Map<String, Object> ingestPnuMapper(@PathVariable String slug, @RequestParam String pnu,
+                                                @RequestParam(required = false) String extraParamsJson) {
+        String datasetCode = slugToDatasetCode.get(slug);
+        if (datasetCode == null) {
+            return Map.of("success", false, "message", "알 수 없는 서비스: " + slug);
+        }
+        Map<String, String> extraParams;
+        try {
+            extraParams = parseExtraParams(extraParamsJson);
+        } catch (Exception e) {
+            return Map.of("success", false, "message", "추가 파라미터 JSON 형식 오류: " + e.getMessage());
+        }
+        KrasXmlServiceMapper mapper = mappersByDatasetCode.get(datasetCode);
+        AtomicBoolean running = runningByDatasetCode.get(datasetCode);
+        if (!running.compareAndSet(false, true)) {
             return Map.of("error", "이미 실행 중입니다.");
         }
         try {
             KrasPnuIngestService.IngestResult result =
-                    pnuIngestService.ingest(jdbc(), settings.orgCode(), landInfoMapper, pnu, "UI");
+                    pnuIngestService.ingest(jdbc(), settings.orgCode(), mapper, pnu, extraParams, "UI");
             String msg = result.promotable()
                     ? "수집 성공: item_id=%d — 값을 확인한 뒤 승격하세요.".formatted(result.itemId())
                     : "수집됨(item_id=%d), 단 필드 파싱 경고로 승격 보류: %s".formatted(result.itemId(), result.warnings());
-            lastLandInfoResult = msg;
+            lastResultByDatasetCode.put(datasetCode, msg);
             return Map.of("success", true, "itemId", result.itemId(), "promotable", result.promotable(),
                     "warnings", result.warnings(), "preview", result.preview(), "message", msg);
         } catch (Exception e) {
-            log.error("[KrasSchema] land_info 수집 실패: {}", e.getMessage(), e);
-            lastLandInfoResult = "수집 실패: " + e.getMessage();
-            return Map.of("success", false, "message", lastLandInfoResult);
+            log.error("[KrasSchema] {} 수집 실패: {}", datasetCode, e.getMessage(), e);
+            String msg = "수집 실패: " + e.getMessage();
+            lastResultByDatasetCode.put(datasetCode, msg);
+            return Map.of("success", false, "message", msg);
         } finally {
-            landInfoRunning.set(false);
+            running.set(false);
         }
     }
 
-    /** land_info 승격만(설계 절차 9). kras.parcel/land_register/land_owner를 pnu 자연키로 upsert한다. */
-    @PostMapping("/kras-db/promote/land-info")
+    /** PNU 단건 매퍼 공용 승격만(설계 절차 9). 승격 패턴(A/B/C)은 매퍼가 declare한 StagePromotionSpec이 결정한다. */
+    @PostMapping("/kras-db/promote/{slug}")
     @ResponseBody
-    public Map<String, Object> promoteLandInfo(@RequestParam long itemId) {
+    public Map<String, Object> promotePnuMapper(@PathVariable String slug, @RequestParam long itemId) {
+        String datasetCode = slugToDatasetCode.get(slug);
+        if (datasetCode == null) {
+            return Map.of("success", false, "message", "알 수 없는 서비스: " + slug);
+        }
+        KrasXmlServiceMapper mapper = mappersByDatasetCode.get(datasetCode);
         try {
-            KrasPnuIngestService.PromoteResult result =
-                    pnuIngestService.promote(jdbc(), settings.orgCode(), landInfoMapper, itemId);
+            KrasPnuIngestService.PromoteResult result = pnuIngestService.promote(jdbc(), settings.orgCode(), mapper, itemId);
             String msg = "승격 성공: item_id=%d".formatted(result.itemId());
-            lastLandInfoResult = msg;
+            lastResultByDatasetCode.put(datasetCode, msg);
             return Map.of("success", true, "itemId", result.itemId(), "message", msg);
         } catch (Exception e) {
-            log.error("[KrasSchema] land_info 승격 실패: {}", e.getMessage(), e);
-            lastLandInfoResult = "승격 실패: " + e.getMessage();
-            return Map.of("success", false, "message", lastLandInfoResult);
+            log.error("[KrasSchema] {} 승격 실패: {}", datasetCode, e.getMessage(), e);
+            String msg = "승격 실패: " + e.getMessage();
+            lastResultByDatasetCode.put(datasetCode, msg);
+            return Map.of("success", false, "message", msg);
         }
     }
 
-    /** land_bldg_check 테스트 수집(설계 절차 1~8). 날짜/숫자 필드가 없어 파싱 경고가 발생하지 않는다. */
-    @PostMapping("/kras-db/ingest/land-bldg-check")
-    @ResponseBody
-    public Map<String, Object> ingestLandBldgCheck(@RequestParam String pnu) {
-        if (!landBldgCheckRunning.compareAndSet(false, true)) {
-            return Map.of("error", "이미 실행 중입니다.");
+    private static final com.fasterxml.jackson.databind.ObjectMapper EXTRA_PARAMS_MAPPER =
+            new com.fasterxml.jackson.databind.ObjectMapper();
+
+    /** {"cbldg_seqno":"0285"} 형태의 JSON 문자열을 Map으로 파싱한다. 비어있으면 빈 Map. */
+    @SuppressWarnings("unchecked")
+    private static Map<String, String> parseExtraParams(String json) throws Exception {
+        if (json == null || json.isBlank()) {
+            return Map.of();
         }
-        try {
-            KrasPnuIngestService.IngestResult result =
-                    pnuIngestService.ingest(jdbc(), settings.orgCode(), landBldgCheckMapper, pnu, "UI");
-            String msg = "수집 성공: item_id=%d — 값을 확인한 뒤 승격하세요.".formatted(result.itemId());
-            lastLandBldgCheckResult = msg;
-            return Map.of("success", true, "itemId", result.itemId(), "promotable", result.promotable(),
-                    "warnings", result.warnings(), "preview", result.preview(), "message", msg);
-        } catch (Exception e) {
-            log.error("[KrasSchema] land_bldg_check 수집 실패: {}", e.getMessage(), e);
-            lastLandBldgCheckResult = "수집 실패: " + e.getMessage();
-            return Map.of("success", false, "message", lastLandBldgCheckResult);
-        } finally {
-            landBldgCheckRunning.set(false);
-        }
+        return EXTRA_PARAMS_MAPPER.readValue(json, Map.class);
     }
 
-    /** land_bldg_check 승격만(설계 절차 9). kras.parcel/land_presence를 pnu 자연키로 upsert한다. */
-    @PostMapping("/kras-db/promote/land-bldg-check")
-    @ResponseBody
-    public Map<String, Object> promoteLandBldgCheck(@RequestParam long itemId) {
-        try {
-            KrasPnuIngestService.PromoteResult result =
-                    pnuIngestService.promote(jdbc(), settings.orgCode(), landBldgCheckMapper, itemId);
-            String msg = "승격 성공: item_id=%d".formatted(result.itemId());
-            lastLandBldgCheckResult = msg;
-            return Map.of("success", true, "itemId", result.itemId(), "message", msg);
-        } catch (Exception e) {
-            log.error("[KrasSchema] land_bldg_check 승격 실패: {}", e.getMessage(), e);
-            lastLandBldgCheckResult = "승격 실패: " + e.getMessage();
-            return Map.of("success", false, "message", lastLandBldgCheckResult);
-        }
+    private static String capitalize(String s) {
+        return Character.toUpperCase(s.charAt(0)) + s.substring(1);
     }
 
-    /**
-     * collective_building 테스트 수집(설계 절차 1~8). conn_svc_id가 미확인 상태라 지금은
-     * CollectiveBuildingMapper.connSvcId()가 예외를 던져 여기서 바로 실패로 끝난다 — 값이 채워지면
-     * 코드 변경 없이 바로 동작한다.
-     */
-    @PostMapping("/kras-db/ingest/collective-building")
-    @ResponseBody
-    public Map<String, Object> ingestCollectiveBuilding(@RequestParam String pnu) {
-        if (!collectiveBuildingRunning.compareAndSet(false, true)) {
-            return Map.of("error", "이미 실행 중입니다.");
-        }
-        try {
-            KrasPnuIngestService.IngestResult result =
-                    pnuIngestService.ingest(jdbc(), settings.orgCode(), collectiveBuildingMapper, pnu, "UI");
-            String msg = result.promotable()
-                    ? "수집 성공: item_id=%d — 값을 확인한 뒤 승격하세요.".formatted(result.itemId())
-                    : "수집됨(item_id=%d), 단 필드 파싱 경고로 승격 보류: %s".formatted(result.itemId(), result.warnings());
-            lastCollectiveBuildingResult = msg;
-            return Map.of("success", true, "itemId", result.itemId(), "promotable", result.promotable(),
-                    "warnings", result.warnings(), "preview", result.preview(), "message", msg);
-        } catch (Exception e) {
-            log.error("[KrasSchema] collective_building 수집 실패: {}", e.getMessage(), e);
-            lastCollectiveBuildingResult = "수집 실패: " + e.getMessage();
-            return Map.of("success", false, "message", lastCollectiveBuildingResult);
-        } finally {
-            collectiveBuildingRunning.set(false);
-        }
-    }
-
-    /** collective_building 승격만(설계 절차 9, 패턴 C — pnu+cbldg_seqno 신원 매칭). */
-    @PostMapping("/kras-db/promote/collective-building")
-    @ResponseBody
-    public Map<String, Object> promoteCollectiveBuilding(@RequestParam long itemId) {
-        try {
-            KrasPnuIngestService.PromoteResult result =
-                    pnuIngestService.promote(jdbc(), settings.orgCode(), collectiveBuildingMapper, itemId);
-            String msg = "승격 성공: item_id=%d".formatted(result.itemId());
-            lastCollectiveBuildingResult = msg;
-            return Map.of("success", true, "itemId", result.itemId(), "message", msg);
-        } catch (Exception e) {
-            log.error("[KrasSchema] collective_building 승격 실패: {}", e.getMessage(), e);
-            lastCollectiveBuildingResult = "승격 실패: " + e.getMessage();
-            return Map.of("success", false, "message", lastCollectiveBuildingResult);
-        }
-    }
-
-    /** PNU_APIS 17개의 현재 contract_status/enabled를 한 번에 조회해 템플릿용 행으로 합친다. */
-    private List<Map<String, Object>> loadPnuDatasetRows(JdbcTemplate jdbc) {
-        List<String> codes = PNU_APIS.stream().map(PnuApiInfo::datasetCode).toList();
+    /** 주어진 dataset_code들의 contract_status/enabled를 한 번에 조회한다. */
+    private Map<String, Map<String, Object>> batchDatasetStatus(JdbcTemplate jdbc, List<String> codes) {
         String placeholders = String.join(",", codes.stream().map(c -> "?").toList());
         List<Map<String, Object>> rows = jdbc.queryForList(
                 "SELECT dataset_code, contract_status, enabled FROM kras.sync_dataset WHERE dataset_code IN (" + placeholders + ")",
                 codes.toArray());
-        Map<String, Map<String, Object>> statusByCode = new HashMap<>();
+        Map<String, Map<String, Object>> byCode = new HashMap<>();
         for (Map<String, Object> row : rows) {
-            statusByCode.put((String) row.get("dataset_code"), row);
+            byCode.put((String) row.get("dataset_code"), row);
         }
+        return byCode;
+    }
+
+    /** PNU_APIS 14개의 현재 contract_status/enabled를 한 번에 조회해 템플릿용 행으로 합친다. */
+    private List<Map<String, Object>> loadPnuDatasetRows(JdbcTemplate jdbc) {
+        Map<String, Map<String, Object>> statusByCode = batchDatasetStatus(jdbc,
+                PNU_APIS.stream().map(PnuApiInfo::datasetCode).toList());
 
         List<Map<String, Object>> result = new ArrayList<>();
         for (PnuApiInfo api : PNU_APIS) {

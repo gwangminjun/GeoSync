@@ -37,9 +37,20 @@ public class KrasPnuIngestService {
         this.promotionService = promotionService;
     }
 
-    /** 설계 §6.3 절차 1~8, 하나의 트랜잭션. */
+    /** 설계 §6.3 절차 1~8, 하나의 트랜잭션. PNU만으로 되는 서비스용 — extraParams 없이 위임. */
     public IngestResult ingest(JdbcTemplate targetJdbc, String orgCd, KrasXmlServiceMapper mapper,
                                 String pnu, String triggeredBy) {
+        return ingest(targetJdbc, orgCd, mapper, pnu, Map.of(), triggeredBy);
+    }
+
+    /**
+     * PNU 외 추가 요청 파라미터가 필요한 드릴다운 서비스(집합건물 전유부 등)용. extraParams는
+     * (1) krasApiClient.query()로 그대로 전달되고, (2) scope_key에 섞여 같은 PNU라도 파라미터가
+     * 다르면 별개 item이 되고, (3) 모든 stage 행의 extra_attributes에 자동으로 남아(_pnu/_extra_params)
+     * 승격 단계에서 상위 서로게이트 ID를 조회하는 등의 용도로 쓸 수 있다.
+     */
+    public IngestResult ingest(JdbcTemplate targetJdbc, String orgCd, KrasXmlServiceMapper mapper,
+                                String pnu, Map<String, String> extraParams, String triggeredBy) {
         if (!pnu.matches("\\d{19}")) {
             throw new IllegalArgumentException("PNU 형식 오류: 19자리 숫자여야 합니다");
         }
@@ -48,7 +59,7 @@ public class KrasPnuIngestService {
             conn.setAutoCommit(false);
             try {
                 JdbcTemplate tx = new JdbcTemplate(new SingleConnectionDataSource(conn, true));
-                IngestResult result = ingestInTransaction(tx, orgCd, mapper, pnu, triggeredBy);
+                IngestResult result = ingestInTransaction(tx, orgCd, mapper, pnu, extraParams, triggeredBy);
                 conn.commit();
                 log.info("[KrasPnuIngest] 수집 완료 dataset={} itemId={} promotable={} warnings={}",
                         mapper.datasetCode(), result.itemId(), result.promotable(), result.warnings());
@@ -64,14 +75,15 @@ public class KrasPnuIngestService {
     }
 
     private IngestResult ingestInTransaction(JdbcTemplate tx, String orgCd, KrasXmlServiceMapper mapper,
-                                              String pnu, String triggeredBy) {
+                                              String pnu, Map<String, String> extraParams, String triggeredBy) {
         LocalDate today = LocalDate.now();
         LocalDate tomorrow = today.plusDays(1);
 
         Long runId = findOrCreateTodayRun(tx, orgCd, triggeredBy, today, tomorrow);
 
         String scopeKey = tx.queryForObject(
-                "SELECT kras.entity_key(jsonb_build_object('pnu', ?::text))", String.class, pnu);
+                "SELECT kras.entity_key(jsonb_build_object('pnu', ?::text) || ?::jsonb)",
+                String.class, pnu, writeJson(extraParams));
 
         Long itemId = tx.queryForObject("""
             INSERT INTO kras.sync_item(run_id, org_cd, dataset_code, scope_key, window_start, window_end_exclusive)
@@ -81,19 +93,19 @@ public class KrasPnuIngestService {
 
         Document doc;
         try {
-            byte[] xml = krasApiClient.query(mapper.connSvcId(), pnu, null);
+            byte[] xml = krasApiClient.query(mapper.connSvcId(), pnu, extraParams.isEmpty() ? null : extraParams);
             doc = XmlUtil.parse(xml);
         } catch (Exception e) {
             throw new IllegalStateException(mapper.connSvcId() + " 호출/파싱 실패: " + e.getMessage(), e);
         }
-        KrasXmlServiceMapper.MappingResult mapped = mapper.map(doc, pnu);
+        KrasXmlServiceMapper.MappingResult mapped = mapper.map(doc, pnu, extraParams);
 
         // stage 테이블 하나에 여러 행이 몰릴 수 있다(반복 그룹 응답) — 테이블별로 row_no를 1부터 증가시킨다.
         Map<String, Integer> rowNoByTable = new java.util.LinkedHashMap<>();
         Map<String, List<Map<String, Object>>> columnsByTable = new java.util.LinkedHashMap<>();
         for (KrasXmlServiceMapper.StageRow row : mapped.rows()) {
             int rowNo = rowNoByTable.merge(row.stageTable(), 1, Integer::sum);
-            insertStageRow(tx, row, itemId, rowNo);
+            insertStageRow(tx, row, itemId, rowNo, pnu, extraParams);
             columnsByTable.computeIfAbsent(row.stageTable(), k -> new ArrayList<>()).add(row.columns());
         }
         Map<String, Object> preview = new java.util.LinkedHashMap<>();
@@ -133,11 +145,27 @@ public class KrasPnuIngestService {
             """, Long.class, orgCd, triggeredBy, today, tomorrow);
     }
 
-    private void insertStageRow(JdbcTemplate tx, KrasXmlServiceMapper.StageRow row, long itemId, int rowNo) {
+    /**
+     * extra_attributes에 항상 _pnu/_extra_params를 함께 적어둔다(매퍼가 이미 뭘 넣어놨든 병합) —
+     * 승격 단계에서 상위 서로게이트 ID를 조회해야 하는 드릴다운 매퍼(예: collective_unit이
+     * collective_building_id를 찾을 때)가 이걸로 pnu/요청 파라미터를 다시 알아낸다. 일반 매퍼는
+     * 그냥 부가 정보로 남을 뿐 기존 승격 로직(copyColumns에 extra_attributes를 안 넣음)엔 영향 없다.
+     */
+    @SuppressWarnings("unchecked")
+    private void insertStageRow(JdbcTemplate tx, KrasXmlServiceMapper.StageRow row, long itemId, int rowNo,
+                                 String pnu, Map<String, String> extraParams) {
+        Map<String, Object> columns = new java.util.LinkedHashMap<>(row.columns());
+        Map<String, Object> extra = (Map<String, Object>) columns.computeIfAbsent(
+                "extra_attributes", k -> new java.util.LinkedHashMap<String, Object>());
+        extra.put("_pnu", pnu);
+        if (!extraParams.isEmpty()) {
+            extra.put("_extra_params", extraParams);
+        }
+
         List<String> names = new ArrayList<>(List.of("item_id", "row_no"));
         List<String> placeholders = new ArrayList<>(List.of("?", "?"));
         List<Object> values = new ArrayList<>(List.of((Object) itemId, (Object) (long) rowNo));
-        for (Map.Entry<String, Object> e : row.columns().entrySet()) {
+        for (Map.Entry<String, Object> e : columns.entrySet()) {
             names.add(e.getKey());
             if ("extra_attributes".equals(e.getKey()) || "field_presence".equals(e.getKey())) {
                 placeholders.add("?::jsonb");
@@ -190,12 +218,16 @@ public class KrasPnuIngestService {
                     + "잘못된 item일 수 있습니다). status=" + status);
         }
         List<KrasStagePromotionService.StagePromotionSpec> specs = mapper.promotionSpecs();
-        // 패턴 C(신원 매칭 후 UPSERT)는 탐색→UPDATE/INSERT 사이 경쟁 상태가 있어 직렬화가 필요하다(설계 §8.7).
-        // 패턴 A는 ON CONFLICT 자체가 원자적이라 불필요 — 필요한 경우에만 건다.
-        boolean needsSerialization = specs.stream()
-                .anyMatch(s -> s.pattern() == KrasStagePromotionService.PromotionPattern.IDENTITY_MATCH_UPSERT);
+        // 탐색→UPDATE/INSERT 사이 경쟁 상태가 있는 패턴(C, 부모 조회 후 신원 매칭)은 직렬화가 필요하다
+        // (설계 §8.7). 패턴 A/B는 원자적 SQL 한 문장이라 불필요 — 필요한 경우에만 건다.
+        boolean needsSerialization = specs.stream().anyMatch(s ->
+                s.pattern() == KrasStagePromotionService.PromotionPattern.IDENTITY_MATCH_UPSERT
+                        || s.pattern() == KrasStagePromotionService.PromotionPattern.PARENT_LOOKUP_IDENTITY_MATCH_UPSERT);
         if (needsSerialization) {
-            String pnu = tx.queryForObject("SELECT pnu FROM kras.stage_parcel WHERE item_id=?", String.class, itemId);
+            // 모든 stage 행에 _pnu가 자동으로 남아 있어(insertStageRow) 어느 spec의 stage 테이블에서든 읽을 수 있다.
+            String pnu = tx.queryForObject(
+                    "SELECT extra_attributes->>'_pnu' FROM " + specs.get(0).stageTable() + " WHERE item_id=? LIMIT 1",
+                    String.class, itemId);
             tx.query("SELECT pg_advisory_xact_lock(hashtextextended(?, 0))",
                     (org.springframework.jdbc.core.ResultSetExtractor<Void>) rs -> null,
                     "kras-promote:" + orgCd + ":" + pnu);

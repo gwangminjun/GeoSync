@@ -40,7 +40,15 @@ public final class XmlUtil {
 
     /** tagName을 가진 모든 요소를 문서 순서대로 반환한다 — 반복 그룹(SHR_YMB_SET > SHR_YMB 등) 순회용. */
     public static List<Element> elementsOf(Document doc, String tagName) {
-        NodeList nl = doc.getElementsByTagName(tagName);
+        return elementsOf(doc.getElementsByTagName(tagName));
+    }
+
+    /** el의 자손 중 tagName인 요소들 — 중첩 반복(LAND_MOV_HIST 안의 RELJIBUN 등) 순회용. */
+    public static List<Element> elementsOf(Element el, String tagName) {
+        return elementsOf(el.getElementsByTagName(tagName));
+    }
+
+    private static List<Element> elementsOf(NodeList nl) {
         List<Element> result = new ArrayList<>(nl.getLength());
         for (int i = 0; i < nl.getLength(); i++) {
             Node n = nl.item(i);

@@ -317,11 +317,305 @@
     <pre id="collective-building-preview" class="result-box" style="display:none;"></pre>
   </div>
 
-  <!-- 카드 1c: PNU 단건 API 계약 상태 — land_info/land_bldg_check 제외 17개 -->
+  <!-- 카드 1b-7: 데이터셋 계약 상태 — shr_ymb -->
   <div class="card">
-    <div class="card-title">데이터셋 계약 상태 — PNU 단건 API 17개</div>
+    <div class="card-title">
+      데이터셋 계약 상태 — shr_ymb
+      <span th:if="${shrYmbStatus == 'VERIFIED' and shrYmbEnabled}" class="badge badge-on">VERIFIED · enabled</span>
+      <span th:unless="${shrYmbStatus == 'VERIFIED' and shrYmbEnabled}" class="badge badge-warn"
+            th:text="${shrYmbStatus} + ' · ' + (${shrYmbEnabled} ? 'enabled' : 'disabled')"></span>
+    </div>
+    <p style="font-size:12px;color:#69707b;font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;">
+      이 API가 동기화하는 테이블 (KRAS000003 · /conn/shr_ymb)
+      <a href="/api-test?api=conn/shr_ymb" target="_blank" style="text-transform:none;letter-spacing:normal;font-weight:600;color:#5fa8e8;">→ 테스트</a>
+    </p>
     <p style="font-size:13px;color:#9aa2ad;margin-bottom:14px;">
-      아직 실제 파싱·적재 매퍼는 없습니다(land_info/land_bldg_check만 구현됨) — 이 표는 각 API가 나중에 어떤 업무 테이블로
+      공유인 수만큼 반복되는 응답(docs/reference/kras.md §2)이라 승격은 land_info/land_bldg_check와 달리
+      <b>패턴 B(범위 전체 교체)</b> — pnu 범위 전체를 DELETE 후 이번 응답 전체를 다시 INSERT합니다.
+      요청 필수 항목인 "말소자 포함유무"의 실제 파라미터명은 문서에 없어 보내지 않습니다 — 게이트웨이가
+      필수로 거부하면 그 에러로 실제 이름을 확인해야 합니다.
+    </p>
+    <div style="overflow-x:auto;margin-bottom:16px;">
+      <table class="hist-table">
+        <thead><tr><th>응답 항목(XML 태그)</th><th>stage 테이블</th><th>승격 대상(업무 테이블)</th><th>비고</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>ADM_SECT_CD, LAND_LOC_CD, LEDG_GBN, BOBN, BUBN</td>
+            <td>kras.stage_parcel</td>
+            <td>kras.parcel</td>
+            <td>반복 항목 첫 번째 것에서 읽음 — kras.md 예시는 항목마다 BOBN이 달라 실제 응답으로 재확인 필요</td>
+          </tr>
+          <tr>
+            <td>SHR_SEQNO, OWN_RGT_CHG_RSN_CD(_NM), OWN_RGT_CHG_YMD, OWNER_REGNO, OWNER_NM, OWNER_ADDR, OWN_RGT_JIBUN, OWN_RGT_CHG_DEL_YMD, OWN_GBN(_NM), PAREA (SHR_YMB 반복)</td>
+            <td>kras.stage_land_share</td>
+            <td>kras.land_share</td>
+            <td>land_share.pnu는 항목 태그가 아니라 요청 PNU를 그대로 씀(테이블에 식별 컬럼 없음)</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div th:unless="${shrYmbStatus == 'VERIFIED' and shrYmbEnabled}">
+      <form method="post" action="/kras-db/verify-dataset" id="verify-form-shr-ymb">
+        <input type="hidden" name="datasetCode" value="shr_ymb">
+        <div class="confirm-row">
+          <input type="checkbox" id="verify-confirm-shr-ymb" onchange="document.getElementById('verify-submit-shr-ymb').disabled = !this.checked;">
+          <label for="verify-confirm-shr-ymb">실제 운영 응답으로 shr_ymb 계약을 확인했음</label>
+        </div>
+        <input type="hidden" name="confirmed" id="verify-confirmed-shr-ymb" value="false">
+        <button type="submit" id="verify-submit-shr-ymb" class="btn btn-primary" disabled
+                onclick="document.getElementById('verify-confirmed-shr-ymb').value='true';">계약 확인 → VERIFIED로 전환</button>
+      </form>
+    </div>
+    <form th:if="${shrYmbStatus == 'VERIFIED' and shrYmbEnabled}" method="post" action="/kras-db/revert-dataset"
+          onsubmit="return confirm('shr_ymb 검증을 원복하시겠습니까? UNVERIFIED/disabled로 되돌아갑니다.');">
+      <input type="hidden" name="datasetCode" value="shr_ymb">
+      <button type="submit" class="btn btn-secondary">검증 원복</button>
+    </form>
+  </div>
+
+  <!-- 카드 1b-8: shr_ymb PNU 테스트 수집/승격 -->
+  <div class="card">
+    <div class="card-title">
+      shr_ymb PNU 테스트 수집/승격
+      <span th:if="${shrYmbRunning}" class="badge badge-warn">실행 중</span>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+      <input type="text" id="shr-ymb-pnu" placeholder="PNU 19자리" maxlength="19"
+             style="padding:8px 12px;border-radius:8px;border:1px solid #2e3640;background:#14171c;color:#e7eaee;font-family:'JetBrains Mono',monospace;width:220px;">
+      <button class="btn btn-primary" id="btn-shr-ymb-ingest" th:disabled="${shrYmbRunning}"
+              onclick="runShrYmbIngest()">테스트 수집</button>
+      <button class="btn btn-secondary" id="btn-shr-ymb-promote" th:disabled="${shrYmbRunning}" disabled
+              onclick="runShrYmbPromote()">업무 테이블로 승격</button>
+    </div>
+    <div id="shr-ymb-result" class="result-box" th:if="${lastShrYmbResult}" th:text="${lastShrYmbResult}"></div>
+    <div id="shr-ymb-result-js" class="result-box" style="display:none;"></div>
+    <pre id="shr-ymb-preview" class="result-box" style="display:none;"></pre>
+  </div>
+
+  <!-- 카드 1b-9: 데이터셋 계약 상태 — own_rgt_hist -->
+  <div class="card">
+    <div class="card-title">
+      데이터셋 계약 상태 — own_rgt_hist
+      <span th:if="${ownRgtHistStatus == 'VERIFIED' and ownRgtHistEnabled}" class="badge badge-on">VERIFIED · enabled</span>
+      <span th:unless="${ownRgtHistStatus == 'VERIFIED' and ownRgtHistEnabled}" class="badge badge-warn"
+            th:text="${ownRgtHistStatus} + ' · ' + (${ownRgtHistEnabled} ? 'enabled' : 'disabled')"></span>
+    </div>
+    <p style="font-size:12px;color:#69707b;font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;">
+      이 API가 동기화하는 테이블 (KRAS000007 · /conn/own_rgt_hist)
+      <a href="/api-test?api=conn/own_rgt_hist" target="_blank" style="text-transform:none;letter-spacing:normal;font-weight:600;color:#5fa8e8;">→ 테스트</a>
+    </p>
+    <p style="font-size:13px;color:#9aa2ad;margin-bottom:14px;">
+      shr_ymb와 동일한 모양(단일 레벨 반복, 자식 테이블 없음) — <b>패턴 B(범위 전체 교체)</b>로 승격합니다(docs/reference/kras.md §8).
+    </p>
+    <div style="overflow-x:auto;margin-bottom:16px;">
+      <table class="hist-table">
+        <thead><tr><th>응답 항목(XML 태그)</th><th>stage 테이블</th><th>승격 대상(업무 테이블)</th><th>비고</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>ADM_SECT_CD, LAND_LOC_CD, LEDG_GBN, BOBN, BUBN</td>
+            <td>kras.stage_parcel</td>
+            <td>kras.parcel</td>
+            <td>반복 항목 첫 번째 것에서 읽어 PNU와 대조</td>
+          </tr>
+          <tr>
+            <td>OWN_RGT_CHG_HIST_ODRNO, DODRNO, OWN_RGT_CHG_RSN_CD(_NM), DREGNO, OWNER_NM, OWN_GBN(_NM), OWN_RGT_CHG_CHRG_MAN_ID, DYMD, SHR_CNT (OWN_RGT_HIST 반복)</td>
+            <td>kras.stage_land_ownership_history</td>
+            <td>kras.land_ownership_history</td>
+            <td>DYMD 파싱 실패 시 extra_attributes에 원문 보존</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div th:unless="${ownRgtHistStatus == 'VERIFIED' and ownRgtHistEnabled}">
+      <form method="post" action="/kras-db/verify-dataset" id="verify-form-own-rgt-hist">
+        <input type="hidden" name="datasetCode" value="own_rgt_hist">
+        <div class="confirm-row">
+          <input type="checkbox" id="verify-confirm-own-rgt-hist" onchange="document.getElementById('verify-submit-own-rgt-hist').disabled = !this.checked;">
+          <label for="verify-confirm-own-rgt-hist">실제 운영 응답으로 own_rgt_hist 계약을 확인했음</label>
+        </div>
+        <input type="hidden" name="confirmed" id="verify-confirmed-own-rgt-hist" value="false">
+        <button type="submit" id="verify-submit-own-rgt-hist" class="btn btn-primary" disabled
+                onclick="document.getElementById('verify-confirmed-own-rgt-hist').value='true';">계약 확인 → VERIFIED로 전환</button>
+      </form>
+    </div>
+    <form th:if="${ownRgtHistStatus == 'VERIFIED' and ownRgtHistEnabled}" method="post" action="/kras-db/revert-dataset"
+          onsubmit="return confirm('own_rgt_hist 검증을 원복하시겠습니까? UNVERIFIED/disabled로 되돌아갑니다.');">
+      <input type="hidden" name="datasetCode" value="own_rgt_hist">
+      <button type="submit" class="btn btn-secondary">검증 원복</button>
+    </form>
+  </div>
+
+  <!-- 카드 1b-10: own_rgt_hist PNU 테스트 수집/승격 -->
+  <div class="card">
+    <div class="card-title">
+      own_rgt_hist PNU 테스트 수집/승격
+      <span th:if="${ownRgtHistRunning}" class="badge badge-warn">실행 중</span>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+      <input type="text" id="own-rgt-hist-pnu" placeholder="PNU 19자리" maxlength="19"
+             style="padding:8px 12px;border-radius:8px;border:1px solid #2e3640;background:#14171c;color:#e7eaee;font-family:'JetBrains Mono',monospace;width:220px;">
+      <button class="btn btn-primary" id="btn-own-rgt-hist-ingest" th:disabled="${ownRgtHistRunning}"
+              onclick="runOwnRgtHistIngest()">테스트 수집</button>
+      <button class="btn btn-secondary" id="btn-own-rgt-hist-promote" th:disabled="${ownRgtHistRunning}" disabled
+              onclick="runOwnRgtHistPromote()">업무 테이블로 승격</button>
+    </div>
+    <div id="own-rgt-hist-result" class="result-box" th:if="${lastOwnRgtHistResult}" th:text="${lastOwnRgtHistResult}"></div>
+    <div id="own-rgt-hist-result-js" class="result-box" style="display:none;"></div>
+    <pre id="own-rgt-hist-preview" class="result-box" style="display:none;"></pre>
+  </div>
+
+  <!-- 카드 1b-11: 데이터셋 계약 상태 — land_mov_hist -->
+  <div class="card">
+    <div class="card-title">
+      데이터셋 계약 상태 — land_mov_hist
+      <span th:if="${landMovHistStatus == 'VERIFIED' and landMovHistEnabled}" class="badge badge-on">VERIFIED · enabled</span>
+      <span th:unless="${landMovHistStatus == 'VERIFIED' and landMovHistEnabled}" class="badge badge-warn"
+            th:text="${landMovHistStatus} + ' · ' + (${landMovHistEnabled} ? 'enabled' : 'disabled')"></span>
+    </div>
+    <p style="font-size:12px;color:#69707b;font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;">
+      이 API가 동기화하는 테이블 (KRAS000006 · /conn/land_mov_hist)
+      <a href="/api-test?api=conn/land_mov_hist" target="_blank" style="text-transform:none;letter-spacing:normal;font-weight:600;color:#5fa8e8;">→ 테스트</a>
+    </p>
+    <p style="font-size:13px;color:#9aa2ad;margin-bottom:14px;">
+      다른 서비스와 달리 <b>중첩 반복</b>입니다 — LAND_MOV_HIST(연혁) 안에 RELJIBUN(관련지번)이 또 반복됩니다
+      (docs/reference/kras.md §7). 승격은 패턴 B의 2단 변형 — 연혁을 먼저 INSERT해 새 history_id를 받고,
+      그 ID로 관련지번을 잇달아 INSERT합니다. 이 응답엔 필지 식별 태그가 없어 parcel 승격은 안 하고,
+      요청 PNU에 대응하는 <code>kras.parcel</code> 행이 이미 있어야 승격이 성공합니다(FK로 강제됨) —
+      먼저 land_info나 land_bldg_check로 그 PNU를 한 번 승격해두세요.
+    </p>
+    <div style="overflow-x:auto;margin-bottom:16px;">
+      <table class="hist-table">
+        <thead><tr><th>응답 항목(XML 태그)</th><th>stage 테이블</th><th>승격 대상(업무 테이블)</th><th>비고</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>JIMOK(_NM), LAND_MOV_RSN_CD(_NM), SCALE(_NM), OWN_GBN, SHR_CNT, DOHO, DEL_YMD, LAND_MOV_DEL_YMD, LAND_MOV_HIST_ODRNO, LAND_HIST_ODRNO, PAREA, DYMD, LAND_MOV_CHRG_MAN_ID, OWNER_ADDR, OWNER_NM (LAND_MOV_HIST 반복)</td>
+            <td>kras.stage_land_movement_history</td>
+            <td>kras.land_movement_history</td>
+            <td>pnu는 요청 PNU 그대로 사용(응답에 식별 태그 없음)</td>
+          </tr>
+          <tr>
+            <td>JIBUN (RELJIBUN 중첩 반복)</td>
+            <td>kras.stage_land_movement_relation</td>
+            <td>kras.land_movement_relation</td>
+            <td>related_pnu는 채우지 않음 — JIBUN 문자열만으로는 완전한 PNU를 만들 근거가 없음</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div th:unless="${landMovHistStatus == 'VERIFIED' and landMovHistEnabled}">
+      <form method="post" action="/kras-db/verify-dataset" id="verify-form-land-mov-hist">
+        <input type="hidden" name="datasetCode" value="land_mov_hist">
+        <div class="confirm-row">
+          <input type="checkbox" id="verify-confirm-land-mov-hist" onchange="document.getElementById('verify-submit-land-mov-hist').disabled = !this.checked;">
+          <label for="verify-confirm-land-mov-hist">실제 운영 응답으로 land_mov_hist 계약을 확인했음</label>
+        </div>
+        <input type="hidden" name="confirmed" id="verify-confirmed-land-mov-hist" value="false">
+        <button type="submit" id="verify-submit-land-mov-hist" class="btn btn-primary" disabled
+                onclick="document.getElementById('verify-confirmed-land-mov-hist').value='true';">계약 확인 → VERIFIED로 전환</button>
+      </form>
+    </div>
+    <form th:if="${landMovHistStatus == 'VERIFIED' and landMovHistEnabled}" method="post" action="/kras-db/revert-dataset"
+          onsubmit="return confirm('land_mov_hist 검증을 원복하시겠습니까? UNVERIFIED/disabled로 되돌아갑니다.');">
+      <input type="hidden" name="datasetCode" value="land_mov_hist">
+      <button type="submit" class="btn btn-secondary">검증 원복</button>
+    </form>
+  </div>
+
+  <!-- 카드 1b-12: land_mov_hist PNU 테스트 수집/승격 -->
+  <div class="card">
+    <div class="card-title">
+      land_mov_hist PNU 테스트 수집/승격
+      <span th:if="${landMovHistRunning}" class="badge badge-warn">실행 중</span>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+      <input type="text" id="land-mov-hist-pnu" placeholder="PNU 19자리" maxlength="19"
+             style="padding:8px 12px;border-radius:8px;border:1px solid #2e3640;background:#14171c;color:#e7eaee;font-family:'JetBrains Mono',monospace;width:220px;">
+      <button class="btn btn-primary" id="btn-land-mov-hist-ingest" th:disabled="${landMovHistRunning}"
+              onclick="runLandMovHistIngest()">테스트 수집</button>
+      <button class="btn btn-secondary" id="btn-land-mov-hist-promote" th:disabled="${landMovHistRunning}" disabled
+              onclick="runLandMovHistPromote()">업무 테이블로 승격</button>
+    </div>
+    <div id="land-mov-hist-result" class="result-box" th:if="${lastLandMovHistResult}" th:text="${lastLandMovHistResult}"></div>
+    <div id="land-mov-hist-result-js" class="result-box" style="display:none;"></div>
+    <pre id="land-mov-hist-preview" class="result-box" style="display:none;"></pre>
+  </div>
+
+  <!-- 카드 1b-13: 데이터셋 계약 상태 — collective_unit -->
+  <div class="card">
+    <div class="card-title">
+      데이터셋 계약 상태 — collective_unit
+      <span th:if="${collectiveUnitStatus == 'VERIFIED' and collectiveUnitEnabled}" class="badge badge-on">VERIFIED · enabled</span>
+      <span th:unless="${collectiveUnitStatus == 'VERIFIED' and collectiveUnitEnabled}" class="badge badge-warn"
+            th:text="${collectiveUnitStatus} + ' · ' + (${collectiveUnitEnabled} ? 'enabled' : 'disabled')"></span>
+      <span class="badge" style="background:#3a1f1f;color:#e88a82;">conn_svc_id 미확인</span>
+    </div>
+    <p style="font-size:13px;color:#9aa2ad;margin-bottom:14px;">
+      "대지권등록부(전유부조회)" — <b>드릴다운 1단계</b>: PNU만으로 안 되고 집합건물순번(CBLDG_SEQNO)이
+      추가로 필요합니다(docs/reference/kras.md §5). 먼저 위 collective_building 카드에서 그 PNU를
+      수집해 cbldg_seqno 값을 확인한 뒤, 아래 "추가 파라미터(JSON)"에 그 키로 값을 넣어 호출하세요 —
+      실제 KRAS 쪽 파라미터명이 정확히 "cbldg_seqno"인지는 확인되지 않아 운영자가 입력한 값을 그대로
+      보냅니다. conn_svc_id도 아직 확인 전이라(service_code=NULL) 실제 호출은 막혀 있습니다.
+    </p>
+    <div style="overflow-x:auto;margin-bottom:16px;">
+      <table class="hist-table">
+        <thead><tr><th>응답 항목(XML 태그)</th><th>stage 테이블</th><th>승격 대상(업무 테이블)</th><th>비고</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>DONG, FLR, HO, SIL, CBLDG_NM, SHR_CNT (LAND_RGT_RFHS 반복)</td>
+            <td>kras.stage_collective_unit</td>
+            <td>kras.collective_unit</td>
+            <td>승격 시 collective_building_id를 pnu+cbldg_seqno로 조회해 채움(드릴다운 승격, §8.4 변형)</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div th:unless="${collectiveUnitStatus == 'VERIFIED' and collectiveUnitEnabled}">
+      <form method="post" action="/kras-db/verify-dataset" id="verify-form-collective-unit">
+        <input type="hidden" name="datasetCode" value="collective_unit">
+        <div class="confirm-row">
+          <input type="checkbox" id="verify-confirm-collective-unit" onchange="document.getElementById('verify-submit-collective-unit').disabled = !this.checked;">
+          <label for="verify-confirm-collective-unit">실제 운영 응답으로 collective_unit 계약을 확인했음</label>
+        </div>
+        <input type="hidden" name="confirmed" id="verify-confirmed-collective-unit" value="false">
+        <button type="submit" id="verify-submit-collective-unit" class="btn btn-primary" disabled
+                onclick="document.getElementById('verify-confirmed-collective-unit').value='true';">계약 확인 → VERIFIED로 전환</button>
+      </form>
+    </div>
+    <form th:if="${collectiveUnitStatus == 'VERIFIED' and collectiveUnitEnabled}" method="post" action="/kras-db/revert-dataset"
+          onsubmit="return confirm('collective_unit 검증을 원복하시겠습니까? UNVERIFIED/disabled로 되돌아갑니다.');">
+      <input type="hidden" name="datasetCode" value="collective_unit">
+      <button type="submit" class="btn btn-secondary">검증 원복</button>
+    </form>
+  </div>
+
+  <!-- 카드 1b-14: collective_unit PNU 테스트 수집/승격 -->
+  <div class="card">
+    <div class="card-title">
+      collective_unit PNU 테스트 수집/승격
+      <span th:if="${collectiveUnitRunning}" class="badge badge-warn">실행 중</span>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px;">
+      <input type="text" id="collective-unit-pnu" placeholder="PNU 19자리" maxlength="19"
+             style="padding:8px 12px;border-radius:8px;border:1px solid #2e3640;background:#14171c;color:#e7eaee;font-family:'JetBrains Mono',monospace;width:220px;">
+      <input type="text" id="collective-unit-extra-params" placeholder='추가 파라미터(JSON), 예: {"cbldg_seqno":"0285"}'
+             style="padding:8px 12px;border-radius:8px;border:1px solid #2e3640;background:#14171c;color:#e7eaee;font-family:'JetBrains Mono',monospace;flex:1;min-width:260px;">
+    </div>
+    <div style="display:flex;gap:10px;">
+      <button class="btn btn-primary" id="btn-collective-unit-ingest" th:disabled="${collectiveUnitRunning}"
+              onclick="runCollectiveUnitIngest()">테스트 수집</button>
+      <button class="btn btn-secondary" id="btn-collective-unit-promote" th:disabled="${collectiveUnitRunning}" disabled
+              onclick="runCollectiveUnitPromote()">업무 테이블로 승격</button>
+    </div>
+    <div id="collective-unit-result" class="result-box" th:if="${lastCollectiveUnitResult}" th:text="${lastCollectiveUnitResult}"></div>
+    <div id="collective-unit-result-js" class="result-box" style="display:none;"></div>
+    <pre id="collective-unit-preview" class="result-box" style="display:none;"></pre>
+  </div>
+
+  <!-- 카드 1c: PNU 단건 API 계약 상태 — land_info/land_bldg_check/shr_ymb/own_rgt_hist/land_mov_hist 제외 14개 -->
+  <div class="card">
+    <div class="card-title">데이터셋 계약 상태 — PNU 단건 API 14개</div>
+    <p style="font-size:13px;color:#9aa2ad;margin-bottom:14px;">
+      아직 실제 파싱·적재 매퍼는 없습니다(land_info/land_bldg_check/collective_building/shr_ymb/own_rgt_hist/land_mov_hist/collective_unit만 구현됨) — 이 표는 각 API가 나중에 어떤 업무 테이블로
       승격될지 미리 정리해 둔 것입니다. "테스트"로 실제 응답을 먼저 확인한 뒤 VERIFIED로 전환하세요.
     </p>
     <div style="overflow-x:auto;">
@@ -452,8 +746,12 @@ async function runPnuIngest(slug) {
   box.className = 'result-box';
   box.textContent = '수집 중...';
   preview.style.display = 'none';
+  const extraParamsEl = document.getElementById(slug + '-extra-params');
+  const extraParams = extraParamsEl ? extraParamsEl.value.trim() : '';
   try {
-    const res = await fetch('/kras-db/ingest/' + slug + '?pnu=' + encodeURIComponent(pnu), { method: 'POST' });
+    let url = '/kras-db/ingest/' + slug + '?pnu=' + encodeURIComponent(pnu);
+    if (extraParams) url += '&extraParamsJson=' + encodeURIComponent(extraParams);
+    const res = await fetch(url, { method: 'POST' });
     const data = await res.json();
     box.textContent = data.message || JSON.stringify(data);
     box.classList.add(data.success ? 'ok' : 'err');
@@ -506,6 +804,14 @@ function runLandBldgCheckIngest() { return runPnuIngest('land-bldg-check'); }
 function runLandBldgCheckPromote() { return runPnuPromote('land-bldg-check'); }
 function runCollectiveBuildingIngest() { return runPnuIngest('collective-building'); }
 function runCollectiveBuildingPromote() { return runPnuPromote('collective-building'); }
+function runShrYmbIngest() { return runPnuIngest('shr-ymb'); }
+function runShrYmbPromote() { return runPnuPromote('shr-ymb'); }
+function runOwnRgtHistIngest() { return runPnuIngest('own-rgt-hist'); }
+function runOwnRgtHistPromote() { return runPnuPromote('own-rgt-hist'); }
+function runLandMovHistIngest() { return runPnuIngest('land-mov-hist'); }
+function runLandMovHistPromote() { return runPnuPromote('land-mov-hist'); }
+function runCollectiveUnitIngest() { return runPnuIngest('collective-unit'); }
+function runCollectiveUnitPromote() { return runPnuPromote('collective-unit'); }
 </script>
 </th:block>
 </body>
