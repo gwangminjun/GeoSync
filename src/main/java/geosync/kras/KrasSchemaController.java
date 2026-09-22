@@ -125,6 +125,9 @@ public class KrasSchemaController {
             SPEC_SERVICES.stream().map(SpecService::datasetCode)
     ).flatMap(s -> s).collect(Collectors.toUnmodifiableSet());
 
+    private final KrasOperationLogService operationLog;
+    private final KrasHistoryService historyService;
+    private final Map<String, AtomicBoolean> operationLocks = new ConcurrentHashMap<>();
     private final TargetDbService targetDbService;
     private final RuntimeSettingsService settings;
     private final KrasApiClient krasApiClient;
@@ -162,7 +165,10 @@ public class KrasSchemaController {
                                  KrasDateRangeIngestService dateRangeIngestService,
                                  List<KrasDateRangeServiceMapper> dateRangeMappers,
                                  KrasUsezoneIngestService usezoneIngestService,
-                                 KrasTxtIngestService txtIngestService) {
+                                 KrasTxtIngestService txtIngestService,
+                                 KrasOperationLogService operationLog, KrasHistoryService historyService) {
+        this.operationLog = operationLog;
+        this.historyService = historyService;
         this.targetDbService = targetDbService;
         this.settings = settings;
         this.krasApiClient = krasApiClient;
@@ -362,203 +368,221 @@ public class KrasSchemaController {
     @PostMapping("/kras-db/ingest/cadastral")
     @ResponseBody
     public Map<String, Object> ingestCadastral() {
-        if (!cadastralRunning.compareAndSet(false, true)) {
-            return Map.of("error", "이미 실행 중입니다.");
-        }
-        try {
-            SyncTableDef def = findCadastralDef();
-            Path workDir = Path.of(settings.krasWorkDir(), settings.orgCode());
-            String baseName = krasApiClient.downloadLayer(def.srcTableName, workDir);
-            Path shpPath = workDir.resolve(baseName + ".shp");
-            List<Map<String, Object>> rows = workspaceScanner.loadShpFile(shpPath, def);
+        return executeOperation("cadastral_file", "INGEST", null, (targetJdbc, orgCd) -> {
+            if (!cadastralRunning.compareAndSet(false, true)) {
+                return Map.of("error", "이미 실행 중입니다.");
+            }
+            try {
+                SyncTableDef def = findCadastralDef();
+                Path workDir = Path.of(settings.krasWorkDir(), orgCd);
+                String baseName = krasApiClient.downloadLayer(def.srcTableName, workDir);
+                Path shpPath = workDir.resolve(baseName + ".shp");
+                List<Map<String, Object>> rows = workspaceScanner.loadShpFile(shpPath, def);
 
-            KrasCadastralIngestService.IngestResult result =
-                    cadastralIngestService.ingest(jdbc(), settings.orgCode(), LAYER_CODE, rows, "UI");
+                KrasCadastralIngestService.IngestResult result =
+                        cadastralIngestService.ingest(targetJdbc, orgCd, LAYER_CODE, rows, "UI");
 
-            String msg = "수집 성공: item_id=%d, %d건 적재(도형 없음 %d건 제외)"
-                    .formatted(result.itemId(), result.rowCount(), result.skippedCount());
-            lastCadastralResult = msg;
-            return Map.of("success", true, "itemId", result.itemId(), "rowCount", result.rowCount(),
-                    "skippedCount", result.skippedCount(), "message", msg);
-        } catch (Exception e) {
-            log.error("[KrasSchema] 연속지적 수집 실패: {}", e.getMessage(), e);
-            lastCadastralResult = "수집 실패: " + e.getMessage();
-            return Map.of("success", false, "message", lastCadastralResult);
-        } finally {
-            cadastralRunning.set(false);
-        }
+                String msg = "수집 성공: item_id=%d, %d건 적재(도형 없음 %d건 제외)"
+                        .formatted(result.itemId(), result.rowCount(), result.skippedCount());
+                lastCadastralResult = msg;
+                return Map.of("success", true, "itemId", result.itemId(), "rowCount", result.rowCount(),
+                        "skippedCount", result.skippedCount(), "message", msg);
+            } catch (Exception e) {
+                log.error("[KrasSchema] 연속지적 수집 실패: {}", e.getMessage(), e);
+                lastCadastralResult = "수집 실패: " + e.getMessage();
+                return Map.of("success", false, "message", lastCadastralResult);
+            } finally {
+                cadastralRunning.set(false);
+            }
+        });
     }
 
     /** 승격만(설계 절차 7~8). 실제 GeoServer 테이블(public.lp_pa_cbnd)을 여기서만 건드린다. */
     @PostMapping("/kras-db/promote/cadastral")
     @ResponseBody
     public Map<String, Object> promoteCadastral() {
-        try {
-            KrasCadastralIngestService.PromoteResult result =
-                    cadastralIngestService.promote(jdbc(), settings.orgCode(), LAYER_CODE);
-            String msg = "승격 성공: item_id=%d, public.lp_pa_cbnd %d건"
-                    .formatted(result.itemId(), result.promotedRows());
-            lastCadastralResult = msg;
-            return Map.of("success", true, "itemId", result.itemId(),
-                    "promotedRows", result.promotedRows(), "message", msg);
-        } catch (Exception e) {
-            log.error("[KrasSchema] 연속지적 승격 실패: {}", e.getMessage(), e);
-            lastCadastralResult = "승격 실패: " + e.getMessage();
-            return Map.of("success", false, "message", lastCadastralResult);
-        }
+        return executeOperation("cadastral_file", "PUBLIC", null, (targetJdbc, orgCd) -> {
+            try {
+                KrasCadastralIngestService.PromoteResult result =
+                        cadastralIngestService.promote(targetJdbc, orgCd, LAYER_CODE);
+                String msg = "승격 성공: item_id=%d, public.lp_pa_cbnd %d건"
+                        .formatted(result.itemId(), result.promotedRows());
+                lastCadastralResult = msg;
+                return Map.of("success", true, "itemId", result.itemId(),
+                        "promotedRows", result.promotedRows(), "message", msg);
+            } catch (Exception e) {
+                log.error("[KrasSchema] 연속지적 승격 실패: {}", e.getMessage(), e);
+                lastCadastralResult = "승격 실패: " + e.getMessage();
+                return Map.of("success", false, "message", lastCadastralResult);
+            }
+        });
     }
 
     /** 용도지역 §9.1 절차 0 — KRAS 레이어 목록을 layer_list item + sync_record로 동결. */
     @PostMapping("/kras-db/usezone/collect-catalog")
     @ResponseBody
     public Map<String, Object> collectUsezoneCatalog() {
-        if (!usezoneRunning.compareAndSet(false, true)) {
-            return Map.of("error", "이미 실행 중입니다.");
-        }
-        try {
-            KrasUsezoneIngestService.CatalogResult result =
-                    usezoneIngestService.collectCatalog(jdbc(), settings.orgCode(), "UI");
-            String msg = "카탈로그 수집 성공: item_id=%d, %d개 레이어".formatted(result.itemId(), result.layerCodes().size());
-            lastUsezoneResult = msg;
-            return Map.of("success", true, "itemId", result.itemId(), "layerCount", result.layerCodes().size(),
-                    "message", msg);
-        } catch (Exception e) {
-            log.error("[KrasSchema] 용도지역 카탈로그 수집 실패: {}", e.getMessage(), e);
-            lastUsezoneResult = "카탈로그 수집 실패: " + e.getMessage();
-            return Map.of("success", false, "message", lastUsezoneResult);
-        } finally {
-            usezoneRunning.set(false);
-        }
+        return executeOperation("layer_list", "INGEST", null, (targetJdbc, orgCd) -> {
+            if (!usezoneRunning.compareAndSet(false, true)) {
+                return Map.of("error", "이미 실행 중입니다.");
+            }
+            try {
+                KrasUsezoneIngestService.CatalogResult result =
+                        usezoneIngestService.collectCatalog(targetJdbc, orgCd, "UI");
+                String msg = "카탈로그 수집 성공: item_id=%d, %d개 레이어".formatted(result.itemId(), result.layerCodes().size());
+                lastUsezoneResult = msg;
+                return Map.of("success", true, "itemId", result.itemId(), "layerCount", result.layerCodes().size(),
+                        "message", msg);
+            } catch (Exception e) {
+                log.error("[KrasSchema] 용도지역 카탈로그 수집 실패: {}", e.getMessage(), e);
+                lastUsezoneResult = "카탈로그 수집 실패: " + e.getMessage();
+                return Map.of("success", false, "message", lastUsezoneResult);
+            } finally {
+                usezoneRunning.set(false);
+            }
+        });
     }
 
     /** 용도지역 §9.1 절차 1~4 — release 생성/seal + 레이어별 SHP 수집(레이어당 별도 트랜잭션, 부분 실패 허용). */
     @PostMapping("/kras-db/usezone/sweep")
     @ResponseBody
     public Map<String, Object> sweepUsezoneLayers(@RequestParam long catalogItemId) {
-        if (!usezoneRunning.compareAndSet(false, true)) {
-            return Map.of("error", "이미 실행 중입니다.");
-        }
-        try {
-            KrasUsezoneIngestService.SweepResult result =
-                    usezoneIngestService.runLayerSweep(jdbc(), settings.orgCode(), catalogItemId, "UI");
-            long okCount = result.layers().stream().filter(KrasUsezoneIngestService.LayerResult::success).count();
-            String msg = "레이어 순회 완료: release_id=%d, %d/%d건 성공"
-                    .formatted(result.releaseId(), okCount, result.layers().size());
-            lastUsezoneResult = msg;
-            return Map.of("success", true, "releaseId", result.releaseId(), "layers", result.layers(),
-                    "message", msg);
-        } catch (Exception e) {
-            log.error("[KrasSchema] 용도지역 레이어 순회 실패: {}", e.getMessage(), e);
-            lastUsezoneResult = "레이어 순회 실패: " + e.getMessage();
-            return Map.of("success", false, "message", lastUsezoneResult);
-        } finally {
-            usezoneRunning.set(false);
-        }
+        return executeOperation("usezone_file", "SWEEP", null, "catalog=" + catalogItemId, (targetJdbc, orgCd) -> {
+            if (!usezoneRunning.compareAndSet(false, true)) {
+                return Map.of("error", "이미 실행 중입니다.");
+            }
+            try {
+                KrasUsezoneIngestService.SweepResult result =
+                        usezoneIngestService.runLayerSweep(targetJdbc, orgCd, catalogItemId, "UI");
+                long okCount = result.layers().stream().filter(KrasUsezoneIngestService.LayerResult::success).count();
+                String msg = "레이어 순회 완료: release_id=%d, %d/%d건 성공"
+                        .formatted(result.releaseId(), okCount, result.layers().size());
+                lastUsezoneResult = msg;
+                return Map.of("success", true, "releaseId", result.releaseId(), "layers", result.layers(),
+                        "message", msg);
+            } catch (Exception e) {
+                log.error("[KrasSchema] 용도지역 레이어 순회 실패: {}", e.getMessage(), e);
+                lastUsezoneResult = "레이어 순회 실패: " + e.getMessage();
+                return Map.of("success", false, "message", lastUsezoneResult);
+            } finally {
+                usezoneRunning.set(false);
+            }
+        });
     }
 
     /** 용도지역 §9.1 절차 5 — publish_spatial_release()가 전체 완전성을 검증(부분 실패 시 여기서 막힘). */
     @PostMapping("/kras-db/usezone/publish")
     @ResponseBody
     public Map<String, Object> publishUsezoneRelease(@RequestParam long releaseId) {
-        try {
-            usezoneIngestService.publishRelease(jdbc(), releaseId);
-            String msg = "release 발행 성공: release_id=" + releaseId;
-            lastUsezoneResult = msg;
-            return Map.of("success", true, "releaseId", releaseId, "message", msg);
-        } catch (Exception e) {
-            log.error("[KrasSchema] 용도지역 release 발행 실패: {}", e.getMessage(), e);
-            lastUsezoneResult = "release 발행 실패: " + e.getMessage();
-            return Map.of("success", false, "message", lastUsezoneResult);
-        }
+        return executeOperation("usezone_file", "PUBLISH", null, "release=" + releaseId, (targetJdbc, orgCd) -> {
+            try {
+                usezoneIngestService.publishRelease(targetJdbc, releaseId);
+                String msg = "release 발행 성공: release_id=" + releaseId;
+                lastUsezoneResult = msg;
+                return Map.of("success", true, "releaseId", releaseId, "message", msg);
+            } catch (Exception e) {
+                log.error("[KrasSchema] 용도지역 release 발행 실패: {}", e.getMessage(), e);
+                lastUsezoneResult = "release 발행 실패: " + e.getMessage();
+                return Map.of("success", false, "message", lastUsezoneResult);
+            }
+        });
     }
 
     /** 용도지역 §9.1 절차 6 — 기존 kras.sync_public_usezone() 재사용, public.lt_c_uzone만 여기서 건드림. */
     @PostMapping("/kras-db/usezone/sync-public")
     @ResponseBody
     public Map<String, Object> syncUsezonePublic() {
-        try {
-            long n = usezoneIngestService.syncPublic(jdbc());
-            String msg = "public 승격 성공: public.lt_c_uzone " + n + "건";
-            lastUsezoneResult = msg;
-            return Map.of("success", true, "rowCount", n, "message", msg);
-        } catch (Exception e) {
-            log.error("[KrasSchema] 용도지역 public 승격 실패: {}", e.getMessage(), e);
-            lastUsezoneResult = "public 승격 실패: " + e.getMessage();
-            return Map.of("success", false, "message", lastUsezoneResult);
-        }
+        return executeOperation("usezone_file", "PUBLIC", null, (targetJdbc, orgCd) -> {
+            try {
+                long n = usezoneIngestService.syncPublic(targetJdbc);
+                String msg = "public 승격 성공: public.lt_c_uzone " + n + "건";
+                lastUsezoneResult = msg;
+                return Map.of("success", true, "rowCount", n, "message", msg);
+            } catch (Exception e) {
+                log.error("[KrasSchema] 용도지역 public 승격 실패: {}", e.getMessage(), e);
+                lastUsezoneResult = "public 승격 실패: " + e.getMessage();
+                return Map.of("success", false, "message", lastUsezoneResult);
+            }
+        });
     }
 
     /** 토지기본정보 전체 TXT(KRAS000040) 수집 — kras.stage_parcel/stage_land_basic까지만 채운다. */
     @PostMapping("/kras-db/ingest/land-basic-file")
     @ResponseBody
     public Map<String, Object> ingestLandBasicFile() {
-        if (!landBasicFileRunning.compareAndSet(false, true)) {
-            return Map.of("error", "이미 실행 중입니다.");
-        }
-        try {
-            KrasTxtIngestService.IngestResult result =
-                    txtIngestService.ingestLandBasic(jdbc(), settings.orgCode(), "UI");
-            String msg = result.promotable()
-                    ? "수집 성공: item_id=%d, %d건 — 건수를 확인한 뒤 승격하세요.".formatted(result.itemId(), result.rowCount())
-                    : "수집됨(item_id=%d, %d건), 단 파싱 경고로 승격 보류: %s"
-                            .formatted(result.itemId(), result.rowCount(), result.warnings());
-            lastLandBasicFileResult = msg;
-            return Map.of("success", true, "itemId", result.itemId(), "rowCount", result.rowCount(),
-                    "promotable", result.promotable(), "warnings", result.warnings(), "message", msg);
-        } catch (Exception e) {
-            log.error("[KrasSchema] 토지기본정보 TXT 수집 실패: {}", e.getMessage(), e);
-            lastLandBasicFileResult = "수집 실패: " + e.getMessage();
-            return Map.of("success", false, "message", lastLandBasicFileResult);
-        } finally {
-            landBasicFileRunning.set(false);
-        }
+        return executeOperation("land_basic_file", "INGEST", null, (targetJdbc, orgCd) -> {
+            if (!landBasicFileRunning.compareAndSet(false, true)) {
+                return Map.of("error", "이미 실행 중입니다.");
+            }
+            try {
+                KrasTxtIngestService.IngestResult result =
+                        txtIngestService.ingestLandBasic(targetJdbc, orgCd, "UI");
+                String msg = result.promotable()
+                        ? "수집 성공: item_id=%d, %d건 — 건수를 확인한 뒤 승격하세요.".formatted(result.itemId(), result.rowCount())
+                        : "수집됨(item_id=%d, %d건), 단 파싱 경고로 승격 보류: %s"
+                                .formatted(result.itemId(), result.rowCount(), result.warnings());
+                lastLandBasicFileResult = msg;
+                return Map.of("success", true, "itemId", result.itemId(), "rowCount", result.rowCount(),
+                        "promotable", result.promotable(), "warnings", result.warnings(), "message", msg);
+            } catch (Exception e) {
+                log.error("[KrasSchema] 토지기본정보 TXT 수집 실패: {}", e.getMessage(), e);
+                lastLandBasicFileResult = "수집 실패: " + e.getMessage();
+                return Map.of("success", false, "message", lastLandBasicFileResult);
+            } finally {
+                landBasicFileRunning.set(false);
+            }
+        });
     }
 
     /** 토지기본정보 승격 — kras.parcel/kras.land_basic 자연키 UPSERT. */
     @PostMapping("/kras-db/promote/land-basic-file")
     @ResponseBody
     public Map<String, Object> promoteLandBasicFile(@RequestParam long itemId) {
-        if (!landBasicFileRunning.compareAndSet(false, true)) {
-            return Map.of("error", "이미 실행 중입니다.");
-        }
-        try {
-            txtIngestService.promoteLandBasic(jdbc(), settings.orgCode(), itemId);
-            String msg = "승격 성공: item_id=" + itemId;
-            lastLandBasicFileResult = msg;
-            return Map.of("success", true, "itemId", itemId, "message", msg);
-        } catch (Exception e) {
-            log.error("[KrasSchema] 토지기본정보 승격 실패: {}", e.getMessage(), e);
-            lastLandBasicFileResult = "승격 실패: " + e.getMessage();
-            return Map.of("success", false, "message", lastLandBasicFileResult);
-        } finally {
-            landBasicFileRunning.set(false);
-        }
+        return executeOperation("land_basic_file", "PROMOTE", itemId, (targetJdbc, orgCd) -> {
+            if (!landBasicFileRunning.compareAndSet(false, true)) {
+                return Map.of("error", "이미 실행 중입니다.");
+            }
+            try {
+                txtIngestService.promoteLandBasic(targetJdbc, orgCd, itemId);
+                String msg = "승격 성공: item_id=" + itemId;
+                lastLandBasicFileResult = msg;
+                return Map.of("success", true, "itemId", itemId, "message", msg);
+            } catch (Exception e) {
+                log.error("[KrasSchema] 토지기본정보 승격 실패: {}", e.getMessage(), e);
+                lastLandBasicFileResult = "승격 실패: " + e.getMessage();
+                return Map.of("success", false, "message", lastLandBasicFileResult);
+            } finally {
+                landBasicFileRunning.set(false);
+            }
+        });
     }
 
     /** 공시지가 전체 TXT(KRAS000039) 수집 — kras.land_price_file_row 직행이라 승격 단계가 없다. */
     @PostMapping("/kras-db/ingest/land-price-file")
     @ResponseBody
     public Map<String, Object> ingestLandPriceFile() {
-        if (!landPriceFileRunning.compareAndSet(false, true)) {
-            return Map.of("error", "이미 실행 중입니다.");
-        }
-        try {
-            KrasTxtIngestService.IngestResult result =
-                    txtIngestService.ingestLandPrice(jdbc(), settings.orgCode(), "UI");
-            String msg = result.promotable()
-                    ? "수집 성공: item_id=%d, %d건".formatted(result.itemId(), result.rowCount())
-                    : "수집됨(item_id=%d, %d건), 단 파싱 경고로 SUCCESS 보류: %s"
-                            .formatted(result.itemId(), result.rowCount(), result.warnings());
-            lastLandPriceFileResult = msg;
-            return Map.of("success", true, "itemId", result.itemId(), "rowCount", result.rowCount(),
-                    "promotable", result.promotable(), "warnings", result.warnings(), "message", msg);
-        } catch (Exception e) {
-            log.error("[KrasSchema] 공시지가 TXT 수집 실패: {}", e.getMessage(), e);
-            lastLandPriceFileResult = "수집 실패: " + e.getMessage();
-            return Map.of("success", false, "message", lastLandPriceFileResult);
-        } finally {
-            landPriceFileRunning.set(false);
-        }
+        return executeOperation("land_price_file", "INGEST", null, (targetJdbc, orgCd) -> {
+            if (!landPriceFileRunning.compareAndSet(false, true)) {
+                return Map.of("error", "이미 실행 중입니다.");
+            }
+            try {
+                KrasTxtIngestService.IngestResult result =
+                        txtIngestService.ingestLandPrice(targetJdbc, orgCd, "UI");
+                String msg = result.promotable()
+                        ? "수집 성공: item_id=%d, %d건".formatted(result.itemId(), result.rowCount())
+                        : "수집됨(item_id=%d, %d건), 단 파싱 경고로 SUCCESS 보류: %s"
+                                .formatted(result.itemId(), result.rowCount(), result.warnings());
+                lastLandPriceFileResult = msg;
+                return Map.of("success", true, "itemId", result.itemId(), "rowCount", result.rowCount(),
+                        "promotable", result.promotable(), "warnings", result.warnings(), "message", msg);
+            } catch (Exception e) {
+                log.error("[KrasSchema] 공시지가 TXT 수집 실패: {}", e.getMessage(), e);
+                lastLandPriceFileResult = "수집 실패: " + e.getMessage();
+                return Map.of("success", false, "message", lastLandPriceFileResult);
+            } finally {
+                landPriceFileRunning.set(false);
+            }
+        });
     }
 
     /**
@@ -571,60 +595,65 @@ public class KrasSchemaController {
     @ResponseBody
     public Map<String, Object> ingestPnuMapper(@PathVariable String slug, @RequestParam String pnu,
                                                 @RequestParam(required = false) String extraParamsJson) {
-        String datasetCode = slugToDatasetCode.get(slug);
-        if (datasetCode == null) {
-            return Map.of("success", false, "message", "알 수 없는 서비스: " + slug);
-        }
-        Map<String, String> extraParams;
-        try {
-            extraParams = parseExtraParams(extraParamsJson);
-        } catch (Exception e) {
-            return Map.of("success", false, "message", "추가 파라미터 JSON 형식 오류: " + e.getMessage());
-        }
-        KrasXmlServiceMapper mapper = mappersByDatasetCode.get(datasetCode);
-        AtomicBoolean running = runningByDatasetCode.get(datasetCode);
-        if (!running.compareAndSet(false, true)) {
-            return Map.of("error", "이미 실행 중입니다.");
-        }
-        try {
-            KrasPnuIngestService.IngestResult result =
-                    pnuIngestService.ingest(jdbc(), settings.orgCode(), mapper, pnu, extraParams, "UI");
-            String msg = result.promotable()
-                    ? "수집 성공: item_id=%d — 값을 확인한 뒤 승격하세요.".formatted(result.itemId())
-                    : "수집됨(item_id=%d), 단 필드 파싱 경고로 승격 보류: %s".formatted(result.itemId(), result.warnings());
-            lastResultByDatasetCode.put(datasetCode, msg);
-            return Map.of("success", true, "itemId", result.itemId(), "promotable", result.promotable(),
-                    "warnings", result.warnings(), "preview", result.preview(), "message", msg);
-        } catch (Exception e) {
-            log.error("[KrasSchema] {} 수집 실패: {}", datasetCode, e.getMessage(), e);
-            String msg = "수집 실패: " + e.getMessage();
-            lastResultByDatasetCode.put(datasetCode, msg);
-            return Map.of("success", false, "message", msg);
-        } finally {
-            running.set(false);
-        }
+        return executeOperation(slugToDatasetCode.getOrDefault(slug, ""), "INGEST", null, "PNU=" + pnu, (targetJdbc, orgCd) -> {
+            String datasetCode = slugToDatasetCode.get(slug);
+            if (datasetCode == null) {
+                return Map.of("success", false, "message", "알 수 없는 서비스: " + slug);
+            }
+            Map<String, String> extraParams;
+            try {
+                extraParams = parseExtraParams(extraParamsJson);
+            } catch (Exception e) {
+                return Map.of("success", false, "message", "추가 파라미터 JSON 형식 오류: " + e.getMessage());
+            }
+            KrasXmlServiceMapper mapper = mappersByDatasetCode.get(datasetCode);
+            historyService.requirePnuInput(orgCd, pnu, datasetCode, extraParams);
+            AtomicBoolean running = runningByDatasetCode.get(datasetCode);
+            if (!running.compareAndSet(false, true)) {
+                return Map.of("error", "이미 실행 중입니다.");
+            }
+            try {
+                KrasPnuIngestService.IngestResult result =
+                        pnuIngestService.ingest(targetJdbc, orgCd, mapper, pnu, extraParams, "UI");
+                String msg = result.promotable()
+                        ? "수집 성공: item_id=%d — 값을 확인한 뒤 승격하세요.".formatted(result.itemId())
+                        : "수집됨(item_id=%d), 단 필드 파싱 경고로 승격 보류: %s".formatted(result.itemId(), result.warnings());
+                lastResultByDatasetCode.put(datasetCode, msg);
+                return Map.of("success", true, "itemId", result.itemId(), "promotable", result.promotable(),
+                        "warnings", result.warnings(), "preview", result.preview(), "message", msg);
+            } catch (Exception e) {
+                log.error("[KrasSchema] {} 수집 실패: {}", datasetCode, e.getMessage(), e);
+                String msg = "수집 실패: " + e.getMessage();
+                lastResultByDatasetCode.put(datasetCode, msg);
+                return Map.of("success", false, "message", msg);
+            } finally {
+                running.set(false);
+            }
+        });
     }
 
     /** PNU 단건 매퍼 공용 승격만(설계 절차 9). 승격 패턴(A/B/C)은 매퍼가 declare한 StagePromotionSpec이 결정한다. */
     @PostMapping("/kras-db/promote/{slug}")
     @ResponseBody
     public Map<String, Object> promotePnuMapper(@PathVariable String slug, @RequestParam long itemId) {
-        String datasetCode = slugToDatasetCode.get(slug);
-        if (datasetCode == null) {
-            return Map.of("success", false, "message", "알 수 없는 서비스: " + slug);
-        }
-        KrasXmlServiceMapper mapper = mappersByDatasetCode.get(datasetCode);
-        try {
-            KrasPnuIngestService.PromoteResult result = pnuIngestService.promote(jdbc(), settings.orgCode(), mapper, itemId);
-            String msg = "승격 성공: item_id=%d".formatted(result.itemId());
-            lastResultByDatasetCode.put(datasetCode, msg);
-            return Map.of("success", true, "itemId", result.itemId(), "message", msg);
-        } catch (Exception e) {
-            log.error("[KrasSchema] {} 승격 실패: {}", datasetCode, e.getMessage(), e);
-            String msg = "승격 실패: " + e.getMessage();
-            lastResultByDatasetCode.put(datasetCode, msg);
-            return Map.of("success", false, "message", msg);
-        }
+        return executeOperation(slugToDatasetCode.getOrDefault(slug, ""), "PROMOTE", itemId, (targetJdbc, orgCd) -> {
+            String datasetCode = slugToDatasetCode.get(slug);
+            if (datasetCode == null) {
+                return Map.of("success", false, "message", "알 수 없는 서비스: " + slug);
+            }
+            KrasXmlServiceMapper mapper = mappersByDatasetCode.get(datasetCode);
+            try {
+                KrasPnuIngestService.PromoteResult result = pnuIngestService.promote(targetJdbc, orgCd, mapper, itemId);
+                String msg = "승격 성공: item_id=%d".formatted(result.itemId());
+                lastResultByDatasetCode.put(datasetCode, msg);
+                return Map.of("success", true, "itemId", result.itemId(), "message", msg);
+            } catch (Exception e) {
+                log.error("[KrasSchema] {} 승격 실패: {}", datasetCode, e.getMessage(), e);
+                String msg = "승격 실패: " + e.getMessage();
+                lastResultByDatasetCode.put(datasetCode, msg);
+                return Map.of("success", false, "message", msg);
+            }
+        });
     }
 
     /**
@@ -638,75 +667,90 @@ public class KrasSchemaController {
                                                        @RequestParam String startDate,
                                                        @RequestParam String endDate,
                                                        @RequestParam(required = false) String extraParamsJson) {
-        String datasetCode = dateRangeSlugToDatasetCode.get(slug);
-        if (datasetCode == null) {
-            return Map.of("success", false, "message", "알 수 없는 서비스: " + slug);
-        }
-        Map<String, String> extraParams;
-        try {
-            extraParams = parseExtraParams(extraParamsJson);
-        } catch (Exception e) {
-            return Map.of("success", false, "message", "추가 파라미터 JSON 형식 오류: " + e.getMessage());
-        }
-        KrasDateRangeServiceMapper mapper = dateRangeMappersByDatasetCode.get(datasetCode);
-        AtomicBoolean running = runningByDatasetCode.get(datasetCode);
-        if (!running.compareAndSet(false, true)) {
-            return Map.of("error", "이미 실행 중입니다.");
-        }
-        try {
-            LocalDate start = LocalDate.parse(startDate);
-            LocalDate end = LocalDate.parse(endDate);
-            KrasDateRangeIngestService.IngestResult result =
-                    dateRangeIngestService.ingest(jdbc(), settings.orgCode(), mapper, start, end, extraParams, "UI");
-            String msg = result.promotable()
-                    ? "수집 성공: item_id=%d(%d건) — 값을 확인한 뒤 승격하세요.".formatted(result.itemId(), result.preview().size())
-                    : "수집됨(item_id=%d), 단 필드 파싱 경고로 승격 보류: %s".formatted(result.itemId(), result.warnings());
-            lastResultByDatasetCode.put(datasetCode, msg);
-            return Map.of("success", true, "itemId", result.itemId(), "promotable", result.promotable(),
-                    "warnings", result.warnings(), "preview", result.preview(), "message", msg);
-        } catch (Exception e) {
-            log.error("[KrasSchema] {} 수집 실패: {}", datasetCode, e.getMessage(), e);
-            String msg = "수집 실패: " + e.getMessage();
-            lastResultByDatasetCode.put(datasetCode, msg);
-            return Map.of("success", false, "message", msg);
-        } finally {
-            running.set(false);
-        }
+        return executeOperation(dateRangeSlugToDatasetCode.getOrDefault(slug, ""), "INGEST", null,
+                startDate + " ~ " + endDate, (targetJdbc, orgCd) -> {
+            String datasetCode = dateRangeSlugToDatasetCode.get(slug);
+            if (datasetCode == null) {
+                return Map.of("success", false, "message", "알 수 없는 서비스: " + slug);
+            }
+            Map<String, String> extraParams;
+            try {
+                extraParams = parseExtraParams(extraParamsJson);
+            } catch (Exception e) {
+                return Map.of("success", false, "message", "추가 파라미터 JSON 형식 오류: " + e.getMessage());
+            }
+            KrasDateRangeServiceMapper mapper = dateRangeMappersByDatasetCode.get(datasetCode);
+            AtomicBoolean running = runningByDatasetCode.get(datasetCode);
+            if (!running.compareAndSet(false, true)) {
+                return Map.of("error", "이미 실행 중입니다.");
+            }
+            try {
+                LocalDate start = LocalDate.parse(startDate);
+                LocalDate end = LocalDate.parse(endDate);
+                KrasDateRangeIngestService.IngestResult result =
+                        dateRangeIngestService.ingest(targetJdbc, orgCd, mapper, start, end, extraParams, "UI");
+                String msg = result.promotable()
+                        ? "수집 성공: item_id=%d(%d건) — 값을 확인한 뒤 승격하세요.".formatted(result.itemId(), result.preview().size())
+                        : "수집됨(item_id=%d), 단 필드 파싱 경고로 승격 보류: %s".formatted(result.itemId(), result.warnings());
+                lastResultByDatasetCode.put(datasetCode, msg);
+                return Map.of("success", true, "itemId", result.itemId(), "promotable", result.promotable(),
+                        "warnings", result.warnings(), "preview", result.preview(), "message", msg);
+            } catch (Exception e) {
+                log.error("[KrasSchema] {} 수집 실패: {}", datasetCode, e.getMessage(), e);
+                String msg = "수집 실패: " + e.getMessage();
+                lastResultByDatasetCode.put(datasetCode, msg);
+                return Map.of("success", false, "message", msg);
+            } finally {
+                running.set(false);
+            }
+        });
     }
 
     /** 기간(날짜 범위) 매퍼 공용 승격만. */
     @PostMapping("/kras-db/promote-range/{slug}")
     @ResponseBody
     public Map<String, Object> promoteDateRangeMapper(@PathVariable String slug, @RequestParam long itemId) {
-        String datasetCode = dateRangeSlugToDatasetCode.get(slug);
-        if (datasetCode == null) {
-            return Map.of("success", false, "message", "알 수 없는 서비스: " + slug);
-        }
-        KrasDateRangeServiceMapper mapper = dateRangeMappersByDatasetCode.get(datasetCode);
-        try {
-            KrasDateRangeIngestService.PromoteResult result =
-                    dateRangeIngestService.promote(jdbc(), settings.orgCode(), mapper, itemId);
-            String msg = "승격 성공: item_id=%d".formatted(result.itemId());
-            lastResultByDatasetCode.put(datasetCode, msg);
-            return Map.of("success", true, "itemId", result.itemId(), "message", msg);
-        } catch (Exception e) {
-            log.error("[KrasSchema] {} 승격 실패: {}", datasetCode, e.getMessage(), e);
-            String msg = "승격 실패: " + e.getMessage();
-            lastResultByDatasetCode.put(datasetCode, msg);
-            return Map.of("success", false, "message", msg);
-        }
+        return executeOperation(dateRangeSlugToDatasetCode.getOrDefault(slug, ""), "PROMOTE", itemId, (targetJdbc, orgCd) -> {
+            String datasetCode = dateRangeSlugToDatasetCode.get(slug);
+            if (datasetCode == null) {
+                return Map.of("success", false, "message", "알 수 없는 서비스: " + slug);
+            }
+            KrasDateRangeServiceMapper mapper = dateRangeMappersByDatasetCode.get(datasetCode);
+            try {
+                KrasDateRangeIngestService.PromoteResult result =
+                        dateRangeIngestService.promote(targetJdbc, orgCd, mapper, itemId);
+                String msg = "승격 성공: item_id=%d".formatted(result.itemId());
+                lastResultByDatasetCode.put(datasetCode, msg);
+                return Map.of("success", true, "itemId", result.itemId(), "message", msg);
+            } catch (Exception e) {
+                log.error("[KrasSchema] {} 승격 실패: {}", datasetCode, e.getMessage(), e);
+                String msg = "승격 실패: " + e.getMessage();
+                lastResultByDatasetCode.put(datasetCode, msg);
+                return Map.of("success", false, "message", msg);
+            }
+        });
     }
 
     private static final com.fasterxml.jackson.databind.ObjectMapper EXTRA_PARAMS_MAPPER =
             new com.fasterxml.jackson.databind.ObjectMapper();
 
     /** {"cbldg_seqno":"0285"} 형태의 JSON 문자열을 Map으로 파싱한다. 비어있으면 빈 Map. */
-    @SuppressWarnings("unchecked")
     private static Map<String, String> parseExtraParams(String json) throws Exception {
         if (json == null || json.isBlank()) {
             return Map.of();
         }
-        return EXTRA_PARAMS_MAPPER.readValue(json, Map.class);
+        var node = EXTRA_PARAMS_MAPPER.readTree(json);
+        if (!node.isObject()) throw new IllegalArgumentException("문자열 값을 가진 JSON 객체를 입력하세요.");
+        Map<String, String> params = new HashMap<>();
+        var fields = node.fields();
+        while (fields.hasNext()) {
+            var field = fields.next();
+            if (field.getKey().isBlank() || !field.getValue().isTextual()) {
+                throw new IllegalArgumentException("추가 파라미터의 키와 값은 문자열이어야 합니다.");
+            }
+            params.put(field.getKey(), field.getValue().textValue());
+        }
+        return params;
     }
 
     private static String capitalize(String s) {
@@ -761,6 +805,45 @@ public class KrasSchemaController {
                 .findFirst()
                 .orElseThrow(() -> new IllegalStateException(
                         "base-tables.xml에 " + CADASTRAL_TGT_TABLE + " 정의가 없습니다."));
+    }
+
+    @FunctionalInterface
+    private interface Operation {
+        Map<String, Object> run(JdbcTemplate jdbc, String orgCd) throws Exception;
+    }
+
+    private Map<String, Object> executeOperation(String dataset, String action, Long itemId, Operation operation) {
+        return executeOperation(dataset, action, itemId, "", operation);
+    }
+
+    private Map<String, Object> executeOperation(String dataset, String action, Long itemId,
+                                                 String requestSummary, Operation operation) {
+        String orgCd = settings.orgCode();
+        AtomicBoolean lock = operationLocks.computeIfAbsent(orgCd + ":" + dataset, key -> new AtomicBoolean());
+        if (!lock.compareAndSet(false, true)) {
+            return Map.of("success", false, "message", "같은 연계의 작업이 이미 실행 중입니다.");
+        }
+        try {
+            JdbcTemplate targetJdbc = jdbc();
+            return operationLog.execute(targetJdbc, orgCd, dataset, action, itemId, requestSummary, () -> {
+                historyService.requireReady(targetJdbc, dataset);
+                if ("SWEEP".equals(action)) historyService.requireReady(targetJdbc, "layer_list");
+                if (itemId != null) {
+                    List<String> statuses = targetJdbc.query(
+                            "SELECT status FROM kras.sync_item WHERE item_id=? AND org_cd=? AND dataset_code=?",
+                            (rs, rowNum) -> rs.getString(1), itemId, orgCd, dataset);
+                    if (statuses.isEmpty() || !"SUCCESS".equals(statuses.get(0))) {
+                        throw new IllegalArgumentException("현재 기관·데이터셋의 검증된 수집 건만 반영할 수 있습니다.");
+                    }
+                }
+                return operation.run(targetJdbc, orgCd);
+            });
+        } catch (Exception e) {
+            log.error("[KrasSchema] 작업 준비 실패", e);
+            return Map.of("success", false, "message", "작업 준비 실패: DB 연결 및 설정을 확인하세요.");
+        } finally {
+            lock.set(false);
+        }
     }
 
     private JdbcTemplate jdbc() {

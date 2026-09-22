@@ -271,7 +271,8 @@ public class KrasPnuIngestService {
     private PromoteResult promoteInTransaction(JdbcTemplate tx, String orgCd, KrasXmlServiceMapper mapper,
                                                 long itemId) {
         String status = tx.queryForObject(
-                "SELECT status FROM kras.sync_item WHERE item_id=? AND org_cd=?", String.class, itemId, orgCd);
+                "SELECT status FROM kras.sync_item WHERE item_id=? AND org_cd=? AND dataset_code=?",
+                String.class, itemId, orgCd, mapper.datasetCode());
         if (!"SUCCESS".equals(status)) {
             throw new IllegalStateException("item_id=" + itemId + "은 SUCCESS 상태가 아닙니다(파싱 경고로 보류됐거나 "
                     + "잘못된 item일 수 있습니다). status=" + status);

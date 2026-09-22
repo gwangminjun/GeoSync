@@ -4,7 +4,7 @@
       layout:decorate="~{layout}" lang="ko">
 
 <head>
-<title>kras 적재(신규)</title>
+<title>KRAS 연계 관리</title>
 <th:block layout:fragment="head">
 <style>
   .card{background:#1b2029;border:1px solid #232a34;border-radius:14px;padding:26px 28px;margin-bottom:20px;}
@@ -29,6 +29,18 @@
     background:#14171c;border:1px solid #232a34;color:#c8cdd4;white-space:pre-wrap;word-break:break-all;}
   .result-box.ok{border-color:#1a4a44;color:#5fc98a;}
   .result-box.err{border-color:#4a2a2a;color:#e88a82;}
+  .result-box.warn{border-color:#6b5227;color:#e0b963;}
+  .history-scroll{overflow-x:auto;margin-top:12px;}
+  .history-scroll table{min-width:980px;}
+  .history-scroll td{white-space:pre-line;overflow-wrap:anywhere;max-width:330px;}
+  .history-scroll button{white-space:nowrap;}
+  .history-toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+  .history-toolbar select{background:#14171c;color:#c8cdd4;border:1px solid #2e3640;border-radius:8px;padding:8px;max-width:100%;}
+  .history-help{color:#9aa2ad;font-size:13px;line-height:1.7;margin:10px 0;}
+  #history-preview{max-height:400px;overflow:auto;}
+  #history-detail{margin-top:18px;border-top:1px solid #2e3640;padding-top:16px;}
+  .history-status{white-space:nowrap;}
+  @media(max-width:640px){.card{padding:18px 14px;}.stat-row{gap:12px;flex-wrap:wrap;}}
   table.hist-table{width:100%;border-collapse:collapse;font-size:12.5px;}
   table.hist-table th{text-align:left;padding:8px 10px;color:#69707b;font-weight:500;font-size:11px;
     text-transform:uppercase;letter-spacing:.04em;border-bottom:1px solid #232a34;}
@@ -44,13 +56,47 @@
 <main layout:fragment="content">
 
   <div style="margin-bottom:24px;">
-    <h1 style="font-size:22px;font-weight:700;color:#e7eaee;">kras 적재(신규)</h1>
+    <h1 style="font-size:22px;font-weight:700;color:#e7eaee;">KRAS 연계 관리</h1>
     <p style="margin-top:6px;font-size:13.5px;color:#69707b;">
-      연속지적(lp_pa_cbnd) 1단계. 기존 KRAS 동기화와 완전히 별개 경로 — 여기서 문제가 생겨도 기존 화면·스케줄에는 영향 없음.
+      토지·건물·공간·가격 데이터의 수집 상태를 확인하고, 검증한 수집 건을 업무 테이블 또는 지도 서비스에 반영합니다.
     </p>
   </div>
 
   <div th:if="${message}" class="flash-banner" th:text="${message}"></div>
+
+  <section class="card" id="integration-history" aria-labelledby="history-title">
+    <h2 class="card-title" id="history-title">전체 연계 작업 이력</h2>
+    <div class="history-toolbar">
+      <label for="history-dataset">연계 선택</label>
+      <select id="history-dataset"><option value="">전체 연계</option></select>
+      <button type="button" class="btn btn-secondary" id="history-refresh">이력 새로고침</button>
+      <button type="button" class="btn btn-secondary" id="history-check">실행 조건 확인</button>
+    </div>
+    <p class="history-help">수집 건을 선택하면 새로고침 후에도 미리보기를 확인하고 반영을 이어갈 수 있습니다. 최신 50건을 표시합니다.</p>
+    <div id="history-message" class="result-box" role="status" aria-live="polite">이력을 불러오는 중입니다.</div>
+    <details open>
+      <summary>수집 이력</summary>
+      <div class="history-scroll"><table class="hist-table">
+        <thead><tr><th>수집 ID</th><th>연계 / 대상</th><th>수집 상태</th><th>정상 / 제외</th><th>수집 기간 / 실행 시작</th><th>확인</th></tr></thead>
+        <tbody id="history-items"></tbody>
+      </table></div>
+    </details>
+    <details>
+      <summary>실행 기록 · 실패 원인</summary>
+      <p class="history-help">수집·반영의 실행 결과를 기록합니다. 과거 기록이 없는 건의 반영 여부는 별도 확인이 필요합니다. 실행 중 표시가 오래 지속되면 서버 로그와 실제 작업 상태를 확인하세요.</p>
+      <div class="history-scroll"><table class="hist-table">
+        <thead><tr><th>연계 / 작업</th><th>결과</th><th>시작 / 종료</th><th>수집 ID</th><th>내용</th></tr></thead>
+        <tbody id="history-operations"></tbody>
+      </table></div>
+    </details>
+    <div id="history-detail" hidden>
+      <h3 id="history-detail-title" class="card-title"></h3>
+      <p class="history-help">테이블별 최대 100행의 미리보기입니다. 이전 수집 건을 반영하면 최신 업무 데이터가 과거 값으로 바뀔 수 있으므로 대상과 시점을 확인하세요.</p>
+      <div id="history-detail-reasons" class="result-box"></div>
+      <pre id="history-preview" class="result-box"></pre>
+      <button type="button" id="history-promote" class="btn btn-primary" disabled>선택한 수집 건 업무 테이블 반영</button>
+    </div>
+  </section>
 
   <!-- 카드 1: 데이터셋 계약 상태 -->
   <div class="card">
@@ -163,7 +209,7 @@
              style="padding:8px 12px;border-radius:8px;border:1px solid #2e3640;background:#14171c;color:#e7eaee;font-family:'JetBrains Mono',monospace;width:220px;">
       <button class="btn btn-primary" id="btn-land-info-ingest" th:disabled="${landInfoRunning}"
               onclick="runLandInfoIngest()">테스트 수집</button>
-      <button class="btn btn-secondary" id="btn-land-info-promote" th:disabled="${landInfoRunning}" disabled
+      <button class="btn btn-secondary" id="btn-land-info-promote" disabled
               onclick="runLandInfoPromote()">업무 테이블로 승격</button>
     </div>
     <div id="land-info-result" class="result-box" th:if="${lastLandInfoResult}" th:text="${lastLandInfoResult}"></div>
@@ -235,7 +281,7 @@
              style="padding:8px 12px;border-radius:8px;border:1px solid #2e3640;background:#14171c;color:#e7eaee;font-family:'JetBrains Mono',monospace;width:220px;">
       <button class="btn btn-primary" id="btn-land-bldg-check-ingest" th:disabled="${landBldgCheckRunning}"
               onclick="runLandBldgCheckIngest()">테스트 수집</button>
-      <button class="btn btn-secondary" id="btn-land-bldg-check-promote" th:disabled="${landBldgCheckRunning}" disabled
+      <button class="btn btn-secondary" id="btn-land-bldg-check-promote" disabled
               onclick="runLandBldgCheckPromote()">업무 테이블로 승격</button>
     </div>
     <div id="land-bldg-check-result" class="result-box" th:if="${lastLandBldgCheckResult}" th:text="${lastLandBldgCheckResult}"></div>
@@ -308,7 +354,7 @@
              style="padding:8px 12px;border-radius:8px;border:1px solid #2e3640;background:#14171c;color:#e7eaee;font-family:'JetBrains Mono',monospace;width:220px;">
       <button class="btn btn-primary" id="btn-collective-building-ingest" th:disabled="${collectiveBuildingRunning}"
               onclick="runCollectiveBuildingIngest()">테스트 수집</button>
-      <button class="btn btn-secondary" id="btn-collective-building-promote" th:disabled="${collectiveBuildingRunning}" disabled
+      <button class="btn btn-secondary" id="btn-collective-building-promote" disabled
               onclick="runCollectiveBuildingPromote()">업무 테이블로 승격</button>
     </div>
     <p style="font-size:12px;color:#5b626d;margin-top:10px;">conn_svc_id가 없어 지금은 테스트 수집을 눌러도 바로 실패 메시지가 뜹니다 — 위 카드 설명 참고.</p>
@@ -384,7 +430,7 @@
              style="padding:8px 12px;border-radius:8px;border:1px solid #2e3640;background:#14171c;color:#e7eaee;font-family:'JetBrains Mono',monospace;width:220px;">
       <button class="btn btn-primary" id="btn-shr-ymb-ingest" th:disabled="${shrYmbRunning}"
               onclick="runShrYmbIngest()">테스트 수집</button>
-      <button class="btn btn-secondary" id="btn-shr-ymb-promote" th:disabled="${shrYmbRunning}" disabled
+      <button class="btn btn-secondary" id="btn-shr-ymb-promote" disabled
               onclick="runShrYmbPromote()">업무 테이블로 승격</button>
     </div>
     <div id="shr-ymb-result" class="result-box" th:if="${lastShrYmbResult}" th:text="${lastShrYmbResult}"></div>
@@ -456,7 +502,7 @@
              style="padding:8px 12px;border-radius:8px;border:1px solid #2e3640;background:#14171c;color:#e7eaee;font-family:'JetBrains Mono',monospace;width:220px;">
       <button class="btn btn-primary" id="btn-own-rgt-hist-ingest" th:disabled="${ownRgtHistRunning}"
               onclick="runOwnRgtHistIngest()">테스트 수집</button>
-      <button class="btn btn-secondary" id="btn-own-rgt-hist-promote" th:disabled="${ownRgtHistRunning}" disabled
+      <button class="btn btn-secondary" id="btn-own-rgt-hist-promote" disabled
               onclick="runOwnRgtHistPromote()">업무 테이블로 승격</button>
     </div>
     <div id="own-rgt-hist-result" class="result-box" th:if="${lastOwnRgtHistResult}" th:text="${lastOwnRgtHistResult}"></div>
@@ -532,7 +578,7 @@
              style="padding:8px 12px;border-radius:8px;border:1px solid #2e3640;background:#14171c;color:#e7eaee;font-family:'JetBrains Mono',monospace;width:220px;">
       <button class="btn btn-primary" id="btn-land-mov-hist-ingest" th:disabled="${landMovHistRunning}"
               onclick="runLandMovHistIngest()">테스트 수집</button>
-      <button class="btn btn-secondary" id="btn-land-mov-hist-promote" th:disabled="${landMovHistRunning}" disabled
+      <button class="btn btn-secondary" id="btn-land-mov-hist-promote" disabled
               onclick="runLandMovHistPromote()">업무 테이블로 승격</button>
     </div>
     <div id="land-mov-hist-result" class="result-box" th:if="${lastLandMovHistResult}" th:text="${lastLandMovHistResult}"></div>
@@ -603,7 +649,7 @@
     <div style="display:flex;gap:10px;">
       <button class="btn btn-primary" id="btn-collective-unit-ingest" th:disabled="${collectiveUnitRunning}"
               onclick="runCollectiveUnitIngest()">테스트 수집</button>
-      <button class="btn btn-secondary" id="btn-collective-unit-promote" th:disabled="${collectiveUnitRunning}" disabled
+      <button class="btn btn-secondary" id="btn-collective-unit-promote" disabled
               onclick="runCollectiveUnitPromote()">업무 테이블로 승격</button>
     </div>
     <div id="collective-unit-result" class="result-box" th:if="${lastCollectiveUnitResult}" th:text="${lastCollectiveUnitResult}"></div>
@@ -653,7 +699,7 @@
     </div>
     <div style="display:flex;gap:10px;margin-top:10px;">
       <button class="btn btn-primary" id="btn-land-right-ingest" th:disabled="${landRightRunning}" onclick="runLandRightIngest()">테스트 수집</button>
-      <button class="btn btn-secondary" id="btn-land-right-promote" th:disabled="${landRightRunning}" disabled onclick="runLandRightPromote()">업무 테이블로 승격</button>
+      <button class="btn btn-secondary" id="btn-land-right-promote" disabled onclick="runLandRightPromote()">업무 테이블로 승격</button>
     </div>
     <div id="land-right-result" class="result-box" th:if="${lastLandRightResult}" th:text="${lastLandRightResult}"></div>
     <div id="land-right-result-js" class="result-box" style="display:none;"></div>
@@ -703,7 +749,7 @@
     </div>
     <div style="display:flex;gap:10px;margin-top:10px;">
       <button class="btn btn-primary" id="btn-unit-ownership-history-ingest" th:disabled="${unitOwnershipHistoryRunning}" onclick="runUnitOwnershipHistoryIngest()">테스트 수집</button>
-      <button class="btn btn-secondary" id="btn-unit-ownership-history-promote" th:disabled="${unitOwnershipHistoryRunning}" disabled onclick="runUnitOwnershipHistoryPromote()">업무 테이블로 승격</button>
+      <button class="btn btn-secondary" id="btn-unit-ownership-history-promote" disabled onclick="runUnitOwnershipHistoryPromote()">업무 테이블로 승격</button>
     </div>
     <div id="unit-ownership-history-result" class="result-box" th:if="${lastUnitOwnershipHistoryResult}" th:text="${lastUnitOwnershipHistoryResult}"></div>
     <div id="unit-ownership-history-result-js" class="result-box" style="display:none;"></div>
@@ -748,7 +794,7 @@
       <input type="text" id="integrated-building-pnu" placeholder="PNU 19자리" maxlength="19"
              style="padding:8px 12px;border-radius:8px;border:1px solid #2e3640;background:#14171c;color:#e7eaee;font-family:'JetBrains Mono',monospace;width:220px;">
       <button class="btn btn-primary" id="btn-integrated-building-ingest" th:disabled="${integratedBuildingRunning}" onclick="runIntegratedBuildingIngest()">테스트 수집</button>
-      <button class="btn btn-secondary" id="btn-integrated-building-promote" th:disabled="${integratedBuildingRunning}" disabled onclick="runIntegratedBuildingPromote()">업무 테이블로 승격</button>
+      <button class="btn btn-secondary" id="btn-integrated-building-promote" disabled onclick="runIntegratedBuildingPromote()">업무 테이블로 승격</button>
     </div>
     <div id="integrated-building-result" class="result-box" th:if="${lastIntegratedBuildingResult}" th:text="${lastIntegratedBuildingResult}"></div>
     <div id="integrated-building-result-js" class="result-box" style="display:none;"></div>
@@ -798,7 +844,7 @@
       <input type="text" id="building-image-extra-params" placeholder='추가 파라미터(JSON), 예: {"width":"800","height":"600","scale":"1000"}'
              style="padding:8px 12px;border-radius:8px;border:1px solid #2e3640;background:#14171c;color:#e7eaee;font-family:'JetBrains Mono',monospace;flex:1;min-width:260px;">
       <button class="btn btn-primary" id="btn-building-image-ingest" th:disabled="${buildingImageRunning}" onclick="runBuildingImageIngest()">테스트 수집</button>
-      <button class="btn btn-secondary" id="btn-building-image-promote" th:disabled="${buildingImageRunning}" disabled onclick="runBuildingImagePromote()">업무 테이블로 승격</button>
+      <button class="btn btn-secondary" id="btn-building-image-promote" disabled onclick="runBuildingImagePromote()">업무 테이블로 승격</button>
     </div>
     <div id="building-image-result" class="result-box" th:if="${lastBuildingImageResult}" th:text="${lastBuildingImageResult}"></div>
     <div id="building-image-result-js" class="result-box" style="display:none;"></div>
@@ -849,7 +895,7 @@
     </div>
     <div style="display:flex;gap:10px;margin-top:10px;">
       <button class="btn btn-primary" id="btn-land-change-ingest" th:disabled="${landChangeRunning}" onclick="runLandChangeIngest()">테스트 수집</button>
-      <button class="btn btn-secondary" id="btn-land-change-promote" th:disabled="${landChangeRunning}" disabled onclick="runLandChangePromote()">업무 테이블로 승격</button>
+      <button class="btn btn-secondary" id="btn-land-change-promote" disabled onclick="runLandChangePromote()">업무 테이블로 승격</button>
     </div>
     <div id="land-change-result" class="result-box" th:if="${lastLandChangeResult}" th:text="${lastLandChangeResult}"></div>
     <div id="land-change-result-js" class="result-box" style="display:none;"></div>
@@ -913,9 +959,9 @@
     </div>
     <div style="display:flex;gap:10px;">
       <button class="btn btn-primary" th:id="'btn-' + ${d.slug} + '-ingest'" th:disabled="${d.running}"
-              th:attr="onclick='runPnuIngest('' + ${d.slug} + '')'">테스트 수집</button>
-      <button class="btn btn-secondary" th:id="'btn-' + ${d.slug} + '-promote'" th:disabled="${d.running}" disabled
-              th:attr="onclick='runPnuPromote('' + ${d.slug} + '')'">업무 테이블로 승격</button>
+              th:attr="data-slug=${d.slug}" onclick="runPnuIngest(this.dataset.slug)">테스트 수집</button>
+      <button class="btn btn-secondary" th:id="'btn-' + ${d.slug} + '-promote'" disabled
+              th:attr="data-slug=${d.slug}" onclick="runPnuPromote(this.dataset.slug)">업무 테이블로 승격</button>
     </div>
     <div class="result-box" th:if="${d.lastResult}" th:text="${d.lastResult}"></div>
     <div th:id="${d.slug} + '-result-js'" class="result-box" style="display:none;"></div>
@@ -1044,7 +1090,7 @@
       별도 트랜잭션이라 일부 실패해도 나머지는 유지 — 실패한 레이어만 버튼을 다시 누르면 재시도) →
       <b>③release 발행</b>(전체 레이어 완전성 검증, 하나라도 미완료면 막힘) → <b>④public 승격</b>(public.lt_c_uzone 반영).
     </p>
-    <div class="stat-row" style="margin-bottom:14px;">
+    <div class="stat-row" id="usezone-counts" style="margin-bottom:14px;">
       <div class="stat-box">
         <div class="stat-label">최근 카탈로그 item_id</div>
         <div class="stat-value" th:text="${latestCatalogItemId ?: '없음'}">없음</div>
@@ -1069,9 +1115,10 @@
       <button class="btn btn-secondary" id="btn-usezone-publish" th:disabled="${usezoneRunning or usezoneReleaseId == null}"
               th:attr="data-release-id=${usezoneReleaseId}" onclick="runUsezonePublish()">③release 발행</button>
       <button class="btn btn-secondary" id="btn-usezone-sync-public" th:disabled="${usezoneRunning}" onclick="runUsezoneSyncPublic()">④public 승격</button>
+      <button class="btn btn-secondary" onclick="refreshUsezoneSnapshot().catch(error => alert(error.message))">진행상태 새로고침</button>
     </div>
-    <div style="overflow-x:auto;margin-bottom:14px;" th:if="${not #lists.isEmpty(usezoneReleaseLayers)}">
-      <table class="hist-table">
+    <div id="usezone-release-layers" style="overflow-x:auto;margin-bottom:14px;">
+      <table class="hist-table" th:if="${not #lists.isEmpty(usezoneReleaseLayers)}">
         <thead><tr><th>layer_code</th><th>status</th><th>rows_valid</th></tr></thead>
         <tbody>
           <tr th:each="l : ${usezoneReleaseLayers}">
@@ -1145,7 +1192,7 @@
     <div style="display:flex;gap:10px;flex-wrap:wrap;">
       <button class="btn btn-primary" id="btn-land-basic-file-ingest" th:disabled="${landBasicFileRunning}"
               onclick="runLandBasicFileIngest()">전체 TXT 수집</button>
-      <button class="btn btn-secondary" id="btn-land-basic-file-promote" th:disabled="${landBasicFileRunning}" disabled
+      <button class="btn btn-secondary" id="btn-land-basic-file-promote" disabled
               onclick="runLandBasicFilePromote()">업무 테이블로 승격</button>
     </div>
     <div id="land-basic-file-result" class="result-box" th:if="${lastLandBasicFileResult}" th:text="${lastLandBasicFileResult}"></div>
@@ -1203,6 +1250,7 @@
 </main>
 
 <th:block layout:fragment="scripts">
+<script src="/js/kras-history.js"></script>
 <script>
 async function runIngest() { await run('/kras-db/ingest/cadastral', 'btn-ingest'); }
 async function runPromote() { await run('/kras-db/promote/cadastral', 'btn-promote'); }
@@ -1217,10 +1265,11 @@ async function run(url, btnId) {
   box.className = 'result-box';
   box.textContent = '실행 중...';
   try {
-    const res = await fetch(url, { method: 'POST' });
+    const res = await krasRequest(url, { method: 'POST' });
     const data = await res.json();
-    box.textContent = data.message || JSON.stringify(data);
-    box.classList.add(data.success ? 'ok' : 'err');
+    box.textContent = krasResultMessage(data);
+    box.classList.add(krasResultClass(data));
+    if (window.refreshKrasHistory) await window.refreshKrasHistory();
   } catch (err) {
     box.textContent = '요청 실패: ' + err;
     box.classList.add('err');
@@ -1234,6 +1283,7 @@ async function run(url, btnId) {
 const pnuItemIds = {};
 
 async function runPnuIngest(slug) {
+  pnuItemIds[slug] = null;
   const pnu = document.getElementById(slug + '-pnu').value.trim();
   const ingestBtn = document.getElementById('btn-' + slug + '-ingest');
   const promoteBtn = document.getElementById('btn-' + slug + '-promote');
@@ -1250,10 +1300,11 @@ async function runPnuIngest(slug) {
   try {
     let url = '/kras-db/ingest/' + slug + '?pnu=' + encodeURIComponent(pnu);
     if (extraParams) url += '&extraParamsJson=' + encodeURIComponent(extraParams);
-    const res = await fetch(url, { method: 'POST' });
+    const res = await krasRequest(url, { method: 'POST' });
     const data = await res.json();
-    box.textContent = data.message || JSON.stringify(data);
-    box.classList.add(data.success ? 'ok' : 'err');
+    box.textContent = krasResultMessage(data);
+    box.classList.add(krasResultClass(data));
+    if (window.refreshKrasHistory) await window.refreshKrasHistory();
     if (data.success && data.preview) {
       preview.style.display = 'block';
       preview.textContent = JSON.stringify(data.preview, null, 2);
@@ -1284,10 +1335,11 @@ async function runPnuPromote(slug) {
   box.className = 'result-box';
   box.textContent = '승격 중...';
   try {
-    const res = await fetch('/kras-db/promote/' + slug + '?itemId=' + itemId, { method: 'POST' });
+    const res = await krasRequest('/kras-db/promote/' + slug + '?itemId=' + itemId, { method: 'POST' });
     const data = await res.json();
-    box.textContent = data.message || JSON.stringify(data);
-    box.classList.add(data.success ? 'ok' : 'err');
+    box.textContent = krasResultMessage(data);
+    box.classList.add(krasResultClass(data));
+    if (window.refreshKrasHistory) await window.refreshKrasHistory();
   } catch (err) {
     box.textContent = '요청 실패: ' + err;
     box.classList.add('err');
@@ -1301,6 +1353,7 @@ async function runPnuPromote(slug) {
 const rangeItemIds = {};
 
 async function runDateRangeIngest(slug) {
+  rangeItemIds[slug] = null;
   const start = document.getElementById(slug + '-start').value;
   const end = document.getElementById(slug + '-end').value;
   const ingestBtn = document.getElementById('btn-' + slug + '-ingest');
@@ -1318,10 +1371,11 @@ async function runDateRangeIngest(slug) {
   try {
     let url = '/kras-db/ingest-range/' + slug + '?startDate=' + encodeURIComponent(start) + '&endDate=' + encodeURIComponent(end);
     if (extraParams) url += '&extraParamsJson=' + encodeURIComponent(extraParams);
-    const res = await fetch(url, { method: 'POST' });
+    const res = await krasRequest(url, { method: 'POST' });
     const data = await res.json();
-    box.textContent = data.message || JSON.stringify(data);
-    box.classList.add(data.success ? 'ok' : 'err');
+    box.textContent = krasResultMessage(data);
+    box.classList.add(krasResultClass(data));
+    if (window.refreshKrasHistory) await window.refreshKrasHistory();
     if (data.success && data.preview) {
       preview.style.display = 'block';
       preview.textContent = JSON.stringify(data.preview, null, 2);
@@ -1352,10 +1406,11 @@ async function runDateRangePromote(slug) {
   box.className = 'result-box';
   box.textContent = '승격 중...';
   try {
-    const res = await fetch('/kras-db/promote-range/' + slug + '?itemId=' + itemId, { method: 'POST' });
+    const res = await krasRequest('/kras-db/promote-range/' + slug + '?itemId=' + itemId, { method: 'POST' });
     const data = await res.json();
-    box.textContent = data.message || JSON.stringify(data);
-    box.classList.add(data.success ? 'ok' : 'err');
+    box.textContent = krasResultMessage(data);
+    box.classList.add(krasResultClass(data));
+    if (window.refreshKrasHistory) await window.refreshKrasHistory();
   } catch (err) {
     box.textContent = '요청 실패: ' + err;
     box.classList.add('err');
@@ -1391,9 +1446,21 @@ function runIntegratedBuildingPromote() { return runPnuPromote('integrated-build
 function runBuildingImageIngest() { return runPnuIngest('building-image'); }
 function runBuildingImagePromote() { return runPnuPromote('building-image'); }
 
-// 용도지역 배치(설계 §9.2) — 4버튼, 성공하면 페이지를 새로고침해 최신 상태(item_id/release_id/레이어 표)를 반영한다.
+// 전체 페이지 이동 없이 상태만 갱신해 실패 레이어 메시지와 다른 카드의 선택을 보존한다.
+async function refreshUsezoneSnapshot() {
+  const response = await krasRequest('/kras-db');
+  const updated = new DOMParser().parseFromString(await response.text(), 'text/html');
+  for (const id of ['usezone-counts', 'usezone-release-layers']) {
+    const source = updated.getElementById(id);
+    if (!source) throw new Error('진행상태를 읽지 못했습니다. 페이지를 새로고침하세요.');
+    document.getElementById(id).replaceChildren(...Array.from(source.childNodes));
+  }
+}
+
 async function runUsezoneAction(url, method) {
   const btns = ['btn-usezone-catalog', 'btn-usezone-sweep', 'btn-usezone-publish', 'btn-usezone-sync-public'];
+  const previousDisabled = btns.map(id => document.getElementById(id).disabled);
+  let completed = null;
   btns.forEach(id => document.getElementById(id).disabled = true);
   const box = document.getElementById('usezone-result-js');
   const layersBox = document.getElementById('usezone-layers-js');
@@ -1402,22 +1469,35 @@ async function runUsezoneAction(url, method) {
   box.textContent = '실행 중...';
   layersBox.style.display = 'none';
   try {
-    const res = await fetch(url, { method: method || 'POST' });
+    const res = await krasRequest(url, { method: method || 'POST' });
     const data = await res.json();
-    box.textContent = data.message || JSON.stringify(data);
-    box.classList.add(data.success ? 'ok' : 'err');
+    box.textContent = krasResultMessage(data);
+    box.classList.add(krasResultClass(data));
+    if (window.refreshKrasHistory) await window.refreshKrasHistory();
     if (data.success && data.layers) {
       layersBox.style.display = 'block';
       layersBox.textContent = JSON.stringify(data.layers, null, 2);
     }
-    if (data.success) {
-      setTimeout(() => location.reload(), 1500);
-    }
+    completed = data;
+    try { await refreshUsezoneSnapshot(); }
+    catch (error) { box.textContent += '\n상태 갱신 실패: ' + error.message; }
   } catch (err) {
     box.textContent = '요청 실패: ' + err;
     box.classList.add('err');
   } finally {
-    btns.forEach(id => { const el = document.getElementById(id); if (el) el.disabled = false; });
+    btns.forEach((id, index) => { document.getElementById(id).disabled = previousDisabled[index]; });
+    if (completed && completed.success) {
+      if (completed.itemId && url.endsWith('/collect-catalog')) {
+        const sweep = document.getElementById('btn-usezone-sweep');
+        sweep.dataset.catalogItemId = completed.itemId;
+        sweep.disabled = false;
+      }
+      if (completed.releaseId) {
+        const publish = document.getElementById('btn-usezone-publish');
+        publish.dataset.releaseId = completed.releaseId;
+        publish.disabled = completed.outcome === 'PARTIAL' || completed.outcome === 'FAILED';
+      }
+    }
   }
 }
 
@@ -1435,6 +1515,7 @@ function runUsezoneSyncPublic() { return runUsezoneAction('/kras-db/usezone/sync
 // 전체 TXT 2종 — PNU가 없어 runPnuIngest를 못 쓴다(입력값 자체가 없음). 수집 성공 시 item_id를 기억해 승격을 연다.
 const txtItemIds = {};
 async function runTxtAction(slug, url) {
+  if (url.includes('/ingest/')) txtItemIds[slug] = null;
   const ingestBtn = document.getElementById('btn-' + slug + '-ingest');
   const promoteBtn = document.getElementById('btn-' + slug + '-promote');
   const box = document.getElementById(slug + '-result-js');
@@ -1444,10 +1525,11 @@ async function runTxtAction(slug, url) {
   box.className = 'result-box';
   box.textContent = '실행 중... (전체 파일이라 시간이 걸릴 수 있습니다)';
   try {
-    const res = await fetch(url, { method: 'POST' });
+    const res = await krasRequest(url, { method: 'POST' });
     const data = await res.json();
-    box.textContent = data.message || JSON.stringify(data);
-    box.classList.add(data.success ? 'ok' : 'err');
+    box.textContent = krasResultMessage(data);
+    box.classList.add(krasResultClass(data));
+    if (window.refreshKrasHistory) await window.refreshKrasHistory();
     if (data.success && data.promotable && data.itemId) txtItemIds[slug] = data.itemId;
   } catch (err) {
     box.textContent = '요청 실패: ' + err;
