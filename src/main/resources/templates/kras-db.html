@@ -191,7 +191,7 @@
             <td>ADM_SECT_CD, LAND_LOC_CD, LEDG_GBN, BOBN, BUBN</td>
             <td>kras.stage_parcel</td>
             <td>kras.parcel</td>
-            <td>land_info와 동일하게 PNU 직접 분해값과 대조(docs/reference/kras.md §3)</td>
+            <td>land_info와 동일하게 PNU 직접 분해값과 대조(docs/reference/2026-09-18/kras.md §3)</td>
           </tr>
           <tr>
             <td>REAL_GBN, SECT_LOC_CD, ADM_SECT_NM, SECT_LOC_NM, MAP_GBN</td>
@@ -253,7 +253,7 @@
       <span class="badge" style="background:#3a1f1f;color:#e88a82;">conn_svc_id 미확인</span>
     </div>
     <p style="font-size:13px;color:#9aa2ad;margin-bottom:14px;">
-      "대지권등록부(건물조회)" — PNU 하나에 집합건물이 여러 동이면 응답이 반복 구조(docs/reference/kras.md §4)라
+      "대지권등록부(건물조회)" — PNU 하나에 집합건물이 여러 동이면 응답이 반복 구조(docs/reference/2026-09-18/kras.md §4)라
       승격도 land_info/land_bldg_check와 다른 방식(신원 매칭 후 UPSERT, pnu+cbldg_seqno)을 씁니다.
       실제 KRAS conn_svc_id가 이 저장소 어디에도 없어서(kras.sync_dataset.service_code=NULL) 매퍼는
       완성됐지만 실제 호출은 막혀 있습니다 — 담당자가 ID를 확인해 <code>CollectiveBuildingMapper.connSvcId()</code>에
@@ -330,7 +330,7 @@
       <a href="/api-test?api=conn/shr_ymb" target="_blank" style="text-transform:none;letter-spacing:normal;font-weight:600;color:#5fa8e8;">→ 테스트</a>
     </p>
     <p style="font-size:13px;color:#9aa2ad;margin-bottom:14px;">
-      공유인 수만큼 반복되는 응답(docs/reference/kras.md §2)이라 승격은 land_info/land_bldg_check와 달리
+      공유인 수만큼 반복되는 응답(docs/reference/2026-09-18/kras.md §2)이라 승격은 land_info/land_bldg_check와 달리
       <b>패턴 B(범위 전체 교체)</b> — pnu 범위 전체를 DELETE 후 이번 응답 전체를 다시 INSERT합니다.
       요청 필수 항목인 "말소자 포함유무"의 실제 파라미터명은 문서에 없어 보내지 않습니다 — 게이트웨이가
       필수로 거부하면 그 에러로 실제 이름을 확인해야 합니다.
@@ -405,7 +405,7 @@
       <a href="/api-test?api=conn/own_rgt_hist" target="_blank" style="text-transform:none;letter-spacing:normal;font-weight:600;color:#5fa8e8;">→ 테스트</a>
     </p>
     <p style="font-size:13px;color:#9aa2ad;margin-bottom:14px;">
-      shr_ymb와 동일한 모양(단일 레벨 반복, 자식 테이블 없음) — <b>패턴 B(범위 전체 교체)</b>로 승격합니다(docs/reference/kras.md §8).
+      shr_ymb와 동일한 모양(단일 레벨 반복, 자식 테이블 없음) — <b>패턴 B(범위 전체 교체)</b>로 승격합니다(docs/reference/2026-09-18/kras.md §8).
     </p>
     <div style="overflow-x:auto;margin-bottom:16px;">
       <table class="hist-table">
@@ -478,7 +478,7 @@
     </p>
     <p style="font-size:13px;color:#9aa2ad;margin-bottom:14px;">
       다른 서비스와 달리 <b>중첩 반복</b>입니다 — LAND_MOV_HIST(연혁) 안에 RELJIBUN(관련지번)이 또 반복됩니다
-      (docs/reference/kras.md §7). 승격은 패턴 B의 2단 변형 — 연혁을 먼저 INSERT해 새 history_id를 받고,
+      (docs/reference/2026-09-18/kras.md §7). 승격은 패턴 B의 2단 변형 — 연혁을 먼저 INSERT해 새 history_id를 받고,
       그 ID로 관련지번을 잇달아 INSERT합니다. 이 응답엔 필지 식별 태그가 없어 parcel 승격은 안 하고,
       요청 PNU에 대응하는 <code>kras.parcel</code> 행이 이미 있어야 승격이 성공합니다(FK로 강제됨) —
       먼저 land_info나 land_bldg_check로 그 PNU를 한 번 승격해두세요.
@@ -551,7 +551,7 @@
     </div>
     <p style="font-size:13px;color:#9aa2ad;margin-bottom:14px;">
       "대지권등록부(전유부조회)" — <b>드릴다운 1단계</b>: PNU만으로 안 되고 집합건물순번(CBLDG_SEQNO)이
-      추가로 필요합니다(docs/reference/kras.md §5). 먼저 위 collective_building 카드에서 그 PNU를
+      추가로 필요합니다(docs/reference/2026-09-18/kras.md §5). 먼저 위 collective_building 카드에서 그 PNU를
       수집해 cbldg_seqno 값을 확인한 뒤, 아래 "추가 파라미터(JSON)"에 그 키로 값을 넣어 호출하세요 —
       실제 KRAS 쪽 파라미터명이 정확히 "cbldg_seqno"인지는 확인되지 않아 운영자가 입력한 값을 그대로
       보냅니다. conn_svc_id도 아직 확인 전이라(service_code=NULL) 실제 호출은 막혀 있습니다.
@@ -623,7 +623,7 @@
     </div>
     <p style="font-size:13px;color:#9aa2ad;margin-bottom:14px;">
       "대지권등록부" — <b>드릴다운 2단계</b>(collective_unit 다음): cbldg_seqno+dong+flr+ho+sil이 전부
-      필요합니다(docs/reference/kras.md §6). 응답의 LAND_RGT는 <code>kras.land_right</code>로,
+      필요합니다(docs/reference/2026-09-18/kras.md §6). 응답의 LAND_RGT는 <code>kras.land_right</code>로,
       OWN_HIST는 <code>kras.unit_ownership_history</code>로(source_service='land_right') 갑니다.
       부모(collective_unit)를 먼저 승격해둬야 승격이 성공합니다. conn_svc_id 미확인이라 실제 호출은
       막혀 있습니다.
@@ -672,7 +672,7 @@
     </div>
     <p style="font-size:13px;color:#9aa2ad;margin-bottom:14px;">
       "집합건물소유권연혁" — land_right와 같은 깊이의 드릴다운이지만 <b>이 서비스는 PNU를 아예 입력받지
-      않습니다</b>(docs/reference/kras.md §9, 소재지코드+cbldg_seqno+동/층/호/실만 받음). 아래 PNU
+      않습니다</b>(docs/reference/2026-09-18/kras.md §9, 소재지코드+cbldg_seqno+동/층/호/실만 받음). 아래 PNU
       입력은 KRAS로 보내는 값이 아니라 이 매퍼가 부모(collective_unit)를 찾는 용도로만 씁니다 — 실제
       호출 시 PNU를 분해한 본번/부번까지 같이 전송될 수 있는데 이 서비스가 그걸 원치 않을 수도 있습니다
       (확인 전까지는 모름). 응답은 <code>kras.unit_ownership_history</code>에 source_service=
@@ -722,7 +722,7 @@
     </div>
     <p style="font-size:13px;color:#9aa2ad;margin-bottom:14px;">
       "건물통합정보" — PNU만 있으면 됩니다(드릴다운 아님). land_mov_hist와 같은 모양의 중첩 반복
-      (docs/reference/kras.md §13): GIS_BLDG_INTERG_INFO(건물)가 반복되고, 그 안에 RELJIBUN(관련지번)이
+      (docs/reference/2026-09-18/kras.md §13): GIS_BLDG_INTERG_INFO(건물)가 반복되고, 그 안에 RELJIBUN(관련지번)이
       또 반복됩니다. 건물 자신이 서 있는 필지(MAIN)는 요청 PNU로, 관련지번(RELATED)은 응답 그대로
       <code>kras.building_parcel</code>에 같이 승격됩니다. LAREA/BAREA 등 면적 필드는 응답에 천단위
       콤마가 붙어 있어 파싱 전에 제거합니다.
@@ -767,7 +767,7 @@
     </div>
     <p style="font-size:13px;color:#9aa2ad;margin-bottom:14px;">
       "건물통합도면" — 다른 13개와 달리 응답이 태그 나열이 아니라 base64 인코딩된 파일 한 덩어리
-      (BLDG_INTERG_IMG, docs/reference/kras.md §14)입니다. 디코딩한 원본은 kras.work-dir 아래
+      (BLDG_INTERG_IMG, docs/reference/2026-09-18/kras.md §14)입니다. 디코딩한 원본은 kras.work-dir 아래
       files/building_image/에 저장하고 kras.sync_file → kras.building_image(file_id)로 참조를 남깁니다.
       너비/높이/스케일은 선택 입력이며 실제 KRAS 쪽 파라미터명이 문서에 없어, 아래 "추가 파라미터(JSON)"에
       <code>width</code>/<code>height</code>/<code>scale</code> 키로 넣은 값을 그대로 요청에 실으면서
@@ -816,7 +816,7 @@
       <span th:if="${landChangeRunning}" class="badge badge-warn">실행 중</span>
     </div>
     <p style="font-size:13px;color:#9aa2ad;margin-bottom:14px;">
-      "토지이동 변동내역" — <b>PNU 단건이 아니라 기간(날짜 범위) 조회</b>입니다(docs/reference/kras.md §10).
+      "토지이동 변동내역" — <b>PNU 단건이 아니라 기간(날짜 범위) 조회</b>입니다(docs/reference/2026-09-18/kras.md §10).
       최대 10일까지만 조회됩니다(kras.sync_dataset.max_query_days). 응답 개수만큼 새 사건으로
       <code>kras.land_change_event</code>에 그냥 INSERT되고(패턴 D), 원본 전체는
       <code>kras.sync_record</code>에도 같이 보존됩니다. 실제 요청 파라미터(시작일/종료일 필드명)는

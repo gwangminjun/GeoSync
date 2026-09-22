@@ -14,7 +14,7 @@ import java.util.Map;
 
 /**
  * kras 스키마 연속지적(lp_pa_cbnd) 적재.
- * 설계: docs/superpowers/specs/2026-09-18-kras-ingest-implementation-design.md §4, §8.
+ * 설계: docs/superpowers/specs/2026-09-18/2026-09-18-kras-ingest-implementation-design.md §4, §8.
  *
  * KrasWorker/OdsRepository는 건드리지 않는다 — SHP를 별도로 다시 읽어 kras 스키마에만 적재한다.
  * 수집(ingest, 설계 절차 1~6)과 승격(promote, 절차 7~8)을 분리해, public.lp_pa_cbnd

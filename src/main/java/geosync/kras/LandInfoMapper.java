@@ -17,7 +17,7 @@ import static geosync.kras.KrasXmlServiceMapper.StageRow;
 
 /**
  * land_info(KRAS000002) 매퍼 — 반복 구조 없는 평평한 응답.
- * 태그 매핑: docs/superpowers/specs/2026-09-18-kras-ingest-implementation-design.md §6.2.
+ * 태그 매핑: docs/superpowers/specs/2026-09-18/2026-09-18-kras-ingest-implementation-design.md §6.2.
  */
 @Component
 public class LandInfoMapper implements KrasXmlServiceMapper {

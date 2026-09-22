@@ -13,7 +13,7 @@ import static geosync.kras.KrasStagePromotionService.StagePromotionSpec;
 
 /**
  * land_bldg_check(KRAS000101, "토지(건물) 존재 여부 조회") 매퍼 — 반복 구조 없는 평평한 응답.
- * 실제 응답 샘플: docs/reference/kras.md §3 "토지(건물) 존재 여부 조회" 결과 XML.
+ * 실제 응답 샘플: docs/reference/2026-09-18/kras.md §3 "토지(건물) 존재 여부 조회" 결과 XML.
  * land_info(§6.2)와 달리 날짜/숫자 필드가 없어 파싱 실패 케이스 자체가 없다.
  */
 @Component

@@ -1,13 +1,13 @@
 # KRAS DB 설계 재점검
 
 검토일: 2026-09-16  
-대상: [설계서](../superpowers/specs/2026-09-11-kras-database-sync-design.md), [생성 SQL](./kras-schema-create.sql), [실행 안내](./kras-schema-create.md)
+대상: [설계서](../../superpowers/specs/2026-09-11/2026-09-11-kras-database-sync-design.md), [생성 SQL](../2026-09-18/kras-schema-create.sql), [실행 안내](../2026-09-18/kras-schema-create.md)
 
 ## 판단
 
 신규 `kras` 스키마, PNU 중심 조회, 원본/업무/API 응답 분리, 공간 데이터 버전 게시라는 방향은 유지할 수 있다. 다만 현재 DDL을 **운영 반영 규칙까지 완성된 설계로 보기는 어렵다.** 정상 경로에서 스키마가 생성되는 것과 잘못된 수집 결과가 게시되지 않는 것은 별도 검증이다.
 
-새 임시 PostgreSQL 16.14/PostGIS 3.6.2 DB에 현재 SQL을 다시 적용했고, 아래 네 가지를 재현했다. 생성 SQL 자체는 수정하지 않았다. 재현 코드는 [kras-schema-review-repro.sql](./kras-schema-review-repro.sql)에 있다. 테스트 행은 ROLLBACK했고 운영 DB에 접속하지 않았다.
+새 임시 PostgreSQL 16.14/PostGIS 3.6.2 DB에 현재 SQL을 다시 적용했고, 아래 네 가지를 재현했다. 생성 SQL 자체는 수정하지 않았다. 재현 코드는 [kras-schema-review-repro.sql](../2026-09-18/kras-schema-review-repro.sql)에 있다. 테스트 행은 ROLLBACK했고 운영 DB에 접속하지 않았다.
 
 P1은 조회 결과의 완전성·정상성을 해치는 게시 경로, P2는 적재 정합성·재시도 보장 공백으로 구분했다. 아래 항목은 실제 운영 장애가 발생했다는 뜻이 아니라, 현재 SQL이 받아들이는 잘못된 상태를 확인한 것이다.
 

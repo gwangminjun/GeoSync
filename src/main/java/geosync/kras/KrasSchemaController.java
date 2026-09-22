@@ -31,7 +31,7 @@ import java.util.stream.Stream;
 /**
  * kras 스키마 신규 적재 화면(/kras-db). 기존 schedule.html/SyncController와 코드 레벨로 분리된
  * 새 컨트롤러다 — 기존 KrasWorker/SyncScheduler는 건드리지 않는다.
- * 설계: docs/superpowers/specs/2026-09-18-kras-ingest-implementation-design.md §5.
+ * 설계: docs/superpowers/specs/2026-09-18/2026-09-18-kras-ingest-implementation-design.md §5.
  *
  * PNU 단건 매퍼(land_info, land_bldg_check, ...)는 서비스가 늘어날 때마다 컨트롤러에 필드/엔드포인트
  * 쌍을 복붙하지 않도록 {@link KrasXmlServiceMapper} 구현체를 Spring이 전부 주입받아 레지스트리로

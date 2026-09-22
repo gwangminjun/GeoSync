@@ -24,9 +24,9 @@ class RepositoryLayoutTest {
 
     @Test
     void referenceDocumentsHaveApprovedLocations() {
-        assertThat(root.resolve("docs/reference/46870-data-catalog.md")).exists();
-        assertThat(root.resolve("docs/reference/lt-c-uzone-plan.md")).exists();
-        assertThat(root.resolve("docs/reference/kras-geosync-structure.md")).exists();
-        assertThat(root.resolve("docs/reviews/improvements.md")).exists();
+        assertThat(root.resolve("docs/reference/2026-09-18/46870-data-catalog.md")).exists();
+        assertThat(root.resolve("docs/reference/2026-09-10/lt-c-uzone-plan.md")).exists();
+        assertThat(root.resolve("docs/reference/2026-09-18/kras-geosync-structure.md")).exists();
+        assertThat(root.resolve("docs/reviews/2026-09-18/improvements.md")).exists();
     }
 }

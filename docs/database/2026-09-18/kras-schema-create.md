@@ -3,7 +3,7 @@
 작성일: 2026-09-11
 
 [실행 SQL: kras-schema-create.sql](./kras-schema-create.sql)  
-[기준 설계서](../superpowers/specs/2026-09-11-kras-database-sync-design.md)
+[기준 설계서](../../superpowers/specs/2026-09-11/2026-09-11-kras-database-sync-design.md)
 
 기존 PostgreSQL DB 안에 `kras` 스키마와 테이블·인덱스·조회 뷰를 생성하는 **최초 구축용 SQL**이다. 별도 데이터베이스를 생성하는 `CREATE DATABASE`는 포함하지 않는다. SQL 파일 전체를 순서대로 실행한다.
 

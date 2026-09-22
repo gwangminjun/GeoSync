@@ -34,7 +34,7 @@ import java.util.Set;
  *    레이어별로 SHP 다운로드/파싱 → spatial_feature/usezone_feature 적재 → release_member 등록.
  *    레이어당 별도 트랜잭션이라 일부만 실패해도 나머지는 유지되고, 실패한 레이어만 재시도된다.
  * 5. release 발행 — kras.publish_spatial_release()가 전체 완전성을 검증(하나라도 미완료면 막힘).
- * 6. public 승격 — 기존 kras.sync_public_usezone() 재사용(새로 안 만듦, docs/database/kras-schema-public-sync.sql).
+ * 6. public 승격 — 기존 kras.sync_public_usezone() 재사용(새로 안 만듦, docs/database/2026-09-18/kras-schema-public-sync.sql).
  *
  * theme_code/theme_name(ucode/uname)은 SHP에 없다 — KrasWorker.deriveUsezoneFields와 같은 규칙
  * (mnum 21~26번째 자리 파생 + mt_usezone_cd 코드 테이블 조회)을 그대로 재사용한다. 이 로직 자체는

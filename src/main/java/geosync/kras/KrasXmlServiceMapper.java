@@ -7,7 +7,7 @@ import java.util.Map;
 
 /**
  * PNU 단건 XML 응답 → kras.stage_* 테이블 행 매퍼.
- * 설계: docs/superpowers/specs/2026-09-18-kras-ingest-implementation-design.md §6.2.
+ * 설계: docs/superpowers/specs/2026-09-18/2026-09-18-kras-ingest-implementation-design.md §6.2.
  *
  * TableMapper/SyncTableDef(SHP용)는 컬럼 나열 방식이라 중첩 XML(반복 그룹)엔 안 맞아 재사용하지 않는다 —
  * 서비스별 구현 클래스로 만든다.
