@@ -71,9 +71,17 @@
 ### 2.2 매퍼 (XML → stage 행)
 
 ```text
-KrasXmlServiceMapper          (인터페이스) ← PNU 단건 11개 매퍼
+KrasXmlServiceMapper          (인터페이스)
+  ├─ 손으로 쓴 구현체 11개      ← kras.md에 응답 XML이 있는 서비스
+  └─ KrasSpecMapper × 14       ← kras.md에 응답 XML이 없는 서비스(KrasSpecMapperConfig의 선언)
 KrasDateRangeServiceMapper    (인터페이스) ← 기간 조회 1개 매퍼
 ```
+
+**선언형 14개를 클래스로 복붙하지 않은 이유** — 태그명이 실응답으로 확인되지 않은 가설이라
+고칠 일이 반드시 생긴다. 한 파일(`KrasSpecMapperConfig`)에 모아두면 고칠 때 한 곳만 본다.
+
+`sourceSystem()`이 `"KOREPS"`면 `KrasPnuIngestService`가 `KorepsApiClient`로 보낸다 —
+두 클라이언트의 `query()` 시그니처가 같아 분기 한 줄이면 된다.
 
 ### 2.3 공용 유틸
 
@@ -200,6 +208,10 @@ record MappingResult(List<StageRow> rows, List<String> fieldWarnings) {}
 | **C** `IDENTITY_MATCH_UPSERT` | surrogate PK이고 **DELETE 금지 목록**에 있음 | 후보 자연키로 검색 → 있으면 UPDATE, 없으면 INSERT (surrogate ID 보존) | `collective_building` |
 | **드릴다운** `PARENT_LOOKUP_IDENTITY_MATCH_UPSERT` | 부모가 먼저 승격돼 있어야 자식 식별 가능 | 부모 테이블에서 surrogate ID를 조회해 자식 신원 매칭에 사용 | `collective_unit`, `land_right`, `unit_ownership_history` |
 | **D** `APPEND_ONLY` | 자연키 없음, 매 수집이 새 사건 | INSERT만(`UNIQUE(source_item_id,record_no)`가 중복 차단) | `land_change_event`, `building_image` |
+
+자식 테이블은 **여러 개**를 붙일 수 있다(`List<ChildSpec>`). 건축물대장 표제부가 층별/소유자/변동
+3개를 거느리고, 집합건물 전유부가 면적/소유자/가격 3개를 거느린다. 드릴다운 패턴도 자식을 받는다 —
+부모는 신원 매칭으로 서로게이트 ID를 보존하고, 자식 목록만 매 호출 통째로 교체한다.
 
 **B와 C를 가르는 기준은 "이 surrogate ID를 참조하는 자식이 있는가"** 다. `collective_building_id`는
 `collective_unit`이, `unit_id`는 `land_right`가 참조한다 — ID가 매번 바뀌면 자식 관계가 끊긴다.
@@ -374,7 +386,7 @@ private static final List<DateRangeService> DATE_RANGE_SERVICES = List.of(
 
 ---
 
-## 13. 현재 구현된 데이터셋 17개
+## 13. 현재 구현된 데이터셋 31개
 
 ### SHP/파일 계열 (4)
 
@@ -400,6 +412,31 @@ private static final List<DateRangeService> DATE_RANGE_SERVICES = List.of(
 | `unit_ownership_history` | §9 | **미확인** | `unit_ownership_history` | 드릴다운(2-hop) |
 | `integrated_building` | §13 | **미확인** | `integrated_building`+`building_parcel` | B+자식 |
 | `building_image` | §14 | **미확인** | `sync_file`, `building_image` | D |
+
+### 선언형 매퍼 14개 (kras.md에 응답 규격 없음 — `KrasSpecMapperConfig`)
+
+conn_svc_id와 요청 파라미터는 확인된 값이다(`GatewayPaths` + `KrasApiClient`, `/conn` 운영 중).
+**태그명만 업무 테이블 컬럼명에서 유추한 가설**이라 실응답 확인 전에는 VERIFIED 금지.
+
+| dataset_code | service_code | 승격 대상 | 선행 필요 |
+|---|---|---|---|
+| `use_zone` | KRAS000027 | `land_use_zone` | — |
+| `land_use_plan_attr` | KRAS000025 | `land_use_attribute` | — |
+| `land_use_plan_info` | KRAS000026 | `land_use_plan` + `restriction` | — |
+| `bldg_dong_info` | KRAS000102 | `building_register` | — (건물 계열의 관문) |
+| `bldg_ledg_gen_hds_info` | KRAS000017 | `building_summary` | — |
+| `bldg_ho_info` | KRAS000103 | `building_unit` | bno 필요 |
+| `bldg_hds_info` | KRAS000014 | `building_title` + 층별/소유자/변동 | `bldg_dong_info`, bno |
+| `cbldg_hds_info` | KRAS000015 | `building_title` | `bldg_dong_info`, bno |
+| `cbldg_dfhs_info` | KRAS000016 | `building_exclusive` + 면적/소유자/가격 | `bldg_ho_info`, bno |
+| `land_jiga` | KOREPS00011 | `koreps_land_price` | — |
+| `house_info` | KOREPS00033 | `house_price` | — |
+| `fin_dec_jiga` | KOREPS00034 | `final_land_price` | — |
+| `read_dec_jiga` | KOREPS00035 | `read_land_price` | — |
+| `land_attr` | KOREPS00047 | `land_attribute` | — |
+
+"bno 필요" = 건물식별번호(`bldg_gbn_no`)를 추가 파라미터로 보내야 호출된다. 그 값은
+`bldg_dong_info` 응답에서 나온다 — 자급자족되므로 벤더 확인이 필요 없다.
 
 ### 기간 조회 XML (1)
 
@@ -430,7 +467,8 @@ private static final List<DateRangeService> DATE_RANGE_SERVICES = List.of(
 
 | 항목 | 상태 | 막는 것 |
 |---|---|---|
-| PNU 단건 14개 (`bldg_hds_info` 등 KRAS 9종 + KOREPS 5종) | 미착수 | **kras.md에 해당 서비스 규격이 없음.** 서비스 코드(KRAS000014~017/025~027/102/103, KOREPS 5종)가 §1~16 어디에도 등장하지 않는다 — 실제 응답 없이는 매퍼 작성 불가 |
+| 선언형 14개의 **태그명 확정** | 구현 완료, 검증 대기 | 막는 것 없음. `/api-test`로 한 번씩 호출해 응답을 보고 `KrasSpecMapperConfig`의 태그를 맞추면 된다 |
+| `land_use_plan_asset`(지도 이미지) | 미착수 | KRAS000026 응답의 이미지 인코딩·태그를 실응답으로 확인한 뒤 `building_image`의 파일 저장 경로를 재사용 |
 | `land_owner_change`(§11), `unit_owner_change`(§12) | 미착수 | **kras.md 문서 오류.** §11·§12 내용이 §10과 필드명·샘플값까지 완전히 동일하게 중복 기재됨 |
 | 스케줄 자동화 | 미착수 | 막는 것 없음. `kras.sync_work` 큐는 DDL에 이미 존재. 수동 트리거가 충분히 검증된 뒤 착수하는 게 원칙 |
 | `/conn`,`/svc` 실서빙 전환 | 미착수 | `kras.api_response`/`api_bundle` 계층이 아직 안 채워짐. 운영 트래픽·지연 실측 후 판단할 문제 |

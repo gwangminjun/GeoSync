@@ -21,6 +21,13 @@ public interface KrasXmlServiceMapper {
     String connSvcId();
 
     /**
+     * 어느 게이트웨이로 보낼지. "KRAS"(기본) 또는 "KOREPS".
+     * 두 클라이언트의 query() 시그니처가 같아 호출부는 어느 쪽을 고를지만 결정하면 된다
+     * (KrasGmxController.callGateway()가 이미 하는 분기와 같은 기준).
+     */
+    default String sourceSystem() { return "KRAS"; }
+
+    /**
      * 응답 XML을 stage 테이블 행으로 분해한다.
      * @throws IllegalStateException 응답 신원이 요청 PNU와 어긋나는 등 안전하게 계속 진행할 수 없는 경우
      */

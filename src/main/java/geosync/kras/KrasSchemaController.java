@@ -74,27 +74,47 @@ public class KrasSchemaController {
     );
 
     /**
-     * PNU 단건 API 중 IMPLEMENTED_SERVICES를 제외한 14개. dataset_code/service_code/api-test 딥링크 id/
-     * 승격 대상 업무 테이블은 kras.business_dataset(설계 원본)과 api-test.html의 APIS 목록에서 그대로
-     * 가져온 것 — 이 14개는 아직 실제 파싱·적재 매퍼가 없고, 이 표는 검증 화면 안내용이다.
+     * kras.md에 응답 규격이 없어 KrasSpecMapperConfig에 선언으로 구현한 14개.
+     * conn_svc_id와 요청 파라미터는 GatewayPaths/KrasApiClient에서 확인된 값이고, 막힌 건 응답 구조뿐이다 —
+     * 태그명은 업무 테이블 컬럼명에서 유추한 가설이라 실응답 확인 전에는 VERIFIED로 올리면 안 된다.
+     *
+     * @param needsBno  건물식별번호(bldg_gbn_no)가 있어야 호출되는 서비스인가(GatewayPaths.BLDG_GBN_NO_PATHS 기준).
+     * @param dependsOn 이 서비스보다 먼저 승격돼 있어야 하는 데이터셋(FK/드릴다운 부모). 없으면 빈 문자열.
      */
-    private record PnuApiInfo(String datasetCode, String serviceCode, String apiTestId, String businessTables) {}
+    private record SpecService(String slug, String datasetCode, String serviceCode, String label,
+                                String businessTables, boolean needsBno, String dependsOn) {}
 
-    private static final List<PnuApiInfo> PNU_APIS = List.of(
-        new PnuApiInfo("bldg_hds_info", "KRAS000014", "conn/bldg_hds_info", "kras.building_title, kras.building_floor, kras.building_title_owner, kras.building_title_change"),
-        new PnuApiInfo("cbldg_hds_info", "KRAS000015", "conn/cbldg_hds_info", "kras.building_title"),
-        new PnuApiInfo("cbldg_dfhs_info", "KRAS000016", "conn/cbldg_dfhs_info", "kras.building_exclusive, kras.building_exclusive_area, kras.building_exclusive_owner, kras.building_exclusive_price"),
-        new PnuApiInfo("bldg_ledg_gen_hds_info", "KRAS000017", "conn/bldg_ledg_gen_hds_info", "kras.building_summary"),
-        new PnuApiInfo("land_use_plan_attr", "KRAS000025", "conn/land_use_plan_attr", "kras.land_use_attribute"),
-        new PnuApiInfo("land_use_plan_info", "KRAS000026", "conn/land_use_plan_info", "kras.land_use_plan, kras.land_use_restriction, kras.land_use_plan_asset"),
-        new PnuApiInfo("use_zone", "KRAS000027", "conn/use_zone", "kras.land_use_zone"),
-        new PnuApiInfo("bldg_dong_info", "KRAS000102", "conn/bldg_dong_info", "kras.building_register"),
-        new PnuApiInfo("bldg_ho_info", "KRAS000103", "conn/bldg_ho_info", "kras.building_unit"),
-        new PnuApiInfo("land_jiga", "KOREPS00011", "conn/land_jiga", "kras.koreps_land_price"),
-        new PnuApiInfo("house_info", "KOREPS00033", "conn/house_info", "kras.house_price"),
-        new PnuApiInfo("fin_dec_jiga", "KOREPS00034", "conn/fin_dec_jiga", "kras.final_land_price"),
-        new PnuApiInfo("read_dec_jiga", "KOREPS00035", "conn/read_dec_jiga", "kras.read_land_price"),
-        new PnuApiInfo("land_attr", "KOREPS00047", "conn/land_attr", "kras.land_attribute")
+    private static final List<SpecService> SPEC_SERVICES = List.of(
+        new SpecService("use-zone", "use_zone", "KRAS000027", "용도지역지구",
+            "kras.land_use_zone", false, ""),
+        new SpecService("land-use-plan-attr", "land_use_plan_attr", "KRAS000025", "토지이용계획 속성",
+            "kras.land_use_attribute", false, ""),
+        new SpecService("land-use-plan-info", "land_use_plan_info", "KRAS000026", "토지이용계획 + 행위제한",
+            "kras.land_use_plan, kras.land_use_restriction", false, ""),
+        new SpecService("bldg-dong-info", "bldg_dong_info", "KRAS000102", "건물 동 정보 (건물 계열의 관문)",
+            "kras.building_register", false, ""),
+        new SpecService("bldg-ledg-gen-hds-info", "bldg_ledg_gen_hds_info", "KRAS000017", "건축물대장 총괄표제부",
+            "kras.building_summary", false, ""),
+        new SpecService("bldg-ho-info", "bldg_ho_info", "KRAS000103", "건물 호(전유) 정보",
+            "kras.building_unit", true, ""),
+        new SpecService("bldg-hds-info", "bldg_hds_info", "KRAS000014", "건축물대장 표제부 + 층별/소유자/변동",
+            "kras.building_title, kras.building_floor, kras.building_title_owner, kras.building_title_change",
+            true, "bldg_dong_info"),
+        new SpecService("cbldg-hds-info", "cbldg_hds_info", "KRAS000015", "집합건물 표제부",
+            "kras.building_title", true, "bldg_dong_info"),
+        new SpecService("cbldg-dfhs-info", "cbldg_dfhs_info", "KRAS000016", "집합건물 전유부 + 면적/소유자/가격",
+            "kras.building_exclusive, kras.building_exclusive_area, kras.building_exclusive_owner, kras.building_exclusive_price",
+            true, "bldg_ho_info"),
+        new SpecService("land-jiga", "land_jiga", "KOREPS00011", "공시지가 (KOREPS)",
+            "kras.koreps_land_price", false, ""),
+        new SpecService("house-info", "house_info", "KOREPS00033", "개별주택가격 (KOREPS)",
+            "kras.house_price", false, ""),
+        new SpecService("fin-dec-jiga", "fin_dec_jiga", "KOREPS00034", "공시결정지가 (KOREPS)",
+            "kras.final_land_price", false, ""),
+        new SpecService("read-dec-jiga", "read_dec_jiga", "KOREPS00035", "열람결정지가 (KOREPS)",
+            "kras.read_land_price", false, ""),
+        new SpecService("land-attr", "land_attr", "KOREPS00047", "토지속성 (KOREPS)",
+            "kras.land_attribute", false, "")
     );
 
     /** verify/revert-dataset이 건드릴 수 있는 dataset_code 화이트리스트 — 임의 문자열로 다른 데이터셋을 켜지 못하게 막는다. */
@@ -102,7 +122,7 @@ public class KrasSchemaController {
             Stream.of("cadastral_file", "layer_list", "usezone_file", "land_basic_file", "land_price_file"),
             IMPLEMENTED_SERVICES.stream().map(ImplementedService::datasetCode),
             DATE_RANGE_SERVICES.stream().map(DateRangeService::datasetCode),
-            PNU_APIS.stream().map(PnuApiInfo::datasetCode)
+            SPEC_SERVICES.stream().map(SpecService::datasetCode)
     ).flatMap(s -> s).collect(Collectors.toUnmodifiableSet());
 
     private final TargetDbService targetDbService;
@@ -155,8 +175,10 @@ public class KrasSchemaController {
         this.txtIngestService = txtIngestService;
         this.mappersByDatasetCode = mappers.stream()
                 .collect(Collectors.toUnmodifiableMap(KrasXmlServiceMapper::datasetCode, m -> m));
-        this.slugToDatasetCode = IMPLEMENTED_SERVICES.stream()
-                .collect(Collectors.toUnmodifiableMap(ImplementedService::slug, ImplementedService::datasetCode));
+        Map<String, String> slugs = new java.util.LinkedHashMap<>();
+        for (ImplementedService svc : IMPLEMENTED_SERVICES) slugs.put(svc.slug(), svc.datasetCode());
+        for (SpecService svc : SPEC_SERVICES) slugs.put(svc.slug(), svc.datasetCode());
+        this.slugToDatasetCode = Map.copyOf(slugs);
         this.dateRangeMappersByDatasetCode = dateRangeMappers.stream()
                 .collect(Collectors.toUnmodifiableMap(KrasDateRangeServiceMapper::datasetCode, m -> m));
         this.dateRangeSlugToDatasetCode = DATE_RANGE_SERVICES.stream()
@@ -165,6 +187,9 @@ public class KrasSchemaController {
             runningByDatasetCode.put(svc.datasetCode(), new AtomicBoolean(false));
         }
         for (DateRangeService svc : DATE_RANGE_SERVICES) {
+            runningByDatasetCode.put(svc.datasetCode(), new AtomicBoolean(false));
+        }
+        for (SpecService svc : SPEC_SERVICES) {
             runningByDatasetCode.put(svc.datasetCode(), new AtomicBoolean(false));
         }
     }
@@ -205,7 +230,7 @@ public class KrasSchemaController {
                     lastResultByDatasetCode.get(svc.datasetCode()));
         }
 
-        model.addAttribute("pnuDatasets", loadPnuDatasetRows(jdbc));
+        model.addAttribute("specServices", loadSpecServiceRows(jdbc));
 
         Long krasCount = jdbc.queryForObject("SELECT count(*) FROM kras.lp_pa_cbnd", Long.class);
         Long publicCount = jdbc.queryForObject("SELECT count(*) FROM public.lp_pa_cbnd", Long.class);
@@ -701,21 +726,30 @@ public class KrasSchemaController {
         return byCode;
     }
 
-    /** PNU_APIS 14개의 현재 contract_status/enabled를 한 번에 조회해 템플릿용 행으로 합친다. */
-    private List<Map<String, Object>> loadPnuDatasetRows(JdbcTemplate jdbc) {
+    /**
+     * SPEC_SERVICES 14개를 템플릿의 카드 루프용 행으로 만든다 — 카드를 14개 복붙하지 않고
+     * th:each 한 번으로 찍는다. 서비스가 늘면 SPEC_SERVICES에 한 줄만 추가하면 된다.
+     */
+    private List<Map<String, Object>> loadSpecServiceRows(JdbcTemplate jdbc) {
         Map<String, Map<String, Object>> statusByCode = batchDatasetStatus(jdbc,
-                PNU_APIS.stream().map(PnuApiInfo::datasetCode).toList());
+                SPEC_SERVICES.stream().map(SpecService::datasetCode).toList());
 
         List<Map<String, Object>> result = new ArrayList<>();
-        for (PnuApiInfo api : PNU_APIS) {
-            Map<String, Object> status = statusByCode.get(api.datasetCode());
+        for (SpecService svc : SPEC_SERVICES) {
+            Map<String, Object> status = statusByCode.get(svc.datasetCode());
             Map<String, Object> out = new HashMap<>();
-            out.put("datasetCode", api.datasetCode());
-            out.put("serviceCode", api.serviceCode());
-            out.put("apiTestId", api.apiTestId());
-            out.put("businessTables", api.businessTables());
+            out.put("slug", svc.slug());
+            out.put("datasetCode", svc.datasetCode());
+            out.put("serviceCode", svc.serviceCode());
+            out.put("label", svc.label());
+            out.put("businessTables", svc.businessTables());
+            out.put("needsBno", svc.needsBno());
+            out.put("dependsOn", svc.dependsOn());
+            out.put("apiTestId", (svc.serviceCode().startsWith("KOREPS") ? "conn/" : "conn/") + svc.datasetCode());
             out.put("status", status != null ? status.get("contract_status") : "UNVERIFIED");
             out.put("enabled", status != null && Boolean.TRUE.equals(status.get("enabled")));
+            out.put("running", runningByDatasetCode.get(svc.datasetCode()).get());
+            out.put("lastResult", lastResultByDatasetCode.get(svc.datasetCode()));
             result.add(out);
         }
         return result;

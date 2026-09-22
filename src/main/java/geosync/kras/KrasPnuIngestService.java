@@ -29,6 +29,7 @@ public class KrasPnuIngestService {
     private static final Logger log = LoggerFactory.getLogger(KrasPnuIngestService.class);
 
     private final KrasApiClient krasApiClient;
+    private final KorepsApiClient korepsApiClient;
     private final KrasStagePromotionService promotionService;
     private final RuntimeSettingsService settings;
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -37,9 +38,10 @@ public class KrasPnuIngestService {
                                 List<String> warnings, Map<String, Object> preview) {}
     public record PromoteResult(long itemId) {}
 
-    public KrasPnuIngestService(KrasApiClient krasApiClient, KrasStagePromotionService promotionService,
-                                 RuntimeSettingsService settings) {
+    public KrasPnuIngestService(KrasApiClient krasApiClient, KorepsApiClient korepsApiClient,
+                                 KrasStagePromotionService promotionService, RuntimeSettingsService settings) {
         this.krasApiClient = krasApiClient;
+        this.korepsApiClient = korepsApiClient;
         this.promotionService = promotionService;
         this.settings = settings;
     }
@@ -100,7 +102,10 @@ public class KrasPnuIngestService {
 
         Document doc;
         try {
-            byte[] xml = krasApiClient.query(mapper.connSvcId(), pnu, extraParams.isEmpty() ? null : extraParams);
+            Map<String, String> extra = extraParams.isEmpty() ? null : extraParams;
+            byte[] xml = "KOREPS".equals(mapper.sourceSystem())
+                    ? korepsApiClient.query(mapper.connSvcId(), pnu, extra)
+                    : krasApiClient.query(mapper.connSvcId(), pnu, extra);
             doc = XmlUtil.parse(xml);
         } catch (Exception e) {
             throw new IllegalStateException(mapper.connSvcId() + " 호출/파싱 실패: " + e.getMessage(), e);
@@ -196,6 +201,13 @@ public class KrasPnuIngestService {
      */
     private void resolveFileColumns(JdbcTemplate tx, Map<String, Object> columns, long itemId,
                                      String orgCd, String datasetCode, String pnu, Map<String, String> extraParams) {
+        // request_key(NOT NULL)를 선언한 매퍼는 값 자리에 표시만 넣어둔다 — 해시는 DB 함수로 계산한다.
+        if (KrasSpecMapper.COMPUTE_REQUEST_KEY.equals(columns.get("request_key"))) {
+            columns.put("request_key", tx.queryForObject(
+                    "SELECT kras.request_key(?, '1', ?, '', ?::jsonb)", String.class,
+                    datasetCode, pnu, writeJson(extraParams)));
+        }
+
         byte[] bytes = (byte[]) columns.remove("_file_bytes");
         if (bytes == null) return;
         String fileType = (String) columns.remove("_file_type");

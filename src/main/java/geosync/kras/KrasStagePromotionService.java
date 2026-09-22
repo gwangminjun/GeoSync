@@ -55,38 +55,47 @@ public class KrasStagePromotionService {
      * @param surrogateIdColumn C, 드릴다운 전용 — 이 테이블 자신의 서로게이트 PK 컬럼명.
      *                          B+자식 전용 — 부모의 서로게이트 PK 컬럼명(예: history_id, RETURNING에 씀).
      * @param scopeColumn       B, B+자식 전용 — DELETE WHERE 기준 컬럼(예: pnu). A/C/드릴다운은 null.
-     * @param child             B+자식 전용. 그 외는 null.
+     * @param children          B+자식 / 드릴다운+자식 전용. 자식이 없으면 빈 리스트.
+     *                          한 부모에 자식 테이블이 여러 개인 경우(건축물대장 표제부의 층별/소유자/변동)를
+     *                          위해 리스트다 — 선언 순서대로 처리한다.
      * @param parentLookup      드릴다운 전용. 그 외는 null.
      */
     public record StagePromotionSpec(String stageTable, String businessTable, PromotionPattern pattern,
                                       List<String> naturalKeyColumns, List<String> copyColumns,
-                                      String surrogateIdColumn, String scopeColumn, ChildSpec child,
+                                      String surrogateIdColumn, String scopeColumn, List<ChildSpec> children,
                                       ParentLookup parentLookup) {
 
         public static StagePromotionSpec naturalKeyUpsert(String stageTable, String businessTable,
                                                             List<String> naturalKeyColumns, List<String> copyColumns) {
             return new StagePromotionSpec(stageTable, businessTable, PromotionPattern.NATURAL_KEY_UPSERT,
-                    naturalKeyColumns, copyColumns, null, null, null, null);
+                    naturalKeyColumns, copyColumns, null, null, List.of(), null);
         }
 
         public static StagePromotionSpec identityMatchUpsert(String stageTable, String businessTable,
                                                                String surrogateIdColumn, List<String> naturalKeyColumns,
                                                                List<String> copyColumns) {
             return new StagePromotionSpec(stageTable, businessTable, PromotionPattern.IDENTITY_MATCH_UPSERT,
-                    naturalKeyColumns, copyColumns, surrogateIdColumn, null, null, null);
+                    naturalKeyColumns, copyColumns, surrogateIdColumn, null, List.of(), null);
         }
 
         public static StagePromotionSpec scopeReplace(String stageTable, String businessTable,
                                                         String scopeColumn, List<String> copyColumns) {
             return new StagePromotionSpec(stageTable, businessTable, PromotionPattern.SCOPE_REPLACE,
-                    List.of(), copyColumns, null, scopeColumn, null, null);
+                    List.of(), copyColumns, null, scopeColumn, List.of(), null);
         }
 
         public static StagePromotionSpec scopeReplaceWithChildren(String stageTable, String businessTable,
                                                                     String scopeColumn, String surrogateIdColumn,
                                                                     List<String> copyColumns, ChildSpec child) {
+            return scopeReplaceWithChildren(stageTable, businessTable, scopeColumn, surrogateIdColumn,
+                    copyColumns, List.of(child));
+        }
+
+        public static StagePromotionSpec scopeReplaceWithChildren(String stageTable, String businessTable,
+                                                                    String scopeColumn, String surrogateIdColumn,
+                                                                    List<String> copyColumns, List<ChildSpec> children) {
             return new StagePromotionSpec(stageTable, businessTable, PromotionPattern.SCOPE_REPLACE_WITH_CHILDREN,
-                    List.of(), copyColumns, surrogateIdColumn, scopeColumn, child, null);
+                    List.of(), copyColumns, surrogateIdColumn, scopeColumn, children, null);
         }
 
         public static StagePromotionSpec parentLookupIdentityMatchUpsert(String stageTable, String businessTable,
@@ -94,14 +103,25 @@ public class KrasStagePromotionService {
                                                                           List<String> naturalKeyColumns,
                                                                           List<String> copyColumns,
                                                                           ParentLookup parentLookup) {
+            return parentLookupIdentityMatchUpsert(stageTable, businessTable, surrogateIdColumn,
+                    naturalKeyColumns, copyColumns, parentLookup, List.of());
+        }
+
+        /** 드릴다운 + 자식 — 부모를 신원 매칭으로 보존하면서, 그 부모에 딸린 자식 목록은 매번 통째로 교체한다. */
+        public static StagePromotionSpec parentLookupIdentityMatchUpsert(String stageTable, String businessTable,
+                                                                          String surrogateIdColumn,
+                                                                          List<String> naturalKeyColumns,
+                                                                          List<String> copyColumns,
+                                                                          ParentLookup parentLookup,
+                                                                          List<ChildSpec> children) {
             return new StagePromotionSpec(stageTable, businessTable, PromotionPattern.PARENT_LOOKUP_IDENTITY_MATCH_UPSERT,
-                    naturalKeyColumns, copyColumns, surrogateIdColumn, null, null, parentLookup);
+                    naturalKeyColumns, copyColumns, surrogateIdColumn, null, children, parentLookup);
         }
 
         public static StagePromotionSpec appendOnly(String stageTable, String businessTable,
                                                       List<String> copyColumns) {
             return new StagePromotionSpec(stageTable, businessTable, PromotionPattern.APPEND_ONLY,
-                    List.of(), copyColumns, null, null, null, null);
+                    List.of(), copyColumns, null, null, List.of(), null);
         }
     }
 
@@ -151,14 +171,15 @@ public class KrasStagePromotionService {
      * RETURNING된 ID를 바로 다음 INSERT에 쓸 수 있다.
      */
     private void promoteScopeReplaceWithChildren(JdbcTemplate tx, long itemId, StagePromotionSpec spec) {
-        ChildSpec child = spec.child();
         Object scopeValue = tx.queryForObject(
                 "SELECT " + spec.scopeColumn() + " FROM " + spec.stageTable() + " WHERE item_id=? AND row_no=1",
                 Object.class, itemId);
 
-        tx.update("DELETE FROM " + child.businessTable() + " WHERE " + child.parentIdColumn() + " IN "
-                + "(SELECT " + spec.surrogateIdColumn() + " FROM " + spec.businessTable() + " WHERE "
-                + spec.scopeColumn() + "=?)", scopeValue);
+        for (ChildSpec child : spec.children()) {
+            tx.update("DELETE FROM " + child.businessTable() + " WHERE " + child.parentIdColumn() + " IN "
+                    + "(SELECT " + spec.surrogateIdColumn() + " FROM " + spec.businessTable() + " WHERE "
+                    + spec.scopeColumn() + "=?)", scopeValue);
+        }
         tx.update("DELETE FROM " + spec.businessTable() + " WHERE " + spec.scopeColumn() + "=?", scopeValue);
 
         List<Integer> parentRowNos = tx.query(
@@ -170,7 +191,6 @@ public class KrasStagePromotionService {
         }
 
         String parentColList = String.join(",", spec.copyColumns());
-        String childColList = String.join(",", child.copyColumns());
 
         for (int rowNo : parentRowNos) {
             Map<String, Object> parentRow = tx.queryForMap(
@@ -185,10 +205,23 @@ public class KrasStagePromotionService {
                             + placeholders(spec.copyColumns().size() + 1) + ") RETURNING " + spec.surrogateIdColumn(),
                     Long.class, parentValues.toArray());
 
-            List<Map<String, Object>> childRows = child.copyColumns().isEmpty() ? List.of() : tx.queryForList(
+            insertChildren(tx, itemId, rowNo, parentId, spec.children());
+        }
+    }
+
+    /**
+     * 부모 stage 행(parentRowNo)에 parent_record_no로 이어붙는 자식 stage 행들을 새 parentId로 INSERT한다.
+     * 자식 테이블이 여러 개면(건축물대장 표제부의 층별/소유자/변동) 선언 순서대로 각각 처리한다.
+     */
+    private void insertChildren(JdbcTemplate tx, long itemId, int parentRowNo, Long parentId,
+                                 List<ChildSpec> children) {
+        for (ChildSpec child : children) {
+            if (child.copyColumns().isEmpty()) continue;
+            String childColList = String.join(",", child.copyColumns());
+            List<Map<String, Object>> childRows = tx.queryForList(
                     "SELECT " + childColList + " FROM " + child.stageTable()
                             + " WHERE item_id=? AND parent_record_no=? ORDER BY row_no",
-                    itemId, rowNo);
+                    itemId, parentRowNo);
             int seq = 1;
             for (Map<String, Object> childRow : childRows) {
                 List<Object> childValues = new ArrayList<>();
@@ -311,11 +344,19 @@ public class KrasStagePromotionService {
                     spec.businessTable() + " 승격 실패 — item_id=" + itemId + "의 " + spec.stageTable() + " 행이 없습니다.");
         }
         for (int rowNo : rowNos) {
-            promoteParentLookupRow(tx, itemId, rowNo, spec);
+            long promotedId = promoteParentLookupRow(tx, itemId, rowNo, spec);
+            // 자식은 매번 통째로 교체한다 — 층별/소유자/변동 같은 목록은 서비스가 매 호출 전체를 돌려주므로
+            // 부분 갱신이 아니라 전체 교체가 맞다(부모의 서로게이트 ID는 위에서 신원 매칭으로 보존됨).
+            for (ChildSpec child : spec.children()) {
+                tx.update("DELETE FROM " + child.businessTable() + " WHERE " + child.parentIdColumn() + "=?",
+                        promotedId);
+            }
+            insertChildren(tx, itemId, rowNo, promotedId, spec.children());
         }
     }
 
-    private void promoteParentLookupRow(JdbcTemplate tx, long itemId, int rowNo, StagePromotionSpec spec) {
+    /** @return 이번 행이 매칭/삽입된 업무 테이블의 서로게이트 ID(자식 연결에 쓴다). */
+    private long promoteParentLookupRow(JdbcTemplate tx, long itemId, int rowNo, StagePromotionSpec spec) {
         ParentLookup pl = spec.parentLookup();
         List<String> lookupKeys = pl.lookupKeys();
         StringBuilder lookupSelect = new StringBuilder();
@@ -368,20 +409,23 @@ public class KrasStagePromotionService {
             params.add(id);
             tx.update("UPDATE " + spec.businessTable() + " SET " + setClause
                     + " WHERE " + spec.surrogateIdColumn() + "=?", params.toArray());
-        } else {
-            List<String> insertCols = new ArrayList<>();
-            insertCols.add(pl.childFkColumn());
-            insertCols.addAll(cols);
-            insertCols.add("source_item_id");
-            insertCols.add("last_seen_item_id");
-            List<Object> params = new ArrayList<>();
-            params.add(parentId);
-            for (String c : cols) params.add(stageRow.get(c));
-            params.add(itemId);
-            params.add(itemId);
-            tx.update("INSERT INTO " + spec.businessTable() + "(" + String.join(",", insertCols) + ") VALUES ("
-                    + placeholders(insertCols.size()) + ")", params.toArray());
+            return id;
         }
+        List<String> insertCols = new ArrayList<>();
+        insertCols.add(pl.childFkColumn());
+        insertCols.addAll(cols);
+        insertCols.add("source_item_id");
+        insertCols.add("last_seen_item_id");
+        List<Object> params = new ArrayList<>();
+        params.add(parentId);
+        for (String c : cols) params.add(stageRow.get(c));
+        params.add(itemId);
+        params.add(itemId);
+        Long newId = tx.queryForObject(
+                "INSERT INTO " + spec.businessTable() + "(" + String.join(",", insertCols) + ") VALUES ("
+                        + placeholders(insertCols.size()) + ") RETURNING " + spec.surrogateIdColumn(),
+                Long.class, params.toArray());
+        return newId;
     }
 
     private static String jsonbLookupExpr(String key, int idx) {
