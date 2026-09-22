@@ -99,7 +99,7 @@ public class KrasSchemaController {
 
     /** verify/revert-dataset이 건드릴 수 있는 dataset_code 화이트리스트 — 임의 문자열로 다른 데이터셋을 켜지 못하게 막는다. */
     private static final Set<String> VERIFIABLE_DATASETS = Stream.of(
-            Stream.of("cadastral_file", "layer_list", "usezone_file"),
+            Stream.of("cadastral_file", "layer_list", "usezone_file", "land_basic_file", "land_price_file"),
             IMPLEMENTED_SERVICES.stream().map(ImplementedService::datasetCode),
             DATE_RANGE_SERVICES.stream().map(DateRangeService::datasetCode),
             PNU_APIS.stream().map(PnuApiInfo::datasetCode)
@@ -114,6 +114,7 @@ public class KrasSchemaController {
     private final KrasPnuIngestService pnuIngestService;
     private final KrasDateRangeIngestService dateRangeIngestService;
     private final KrasUsezoneIngestService usezoneIngestService;
+    private final KrasTxtIngestService txtIngestService;
     private final Map<String, String> slugToDatasetCode;
     private final Map<String, KrasXmlServiceMapper> mappersByDatasetCode;
     private final Map<String, String> dateRangeSlugToDatasetCode;
@@ -128,13 +129,20 @@ public class KrasSchemaController {
     private final AtomicBoolean usezoneRunning = new AtomicBoolean(false);
     private volatile String lastUsezoneResult;
 
+    /** 전체 TXT 2종 — 파일 하나를 통째로 받는 작업이라 데이터셋별로 실행 상태를 따로 잡는다. */
+    private final AtomicBoolean landBasicFileRunning = new AtomicBoolean(false);
+    private volatile String lastLandBasicFileResult;
+    private final AtomicBoolean landPriceFileRunning = new AtomicBoolean(false);
+    private volatile String lastLandPriceFileResult;
+
     public KrasSchemaController(TargetDbService targetDbService, RuntimeSettingsService settings,
                                  KrasApiClient krasApiClient, KrasWorkspaceScanner workspaceScanner,
                                  TableMapper tableMapper, KrasCadastralIngestService cadastralIngestService,
                                  KrasPnuIngestService pnuIngestService, List<KrasXmlServiceMapper> mappers,
                                  KrasDateRangeIngestService dateRangeIngestService,
                                  List<KrasDateRangeServiceMapper> dateRangeMappers,
-                                 KrasUsezoneIngestService usezoneIngestService) {
+                                 KrasUsezoneIngestService usezoneIngestService,
+                                 KrasTxtIngestService txtIngestService) {
         this.targetDbService = targetDbService;
         this.settings = settings;
         this.krasApiClient = krasApiClient;
@@ -144,6 +152,7 @@ public class KrasSchemaController {
         this.pnuIngestService = pnuIngestService;
         this.dateRangeIngestService = dateRangeIngestService;
         this.usezoneIngestService = usezoneIngestService;
+        this.txtIngestService = txtIngestService;
         this.mappersByDatasetCode = mappers.stream()
                 .collect(Collectors.toUnmodifiableMap(KrasXmlServiceMapper::datasetCode, m -> m));
         this.slugToDatasetCode = IMPLEMENTED_SERVICES.stream()
@@ -256,6 +265,25 @@ public class KrasSchemaController {
         Long uzonePublicCount = jdbc.queryForObject("SELECT count(*) FROM public.lt_c_uzone", Long.class);
         model.addAttribute("uzoneKrasCount", uzoneKrasCount);
         model.addAttribute("uzonePublicCount", uzonePublicCount);
+
+        // 전체 TXT 2종
+        Map<String, Map<String, Object>> txtStatus = batchDatasetStatus(jdbc,
+                List.of("land_basic_file", "land_price_file"));
+        Map<String, Object> basicSt = txtStatus.get("land_basic_file");
+        model.addAttribute("landBasicFileStatus", basicSt != null ? basicSt.get("contract_status") : "UNVERIFIED");
+        model.addAttribute("landBasicFileEnabled", basicSt != null && Boolean.TRUE.equals(basicSt.get("enabled")));
+        model.addAttribute("landBasicFileRunning", landBasicFileRunning.get());
+        model.addAttribute("lastLandBasicFileResult", lastLandBasicFileResult);
+        Map<String, Object> priceSt = txtStatus.get("land_price_file");
+        model.addAttribute("landPriceFileStatus", priceSt != null ? priceSt.get("contract_status") : "UNVERIFIED");
+        model.addAttribute("landPriceFileEnabled", priceSt != null && Boolean.TRUE.equals(priceSt.get("enabled")));
+        model.addAttribute("landPriceFileRunning", landPriceFileRunning.get());
+        model.addAttribute("lastLandPriceFileResult", lastLandPriceFileResult);
+
+        model.addAttribute("landBasicCount", jdbc.queryForObject("SELECT count(*) FROM kras.land_basic", Long.class));
+        model.addAttribute("landPriceFileRowCount",
+                jdbc.queryForObject("SELECT count(*) FROM kras.land_price_file_row WHERE org_cd=?",
+                        Long.class, settings.orgCode()));
 
         return "kras-db";
     }
@@ -432,6 +460,79 @@ public class KrasSchemaController {
             log.error("[KrasSchema] 용도지역 public 승격 실패: {}", e.getMessage(), e);
             lastUsezoneResult = "public 승격 실패: " + e.getMessage();
             return Map.of("success", false, "message", lastUsezoneResult);
+        }
+    }
+
+    /** 토지기본정보 전체 TXT(KRAS000040) 수집 — kras.stage_parcel/stage_land_basic까지만 채운다. */
+    @PostMapping("/kras-db/ingest/land-basic-file")
+    @ResponseBody
+    public Map<String, Object> ingestLandBasicFile() {
+        if (!landBasicFileRunning.compareAndSet(false, true)) {
+            return Map.of("error", "이미 실행 중입니다.");
+        }
+        try {
+            KrasTxtIngestService.IngestResult result =
+                    txtIngestService.ingestLandBasic(jdbc(), settings.orgCode(), "UI");
+            String msg = result.promotable()
+                    ? "수집 성공: item_id=%d, %d건 — 건수를 확인한 뒤 승격하세요.".formatted(result.itemId(), result.rowCount())
+                    : "수집됨(item_id=%d, %d건), 단 파싱 경고로 승격 보류: %s"
+                            .formatted(result.itemId(), result.rowCount(), result.warnings());
+            lastLandBasicFileResult = msg;
+            return Map.of("success", true, "itemId", result.itemId(), "rowCount", result.rowCount(),
+                    "promotable", result.promotable(), "warnings", result.warnings(), "message", msg);
+        } catch (Exception e) {
+            log.error("[KrasSchema] 토지기본정보 TXT 수집 실패: {}", e.getMessage(), e);
+            lastLandBasicFileResult = "수집 실패: " + e.getMessage();
+            return Map.of("success", false, "message", lastLandBasicFileResult);
+        } finally {
+            landBasicFileRunning.set(false);
+        }
+    }
+
+    /** 토지기본정보 승격 — kras.parcel/kras.land_basic 자연키 UPSERT. */
+    @PostMapping("/kras-db/promote/land-basic-file")
+    @ResponseBody
+    public Map<String, Object> promoteLandBasicFile(@RequestParam long itemId) {
+        if (!landBasicFileRunning.compareAndSet(false, true)) {
+            return Map.of("error", "이미 실행 중입니다.");
+        }
+        try {
+            txtIngestService.promoteLandBasic(jdbc(), settings.orgCode(), itemId);
+            String msg = "승격 성공: item_id=" + itemId;
+            lastLandBasicFileResult = msg;
+            return Map.of("success", true, "itemId", itemId, "message", msg);
+        } catch (Exception e) {
+            log.error("[KrasSchema] 토지기본정보 승격 실패: {}", e.getMessage(), e);
+            lastLandBasicFileResult = "승격 실패: " + e.getMessage();
+            return Map.of("success", false, "message", lastLandBasicFileResult);
+        } finally {
+            landBasicFileRunning.set(false);
+        }
+    }
+
+    /** 공시지가 전체 TXT(KRAS000039) 수집 — kras.land_price_file_row 직행이라 승격 단계가 없다. */
+    @PostMapping("/kras-db/ingest/land-price-file")
+    @ResponseBody
+    public Map<String, Object> ingestLandPriceFile() {
+        if (!landPriceFileRunning.compareAndSet(false, true)) {
+            return Map.of("error", "이미 실행 중입니다.");
+        }
+        try {
+            KrasTxtIngestService.IngestResult result =
+                    txtIngestService.ingestLandPrice(jdbc(), settings.orgCode(), "UI");
+            String msg = result.promotable()
+                    ? "수집 성공: item_id=%d, %d건".formatted(result.itemId(), result.rowCount())
+                    : "수집됨(item_id=%d, %d건), 단 파싱 경고로 SUCCESS 보류: %s"
+                            .formatted(result.itemId(), result.rowCount(), result.warnings());
+            lastLandPriceFileResult = msg;
+            return Map.of("success", true, "itemId", result.itemId(), "rowCount", result.rowCount(),
+                    "promotable", result.promotable(), "warnings", result.warnings(), "message", msg);
+        } catch (Exception e) {
+            log.error("[KrasSchema] 공시지가 TXT 수집 실패: {}", e.getMessage(), e);
+            lastLandPriceFileResult = "수집 실패: " + e.getMessage();
+            return Map.of("success", false, "message", lastLandPriceFileResult);
+        } finally {
+            landPriceFileRunning.set(false);
         }
     }
 

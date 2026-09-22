@@ -1061,6 +1061,119 @@
     <pre id="usezone-layers-js" class="result-box" style="display:none;"></pre>
   </div>
 
+  <!-- 카드 6a: 전체 TXT — land_basic_file (KRAS000040) -->
+  <div class="card">
+    <div class="card-title">
+      데이터셋 계약 상태 + 수집 — land_basic_file (토지기본정보 전체 TXT)
+      <span th:if="${landBasicFileStatus == 'VERIFIED' and landBasicFileEnabled}" class="badge badge-on">VERIFIED · enabled</span>
+      <span th:unless="${landBasicFileStatus == 'VERIFIED' and landBasicFileEnabled}" class="badge badge-warn"
+            th:text="${landBasicFileStatus} + ' · ' + (${landBasicFileEnabled} ? 'enabled' : 'disabled')"></span>
+      <span th:if="${landBasicFileRunning}" class="badge badge-warn">실행 중</span>
+    </div>
+    <p style="font-size:13px;color:#9aa2ad;margin-bottom:14px;">
+      "토지기본정보 다운로드"(KRAS000040) — 시군구 전체 토지의 최소 정보를 TXT로 받습니다
+      (docs/reference/2026-09-18/kras.md §16). 구분자는 <b>ASCII 11</b>, 인코딩은 EUC-KR입니다.
+      파일 8개 항목 중 앞 5개(ADM_SECT_CD·LAND_LOC_CD·LEDG_GBN·BOBN·BUBN)를 이어붙여 19자리 PNU를
+      만들고, 나머지(JIMOK·PAREA·OWN_GBN)가 <code>kras.land_basic</code>이 됩니다.
+      한 줄이라도 파싱에 실패하면 SUCCESS로 올리지 않고 보류합니다 — 전체 파일이라 조용히 건너뛰면
+      안 되기 때문입니다.
+    </p>
+    <div style="overflow-x:auto;margin-bottom:16px;">
+      <table class="hist-table">
+        <thead><tr><th>파일 항목</th><th>stage 테이블</th><th>승격 대상(업무 테이블)</th><th>패턴</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>ADM_SECT_CD, LAND_LOC_CD, LEDG_GBN, BOBN, BUBN</td>
+            <td>kras.stage_parcel</td><td>kras.parcel</td><td>A (자연키 pnu UPSERT)</td>
+          </tr>
+          <tr>
+            <td>JIMOK, PAREA, OWN_GBN</td>
+            <td>kras.stage_land_basic</td><td>kras.land_basic</td><td>A (자연키 pnu UPSERT)</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div th:unless="${landBasicFileStatus == 'VERIFIED' and landBasicFileEnabled}">
+      <form method="post" action="/kras-db/verify-dataset" id="verify-form-land-basic-file">
+        <input type="hidden" name="datasetCode" value="land_basic_file">
+        <div class="confirm-row">
+          <input type="checkbox" id="verify-confirm-land-basic-file" onchange="document.getElementById('verify-submit-land-basic-file').disabled = !this.checked;">
+          <label for="verify-confirm-land-basic-file">실제 운영 파일로 land_basic_file 계약을 확인했음</label>
+        </div>
+        <input type="hidden" name="confirmed" id="verify-confirmed-land-basic-file" value="false">
+        <button type="submit" id="verify-submit-land-basic-file" class="btn btn-primary" disabled
+                onclick="document.getElementById('verify-confirmed-land-basic-file').value='true';">계약 확인 → VERIFIED로 전환</button>
+      </form>
+    </div>
+    <form th:if="${landBasicFileStatus == 'VERIFIED' and landBasicFileEnabled}" method="post" action="/kras-db/revert-dataset"
+          onsubmit="return confirm('land_basic_file 검증을 원복하시겠습니까?');">
+      <input type="hidden" name="datasetCode" value="land_basic_file">
+      <button type="submit" class="btn btn-secondary">검증 원복</button>
+    </form>
+    <div class="stat-row" style="margin:14px 0;">
+      <div class="stat-box">
+        <div class="stat-label">kras.land_basic 현재 건수</div>
+        <div class="stat-value accent" th:text="${landBasicCount}">0</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      <button class="btn btn-primary" id="btn-land-basic-file-ingest" th:disabled="${landBasicFileRunning}"
+              onclick="runLandBasicFileIngest()">전체 TXT 수집</button>
+      <button class="btn btn-secondary" id="btn-land-basic-file-promote" th:disabled="${landBasicFileRunning}" disabled
+              onclick="runLandBasicFilePromote()">업무 테이블로 승격</button>
+    </div>
+    <div id="land-basic-file-result" class="result-box" th:if="${lastLandBasicFileResult}" th:text="${lastLandBasicFileResult}"></div>
+    <div id="land-basic-file-result-js" class="result-box" style="display:none;"></div>
+  </div>
+
+  <!-- 카드 6b: 전체 TXT — land_price_file (KRAS000039) -->
+  <div class="card">
+    <div class="card-title">
+      데이터셋 계약 상태 + 수집 — land_price_file (공시지가 전체 TXT)
+      <span th:if="${landPriceFileStatus == 'VERIFIED' and landPriceFileEnabled}" class="badge badge-on">VERIFIED · enabled</span>
+      <span th:unless="${landPriceFileStatus == 'VERIFIED' and landPriceFileEnabled}" class="badge badge-warn"
+            th:text="${landPriceFileStatus} + ' · ' + (${landPriceFileEnabled} ? 'enabled' : 'disabled')"></span>
+      <span th:if="${landPriceFileRunning}" class="badge badge-warn">실행 중</span>
+    </div>
+    <p style="font-size:13px;color:#9aa2ad;margin-bottom:14px;">
+      공시지가 전체 TXT(KRAS000039) — <b>승격 버튼이 없습니다</b>.
+      <code>kras.land_price_file_row</code>는 업무 테이블이 아니라 spatial_feature와 같은
+      <b>원본 보존 테이블</b>이고, business_dataset에 대응 업무 테이블이 등록돼 있지 않아 승격 단계 자체가
+      없습니다(대장 공시지가 <code>kras.land_price</code>는 land_info 데이터셋 소유라 이 파일에서 채우지 않습니다).
+      파일 컬럼 순서는 kras.md에 없어 기존 <code>KrasTxtLoaderService</code>가 쓰는 순서
+      (land_cd, base_year, jiga, base_mon, pyo_yn)를 그대로 따릅니다.
+    </p>
+    <div th:unless="${landPriceFileStatus == 'VERIFIED' and landPriceFileEnabled}">
+      <form method="post" action="/kras-db/verify-dataset" id="verify-form-land-price-file">
+        <input type="hidden" name="datasetCode" value="land_price_file">
+        <div class="confirm-row">
+          <input type="checkbox" id="verify-confirm-land-price-file" onchange="document.getElementById('verify-submit-land-price-file').disabled = !this.checked;">
+          <label for="verify-confirm-land-price-file">실제 운영 파일로 land_price_file 계약을 확인했음</label>
+        </div>
+        <input type="hidden" name="confirmed" id="verify-confirmed-land-price-file" value="false">
+        <button type="submit" id="verify-submit-land-price-file" class="btn btn-primary" disabled
+                onclick="document.getElementById('verify-confirmed-land-price-file').value='true';">계약 확인 → VERIFIED로 전환</button>
+      </form>
+    </div>
+    <form th:if="${landPriceFileStatus == 'VERIFIED' and landPriceFileEnabled}" method="post" action="/kras-db/revert-dataset"
+          onsubmit="return confirm('land_price_file 검증을 원복하시겠습니까?');">
+      <input type="hidden" name="datasetCode" value="land_price_file">
+      <button type="submit" class="btn btn-secondary">검증 원복</button>
+    </form>
+    <div class="stat-row" style="margin:14px 0;">
+      <div class="stat-box">
+        <div class="stat-label">kras.land_price_file_row 현재 건수</div>
+        <div class="stat-value accent" th:text="${landPriceFileRowCount}">0</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;">
+      <button class="btn btn-primary" id="btn-land-price-file-ingest" th:disabled="${landPriceFileRunning}"
+              onclick="runLandPriceFileIngest()">전체 TXT 수집</button>
+    </div>
+    <div id="land-price-file-result" class="result-box" th:if="${lastLandPriceFileResult}" th:text="${lastLandPriceFileResult}"></div>
+    <div id="land-price-file-result-js" class="result-box" style="display:none;"></div>
+  </div>
+
 </main>
 
 <th:block layout:fragment="scripts">
@@ -1292,6 +1405,40 @@ function runUsezonePublish() {
   return runUsezoneAction('/kras-db/usezone/publish?releaseId=' + encodeURIComponent(releaseId));
 }
 function runUsezoneSyncPublic() { return runUsezoneAction('/kras-db/usezone/sync-public'); }
+
+// 전체 TXT 2종 — PNU가 없어 runPnuIngest를 못 쓴다(입력값 자체가 없음). 수집 성공 시 item_id를 기억해 승격을 연다.
+const txtItemIds = {};
+async function runTxtAction(slug, url) {
+  const ingestBtn = document.getElementById('btn-' + slug + '-ingest');
+  const promoteBtn = document.getElementById('btn-' + slug + '-promote');
+  const box = document.getElementById(slug + '-result-js');
+  ingestBtn.disabled = true;
+  if (promoteBtn) promoteBtn.disabled = true;
+  box.style.display = 'block';
+  box.className = 'result-box';
+  box.textContent = '실행 중... (전체 파일이라 시간이 걸릴 수 있습니다)';
+  try {
+    const res = await fetch(url, { method: 'POST' });
+    const data = await res.json();
+    box.textContent = data.message || JSON.stringify(data);
+    box.classList.add(data.success ? 'ok' : 'err');
+    if (data.success && data.promotable && data.itemId) txtItemIds[slug] = data.itemId;
+  } catch (err) {
+    box.textContent = '요청 실패: ' + err;
+    box.classList.add('err');
+  } finally {
+    ingestBtn.disabled = false;
+    if (promoteBtn) promoteBtn.disabled = !txtItemIds[slug];
+  }
+}
+
+function runLandBasicFileIngest() { return runTxtAction('land-basic-file', '/kras-db/ingest/land-basic-file'); }
+function runLandBasicFilePromote() {
+  const itemId = txtItemIds['land-basic-file'];
+  if (!itemId) return;
+  return runTxtAction('land-basic-file', '/kras-db/promote/land-basic-file?itemId=' + itemId);
+}
+function runLandPriceFileIngest() { return runTxtAction('land-price-file', '/kras-db/ingest/land-price-file'); }
 </script>
 </th:block>
 </body>

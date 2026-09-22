@@ -32,7 +32,8 @@
     ├─ KrasCadastralIngestService   연속지적 SHP    → kras.cadastral_feature  → public.lp_pa_cbnd
     ├─ KrasUsezoneIngestService     용도지역 SHP    → kras.usezone_feature    → public.lt_c_uzone
     ├─ KrasPnuIngestService         PNU 단건 XML    → kras.stage_*            → 업무 테이블
-    └─ KrasDateRangeIngestService   기간 조회 XML   → kras.stage_*            → 업무 테이블
+    ├─ KrasDateRangeIngestService   기간 조회 XML   → kras.stage_*            → 업무 테이블
+    └─ KrasTxtIngestService         전체 TXT        → kras.stage_* / 원본표     → 업무 테이블
 ```
 
 신규 경로는 **새 클래스 + 새 컨트롤러 + 새 화면**으로만 존재한다. `KrasWorker`, `OdsRepository`,
@@ -43,11 +44,15 @@
 `KrasWorkspaceScanner.loadShpFile()`(SHP 파싱), `TableMapper`(base-tables.xml 정의),
 `UsezoneCodeService`(용도지역 코드 테이블). 이들 자체는 수정하지 않고 호출만 한다.
 
+기존 `KrasTxtLoaderService`(TXT → `ods.*`)는 **재사용하지 않고 참고만** 했다 — 그쪽
+`detectDelimiter`는 파이프/탭/콤마만 보고 kras.md §16의 ASCII 11을 모른다. 컬럼 순서는 가져오되
+파싱은 신규 서비스에 따로 썼다.
+
 ---
 
 ## 2. 클래스 구성
 
-### 2.1 적재 서비스 4개
+### 2.1 적재 서비스 5개
 
 | 클래스 | 담당 | 최상위 식별자 | 승격 대상 |
 |---|---|---|---|
@@ -55,10 +60,11 @@
 | `KrasUsezoneIngestService` | 용도지역 SHP(다중 레이어) | `LAYER:{레이어코드}` | `public.lt_c_uzone` |
 | `KrasPnuIngestService` | PNU 단건 XML API | PNU(19자리) | kras 업무 테이블 |
 | `KrasDateRangeIngestService` | 기간 조회 XML API | 시작일~종료일 | kras 업무 테이블 |
+| `KrasTxtIngestService` | 전체 TXT 2종 | `ALL`(기관 전체) | kras 업무 테이블 / 원본 보존 테이블 |
 
-**왜 4개로 나눴나** — 최상위 식별자(scope)가 서로 다르기 때문이다. PNU 단건과 기간 조회는 수집
+**왜 나눠 뒀나** — 최상위 식별자(scope)가 서로 다르기 때문이다. PNU 단건과 기간 조회는 수집
 절차의 모양이 거의 같지만 "무엇 하나를 가리키는가"가 다르고(PNU vs 날짜 범위), 이걸 한 서비스에
-합치면 양쪽 모두에 `null` 파라미터가 생긴다. SHP 계열 둘은 아예 XML이 아니라 파일이라 구조가 다르다.
+합치면 양쪽 모두에 `null` 파라미터가 생긴다. SHP/TXT 계열은 아예 XML이 아니라 파일이라 구조가 다르다.
 
 ### 2.2 매퍼 (XML → stage 행)
 
@@ -286,6 +292,30 @@ geom이 정확히 같은지 검사하기 때문이다 — 부동소수점 재파
 
 ---
 
+## 10.3 전체 TXT 두 개 (`KrasTxtIngestService`)
+
+기관 전체 토지를 한 파일로 받는 FULL 수집모드. `scope_key`는 `ALL`이다.
+인코딩은 EUC-KR, 구분자는 **ASCII 11**(kras.md §16의 `♂`, DDL `sync_file.delimiter_code=11`)을
+정본으로 보고, 없으면 파이프/탭/콤마 순으로 내려간다.
+
+| dataset | 파일 항목 | 적재 대상 | 승격 |
+|---|---|---|---|
+| `land_basic_file`(KRAS000040) | 8개 — 앞 5개를 이어붙이면 19자리 PNU, 나머지가 지목·면적·소유구분 | `stage_parcel` + `stage_land_basic` | 있음(패턴 A×2) |
+| `land_price_file`(KRAS000039) | 5개 — land_cd, base_year, jiga, base_mon, pyo_yn | `land_price_file_row` 직행 | **없음** |
+
+`land_price_file`에 승격이 없는 이유는 `kras.land_price_file_row`가 업무 테이블이 아니라
+`spatial_feature`와 같은 **원본 보존 테이블**(`guard_item_content`가 SUCCESS 후 불변을 강제)이고,
+`business_dataset`에 대응 업무 테이블이 등록돼 있지 않기 때문이다. 대장 공시지가 `kras.land_price`는
+`land_info` 데이터셋 소유라 이 파일에서 채우지 않는다.
+
+**한 줄이라도 파싱에 실패하면 SUCCESS로 올리지 않는다.** 전체 파일이라 조용히 건너뛰면 어느 필지가
+빠졌는지 알 수 없다 — 경고(최대 20건까지 보관)를 화면에 띄우고 승격을 막는다.
+
+파싱만 따로 검증하는 `KrasTxtIngestServiceParseTest`가 있다(DB·API 없이 도는 단위 테스트) —
+구분자 판정과 헤더 스킵이 틀리면 수십만 행이 통째로 잘못 들어가기 때문이다.
+
+---
+
 ## 11. 컨트롤러 레지스트리 — 서비스를 추가하는 방법
 
 `KrasSchemaController`는 매퍼가 늘어날 때마다 필드·엔드포인트 쌍을 복붙하지 않는다.
@@ -322,6 +352,8 @@ private static final List<DateRangeService> DATE_RANGE_SERVICES = List.of(
 | `POST /kras-db/usezone/collect-catalog` · `sweep` · `publish` · `sync-public` | 용도지역 4단계 |
 | `POST /kras-db/ingest/{slug}` · `promote/{slug}` | PNU 단건 공용 |
 | `POST /kras-db/ingest-range/{slug}` · `promote-range/{slug}` | 기간 조회 공용 |
+| `POST /kras-db/ingest/land-basic-file` · `promote/land-basic-file` | 토지기본정보 전체 TXT |
+| `POST /kras-db/ingest/land-price-file` | 공시지가 전체 TXT(승격 없음) |
 
 `{slug}`는 레지스트리에 등록된 것만 허용한다 — 클라이언트가 임의 `dataset_code`로 다른 매퍼를
 부를 수 없다.
@@ -340,14 +372,16 @@ private static final List<DateRangeService> DATE_RANGE_SERVICES = List.of(
 
 ---
 
-## 13. 현재 구현된 데이터셋 15개
+## 13. 현재 구현된 데이터셋 17개
 
-### SHP/파일 계열 (2)
+### SHP/파일 계열 (4)
 
 | dataset_code | 서비스 | 상태 |
 |---|---|---|
 | `cadastral_file` | KRAS000038 (연속지적) | 구현 완료 |
 | `usezone_file` + `layer_list` | KRAS000038/37 (용도지역) | 구현 완료 |
+| `land_basic_file` | KRAS000040 (토지기본정보 전체 TXT) | 구현 완료 |
+| `land_price_file` | KRAS000039 (공시지가 전체 TXT) | 구현 완료 — 승격 단계 없음 |
 
 ### PNU 단건 XML (11)
 
@@ -394,8 +428,7 @@ private static final List<DateRangeService> DATE_RANGE_SERVICES = List.of(
 
 | 항목 | 상태 | 막는 것 |
 |---|---|---|
-| PNU 단건 14개 (`bldg_hds_info` 등 KRAS 9종 + KOREPS 5종) | 미착수 | **kras.md에 해당 서비스 규격이 없음.** §1~16 어디에도 XML 구조가 문서화돼 있지 않아 실제 응답 없이는 매퍼 작성 불가 |
+| PNU 단건 14개 (`bldg_hds_info` 등 KRAS 9종 + KOREPS 5종) | 미착수 | **kras.md에 해당 서비스 규격이 없음.** 서비스 코드(KRAS000014~017/025~027/102/103, KOREPS 5종)가 §1~16 어디에도 등장하지 않는다 — 실제 응답 없이는 매퍼 작성 불가 |
 | `land_owner_change`(§11), `unit_owner_change`(§12) | 미착수 | **kras.md 문서 오류.** §11·§12 내용이 §10과 필드명·샘플값까지 완전히 동일하게 중복 기재됨 |
-| `land_basic_file`(KRAS000040), `land_price_file`(KRAS000039) | 미착수 | 막는 것 없음. §16에 포맷이 있고 레거시 `KrasTxtLoaderService`에 컬럼 순서·구분자·인코딩이 이미 있음 |
 | 스케줄 자동화 | 미착수 | 막는 것 없음. `kras.sync_work` 큐는 DDL에 이미 존재. 수동 트리거가 충분히 검증된 뒤 착수하는 게 원칙 |
 | `/conn`,`/svc` 실서빙 전환 | 미착수 | `kras.api_response`/`api_bundle` 계층이 아직 안 채워짐. 운영 트래픽·지연 실측 후 판단할 문제 |
