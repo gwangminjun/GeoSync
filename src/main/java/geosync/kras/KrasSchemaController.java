@@ -99,7 +99,7 @@ public class KrasSchemaController {
 
     /** verify/revert-dataset이 건드릴 수 있는 dataset_code 화이트리스트 — 임의 문자열로 다른 데이터셋을 켜지 못하게 막는다. */
     private static final Set<String> VERIFIABLE_DATASETS = Stream.of(
-            Stream.of("cadastral_file"),
+            Stream.of("cadastral_file", "layer_list", "usezone_file"),
             IMPLEMENTED_SERVICES.stream().map(ImplementedService::datasetCode),
             DATE_RANGE_SERVICES.stream().map(DateRangeService::datasetCode),
             PNU_APIS.stream().map(PnuApiInfo::datasetCode)
@@ -113,6 +113,7 @@ public class KrasSchemaController {
     private final KrasCadastralIngestService cadastralIngestService;
     private final KrasPnuIngestService pnuIngestService;
     private final KrasDateRangeIngestService dateRangeIngestService;
+    private final KrasUsezoneIngestService usezoneIngestService;
     private final Map<String, String> slugToDatasetCode;
     private final Map<String, KrasXmlServiceMapper> mappersByDatasetCode;
     private final Map<String, String> dateRangeSlugToDatasetCode;
@@ -124,12 +125,16 @@ public class KrasSchemaController {
     private final Map<String, AtomicBoolean> runningByDatasetCode = new ConcurrentHashMap<>();
     private final Map<String, String> lastResultByDatasetCode = new ConcurrentHashMap<>();
 
+    private final AtomicBoolean usezoneRunning = new AtomicBoolean(false);
+    private volatile String lastUsezoneResult;
+
     public KrasSchemaController(TargetDbService targetDbService, RuntimeSettingsService settings,
                                  KrasApiClient krasApiClient, KrasWorkspaceScanner workspaceScanner,
                                  TableMapper tableMapper, KrasCadastralIngestService cadastralIngestService,
                                  KrasPnuIngestService pnuIngestService, List<KrasXmlServiceMapper> mappers,
                                  KrasDateRangeIngestService dateRangeIngestService,
-                                 List<KrasDateRangeServiceMapper> dateRangeMappers) {
+                                 List<KrasDateRangeServiceMapper> dateRangeMappers,
+                                 KrasUsezoneIngestService usezoneIngestService) {
         this.targetDbService = targetDbService;
         this.settings = settings;
         this.krasApiClient = krasApiClient;
@@ -138,6 +143,7 @@ public class KrasSchemaController {
         this.cadastralIngestService = cadastralIngestService;
         this.pnuIngestService = pnuIngestService;
         this.dateRangeIngestService = dateRangeIngestService;
+        this.usezoneIngestService = usezoneIngestService;
         this.mappersByDatasetCode = mappers.stream()
                 .collect(Collectors.toUnmodifiableMap(KrasXmlServiceMapper::datasetCode, m -> m));
         this.slugToDatasetCode = IMPLEMENTED_SERVICES.stream()
@@ -204,6 +210,52 @@ public class KrasSchemaController {
             ORDER BY si.item_id DESC LIMIT 20
             """, settings.orgCode());
         model.addAttribute("recentRuns", recentRuns);
+
+        // 용도지역(usezone_file) — layer_list/usezone_file 두 데이터셋 다 계약 검증 필요(guard_item_transition).
+        Map<String, Map<String, Object>> usezoneDatasetStatus = batchDatasetStatus(jdbc,
+                List.of("layer_list", "usezone_file"));
+        Map<String, Object> layerListSt = usezoneDatasetStatus.get("layer_list");
+        model.addAttribute("layerListStatus", layerListSt != null ? layerListSt.get("contract_status") : "UNVERIFIED");
+        model.addAttribute("layerListEnabled", layerListSt != null && Boolean.TRUE.equals(layerListSt.get("enabled")));
+        Map<String, Object> usezoneFileSt = usezoneDatasetStatus.get("usezone_file");
+        model.addAttribute("usezoneFileStatus", usezoneFileSt != null ? usezoneFileSt.get("contract_status") : "UNVERIFIED");
+        model.addAttribute("usezoneFileEnabled", usezoneFileSt != null && Boolean.TRUE.equals(usezoneFileSt.get("enabled")));
+        model.addAttribute("usezoneRunning", usezoneRunning.get());
+        model.addAttribute("lastUsezoneResult", lastUsezoneResult);
+
+        List<Long> catalogItemIds = jdbc.query("""
+            SELECT item_id FROM kras.sync_item
+            WHERE org_cd=? AND dataset_code='layer_list' AND status='SUCCESS'
+            ORDER BY item_id DESC LIMIT 1
+            """, (rs, i) -> rs.getLong(1), settings.orgCode());
+        model.addAttribute("latestCatalogItemId", catalogItemIds.isEmpty() ? null : catalogItemIds.get(0));
+
+        List<Map<String, Object>> releases = jdbc.queryForList("""
+            SELECT release_id, status, catalog_item_id FROM kras.spatial_release
+            WHERE org_cd=? ORDER BY release_id DESC LIMIT 1
+            """, settings.orgCode());
+        if (!releases.isEmpty()) {
+            Map<String, Object> release = releases.get(0);
+            model.addAttribute("usezoneReleaseId", release.get("release_id"));
+            model.addAttribute("usezoneReleaseStatus", release.get("status"));
+            model.addAttribute("usezoneReleaseLayers", jdbc.queryForList("""
+                SELECT e.layer_code, si.status, si.rows_valid
+                FROM kras.spatial_release_expected e
+                LEFT JOIN kras.spatial_release_member m ON m.release_id=e.release_id AND m.layer_code=e.layer_code
+                LEFT JOIN kras.sync_item si ON si.item_id=m.item_id
+                WHERE e.release_id=?
+                ORDER BY e.layer_code
+                """, release.get("release_id")));
+        } else {
+            model.addAttribute("usezoneReleaseId", null);
+            model.addAttribute("usezoneReleaseStatus", null);
+            model.addAttribute("usezoneReleaseLayers", List.of());
+        }
+
+        Long uzoneKrasCount = jdbc.queryForObject("SELECT count(*) FROM kras.lt_c_uzone", Long.class);
+        Long uzonePublicCount = jdbc.queryForObject("SELECT count(*) FROM public.lt_c_uzone", Long.class);
+        model.addAttribute("uzoneKrasCount", uzoneKrasCount);
+        model.addAttribute("uzonePublicCount", uzonePublicCount);
 
         return "kras-db";
     }
@@ -300,6 +352,86 @@ public class KrasSchemaController {
             log.error("[KrasSchema] 연속지적 승격 실패: {}", e.getMessage(), e);
             lastCadastralResult = "승격 실패: " + e.getMessage();
             return Map.of("success", false, "message", lastCadastralResult);
+        }
+    }
+
+    /** 용도지역 §9.1 절차 0 — KRAS 레이어 목록을 layer_list item + sync_record로 동결. */
+    @PostMapping("/kras-db/usezone/collect-catalog")
+    @ResponseBody
+    public Map<String, Object> collectUsezoneCatalog() {
+        if (!usezoneRunning.compareAndSet(false, true)) {
+            return Map.of("error", "이미 실행 중입니다.");
+        }
+        try {
+            KrasUsezoneIngestService.CatalogResult result =
+                    usezoneIngestService.collectCatalog(jdbc(), settings.orgCode(), "UI");
+            String msg = "카탈로그 수집 성공: item_id=%d, %d개 레이어".formatted(result.itemId(), result.layerCodes().size());
+            lastUsezoneResult = msg;
+            return Map.of("success", true, "itemId", result.itemId(), "layerCount", result.layerCodes().size(),
+                    "message", msg);
+        } catch (Exception e) {
+            log.error("[KrasSchema] 용도지역 카탈로그 수집 실패: {}", e.getMessage(), e);
+            lastUsezoneResult = "카탈로그 수집 실패: " + e.getMessage();
+            return Map.of("success", false, "message", lastUsezoneResult);
+        } finally {
+            usezoneRunning.set(false);
+        }
+    }
+
+    /** 용도지역 §9.1 절차 1~4 — release 생성/seal + 레이어별 SHP 수집(레이어당 별도 트랜잭션, 부분 실패 허용). */
+    @PostMapping("/kras-db/usezone/sweep")
+    @ResponseBody
+    public Map<String, Object> sweepUsezoneLayers(@RequestParam long catalogItemId) {
+        if (!usezoneRunning.compareAndSet(false, true)) {
+            return Map.of("error", "이미 실행 중입니다.");
+        }
+        try {
+            KrasUsezoneIngestService.SweepResult result =
+                    usezoneIngestService.runLayerSweep(jdbc(), settings.orgCode(), catalogItemId, "UI");
+            long okCount = result.layers().stream().filter(KrasUsezoneIngestService.LayerResult::success).count();
+            String msg = "레이어 순회 완료: release_id=%d, %d/%d건 성공"
+                    .formatted(result.releaseId(), okCount, result.layers().size());
+            lastUsezoneResult = msg;
+            return Map.of("success", true, "releaseId", result.releaseId(), "layers", result.layers(),
+                    "message", msg);
+        } catch (Exception e) {
+            log.error("[KrasSchema] 용도지역 레이어 순회 실패: {}", e.getMessage(), e);
+            lastUsezoneResult = "레이어 순회 실패: " + e.getMessage();
+            return Map.of("success", false, "message", lastUsezoneResult);
+        } finally {
+            usezoneRunning.set(false);
+        }
+    }
+
+    /** 용도지역 §9.1 절차 5 — publish_spatial_release()가 전체 완전성을 검증(부분 실패 시 여기서 막힘). */
+    @PostMapping("/kras-db/usezone/publish")
+    @ResponseBody
+    public Map<String, Object> publishUsezoneRelease(@RequestParam long releaseId) {
+        try {
+            usezoneIngestService.publishRelease(jdbc(), releaseId);
+            String msg = "release 발행 성공: release_id=" + releaseId;
+            lastUsezoneResult = msg;
+            return Map.of("success", true, "releaseId", releaseId, "message", msg);
+        } catch (Exception e) {
+            log.error("[KrasSchema] 용도지역 release 발행 실패: {}", e.getMessage(), e);
+            lastUsezoneResult = "release 발행 실패: " + e.getMessage();
+            return Map.of("success", false, "message", lastUsezoneResult);
+        }
+    }
+
+    /** 용도지역 §9.1 절차 6 — 기존 kras.sync_public_usezone() 재사용, public.lt_c_uzone만 여기서 건드림. */
+    @PostMapping("/kras-db/usezone/sync-public")
+    @ResponseBody
+    public Map<String, Object> syncUsezonePublic() {
+        try {
+            long n = usezoneIngestService.syncPublic(jdbc());
+            String msg = "public 승격 성공: public.lt_c_uzone " + n + "건";
+            lastUsezoneResult = msg;
+            return Map.of("success", true, "rowCount", n, "message", msg);
+        } catch (Exception e) {
+            log.error("[KrasSchema] 용도지역 public 승격 실패: {}", e.getMessage(), e);
+            lastUsezoneResult = "public 승격 실패: " + e.getMessage();
+            return Map.of("success", false, "message", lastUsezoneResult);
         }
     }
 

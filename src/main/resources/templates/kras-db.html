@@ -946,6 +946,121 @@
     <p th:if="${#lists.isEmpty(recentRuns)}" style="font-size:13px;color:#5b626d;">실행 이력이 없습니다.</p>
   </div>
 
+  <!-- 카드 5a: 데이터셋 계약 상태 — layer_list -->
+  <div class="card">
+    <div class="card-title">
+      데이터셋 계약 상태 — layer_list
+      <span th:if="${layerListStatus == 'VERIFIED' and layerListEnabled}" class="badge badge-on">VERIFIED · enabled</span>
+      <span th:unless="${layerListStatus == 'VERIFIED' and layerListEnabled}" class="badge badge-warn"
+            th:text="${layerListStatus} + ' · ' + (${layerListEnabled} ? 'enabled' : 'disabled')"></span>
+    </div>
+    <p style="font-size:13px;color:#9aa2ad;margin-bottom:14px;">
+      "레이어 목록 조회"(KRAS000037) — 용도지역 카탈로그 수집(아래 카드)이 이 데이터셋으로 item을 만듭니다.
+    </p>
+    <div th:unless="${layerListStatus == 'VERIFIED' and layerListEnabled}">
+      <form method="post" action="/kras-db/verify-dataset" id="verify-form-layer-list">
+        <input type="hidden" name="datasetCode" value="layer_list">
+        <div class="confirm-row">
+          <input type="checkbox" id="verify-confirm-layer-list" onchange="document.getElementById('verify-submit-layer-list').disabled = !this.checked;">
+          <label for="verify-confirm-layer-list">실제 운영 응답으로 layer_list 계약을 확인했음</label>
+        </div>
+        <input type="hidden" name="confirmed" id="verify-confirmed-layer-list" value="false">
+        <button type="submit" id="verify-submit-layer-list" class="btn btn-primary" disabled
+                onclick="document.getElementById('verify-confirmed-layer-list').value='true';">계약 확인 → VERIFIED로 전환</button>
+      </form>
+    </div>
+    <form th:if="${layerListStatus == 'VERIFIED' and layerListEnabled}" method="post" action="/kras-db/revert-dataset"
+          onsubmit="return confirm('layer_list 검증을 원복하시겠습니까?');">
+      <input type="hidden" name="datasetCode" value="layer_list">
+      <button type="submit" class="btn btn-secondary">검증 원복</button>
+    </form>
+  </div>
+
+  <!-- 카드 5b: 데이터셋 계약 상태 — usezone_file -->
+  <div class="card">
+    <div class="card-title">
+      데이터셋 계약 상태 — usezone_file
+      <span th:if="${usezoneFileStatus == 'VERIFIED' and usezoneFileEnabled}" class="badge badge-on">VERIFIED · enabled</span>
+      <span th:unless="${usezoneFileStatus == 'VERIFIED' and usezoneFileEnabled}" class="badge badge-warn"
+            th:text="${usezoneFileStatus} + ' · ' + (${usezoneFileEnabled} ? 'enabled' : 'disabled')"></span>
+    </div>
+    <p style="font-size:13px;color:#9aa2ad;margin-bottom:14px;">
+      "SHAPE 다운로드"(KRAS000038)를 레이어별로 순회해 kras.usezone_feature에 적재합니다. 연속지적과 달리
+      기관 전체 레이어가 한 번에 완전해야 release가 발행됩니다(아래 카드).
+    </p>
+    <div th:unless="${usezoneFileStatus == 'VERIFIED' and usezoneFileEnabled}">
+      <form method="post" action="/kras-db/verify-dataset" id="verify-form-usezone-file">
+        <input type="hidden" name="datasetCode" value="usezone_file">
+        <div class="confirm-row">
+          <input type="checkbox" id="verify-confirm-usezone-file" onchange="document.getElementById('verify-submit-usezone-file').disabled = !this.checked;">
+          <label for="verify-confirm-usezone-file">실제 운영 응답으로 usezone_file 계약을 확인했음</label>
+        </div>
+        <input type="hidden" name="confirmed" id="verify-confirmed-usezone-file" value="false">
+        <button type="submit" id="verify-submit-usezone-file" class="btn btn-primary" disabled
+                onclick="document.getElementById('verify-confirmed-usezone-file').value='true';">계약 확인 → VERIFIED로 전환</button>
+      </form>
+    </div>
+    <form th:if="${usezoneFileStatus == 'VERIFIED' and usezoneFileEnabled}" method="post" action="/kras-db/revert-dataset"
+          onsubmit="return confirm('usezone_file 검증을 원복하시겠습니까?');">
+      <input type="hidden" name="datasetCode" value="usezone_file">
+      <button type="submit" class="btn btn-secondary">검증 원복</button>
+    </form>
+  </div>
+
+  <!-- 카드 5c: 용도지역 릴리즈 진행상태 (설계 §9.2) -->
+  <div class="card">
+    <div class="card-title">
+      용도지역 릴리즈 진행상태
+      <span th:if="${usezoneRunning}" class="badge badge-warn">실행 중</span>
+    </div>
+    <p style="font-size:13px;color:#9aa2ad;margin-bottom:14px;">
+      순서대로: <b>①카탈로그 수집</b>(레이어 목록 동결) → <b>②레이어 순회 시작</b>(release 생성+SHP 수집, 레이어당
+      별도 트랜잭션이라 일부 실패해도 나머지는 유지 — 실패한 레이어만 버튼을 다시 누르면 재시도) →
+      <b>③release 발행</b>(전체 레이어 완전성 검증, 하나라도 미완료면 막힘) → <b>④public 승격</b>(public.lt_c_uzone 반영).
+    </p>
+    <div class="stat-row" style="margin-bottom:14px;">
+      <div class="stat-box">
+        <div class="stat-label">최근 카탈로그 item_id</div>
+        <div class="stat-value" th:text="${latestCatalogItemId ?: '없음'}">없음</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-label">현재 release</div>
+        <div class="stat-value" th:text="${usezoneReleaseId != null ? (usezoneReleaseId + ' (' + usezoneReleaseStatus + ')') : '없음'}">없음</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-label">kras.lt_c_uzone (게시본)</div>
+        <div class="stat-value accent" th:text="${uzoneKrasCount}">0</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-label">public.lt_c_uzone</div>
+        <div class="stat-value" th:text="${uzonePublicCount}">0</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;">
+      <button class="btn btn-primary" id="btn-usezone-catalog" th:disabled="${usezoneRunning}" onclick="runUsezoneCollectCatalog()">①카탈로그 수집</button>
+      <button class="btn btn-primary" id="btn-usezone-sweep" th:disabled="${usezoneRunning or latestCatalogItemId == null}"
+              th:attr="data-catalog-item-id=${latestCatalogItemId}" onclick="runUsezoneSweep()">②레이어 순회 시작</button>
+      <button class="btn btn-secondary" id="btn-usezone-publish" th:disabled="${usezoneRunning or usezoneReleaseId == null}"
+              th:attr="data-release-id=${usezoneReleaseId}" onclick="runUsezonePublish()">③release 발행</button>
+      <button class="btn btn-secondary" id="btn-usezone-sync-public" th:disabled="${usezoneRunning}" onclick="runUsezoneSyncPublic()">④public 승격</button>
+    </div>
+    <div style="overflow-x:auto;margin-bottom:14px;" th:if="${not #lists.isEmpty(usezoneReleaseLayers)}">
+      <table class="hist-table">
+        <thead><tr><th>layer_code</th><th>status</th><th>rows_valid</th></tr></thead>
+        <tbody>
+          <tr th:each="l : ${usezoneReleaseLayers}">
+            <td th:text="${l.layer_code}"></td>
+            <td th:text="${l.status ?: '대기'}"></td>
+            <td th:text="${l.rows_valid}"></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div id="usezone-result" class="result-box" th:if="${lastUsezoneResult}" th:text="${lastUsezoneResult}"></div>
+    <div id="usezone-result-js" class="result-box" style="display:none;"></div>
+    <pre id="usezone-layers-js" class="result-box" style="display:none;"></pre>
+  </div>
+
 </main>
 
 <th:block layout:fragment="scripts">
@@ -1136,6 +1251,47 @@ function runIntegratedBuildingIngest() { return runPnuIngest('integrated-buildin
 function runIntegratedBuildingPromote() { return runPnuPromote('integrated-building'); }
 function runBuildingImageIngest() { return runPnuIngest('building-image'); }
 function runBuildingImagePromote() { return runPnuPromote('building-image'); }
+
+// 용도지역 배치(설계 §9.2) — 4버튼, 성공하면 페이지를 새로고침해 최신 상태(item_id/release_id/레이어 표)를 반영한다.
+async function runUsezoneAction(url, method) {
+  const btns = ['btn-usezone-catalog', 'btn-usezone-sweep', 'btn-usezone-publish', 'btn-usezone-sync-public'];
+  btns.forEach(id => document.getElementById(id).disabled = true);
+  const box = document.getElementById('usezone-result-js');
+  const layersBox = document.getElementById('usezone-layers-js');
+  box.style.display = 'block';
+  box.className = 'result-box';
+  box.textContent = '실행 중...';
+  layersBox.style.display = 'none';
+  try {
+    const res = await fetch(url, { method: method || 'POST' });
+    const data = await res.json();
+    box.textContent = data.message || JSON.stringify(data);
+    box.classList.add(data.success ? 'ok' : 'err');
+    if (data.success && data.layers) {
+      layersBox.style.display = 'block';
+      layersBox.textContent = JSON.stringify(data.layers, null, 2);
+    }
+    if (data.success) {
+      setTimeout(() => location.reload(), 1500);
+    }
+  } catch (err) {
+    box.textContent = '요청 실패: ' + err;
+    box.classList.add('err');
+  } finally {
+    btns.forEach(id => { const el = document.getElementById(id); if (el) el.disabled = false; });
+  }
+}
+
+function runUsezoneCollectCatalog() { return runUsezoneAction('/kras-db/usezone/collect-catalog'); }
+function runUsezoneSweep() {
+  const catalogItemId = document.getElementById('btn-usezone-sweep').dataset.catalogItemId;
+  return runUsezoneAction('/kras-db/usezone/sweep?catalogItemId=' + encodeURIComponent(catalogItemId));
+}
+function runUsezonePublish() {
+  const releaseId = document.getElementById('btn-usezone-publish').dataset.releaseId;
+  return runUsezoneAction('/kras-db/usezone/publish?releaseId=' + encodeURIComponent(releaseId));
+}
+function runUsezoneSyncPublic() { return runUsezoneAction('/kras-db/usezone/sync-public'); }
 </script>
 </th:block>
 </body>
