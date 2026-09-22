@@ -58,7 +58,9 @@ public class KrasSchemaController {
         new ImplementedService("shr-ymb", "shr_ymb", "shrYmb"),
         new ImplementedService("own-rgt-hist", "own_rgt_hist", "ownRgtHist"),
         new ImplementedService("land-mov-hist", "land_mov_hist", "landMovHist"),
-        new ImplementedService("collective-unit", "collective_unit", "collectiveUnit")
+        new ImplementedService("collective-unit", "collective_unit", "collectiveUnit"),
+        new ImplementedService("land-right", "land_right", "landRight"),
+        new ImplementedService("unit-ownership-history", "unit_ownership_history", "unitOwnershipHistory")
     );
 
     /**

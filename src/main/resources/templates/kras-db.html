@@ -611,11 +611,110 @@
     <pre id="collective-unit-preview" class="result-box" style="display:none;"></pre>
   </div>
 
+  <!-- 카드 1b-15: 데이터셋 계약 상태 + 테스트 — land_right -->
+  <div class="card">
+    <div class="card-title">
+      데이터셋 계약 상태 — land_right
+      <span th:if="${landRightStatus == 'VERIFIED' and landRightEnabled}" class="badge badge-on">VERIFIED · enabled</span>
+      <span th:unless="${landRightStatus == 'VERIFIED' and landRightEnabled}" class="badge badge-warn"
+            th:text="${landRightStatus} + ' · ' + (${landRightEnabled} ? 'enabled' : 'disabled')"></span>
+      <span class="badge" style="background:#3a1f1f;color:#e88a82;">conn_svc_id 미확인</span>
+      <span th:if="${landRightRunning}" class="badge badge-warn">실행 중</span>
+    </div>
+    <p style="font-size:13px;color:#9aa2ad;margin-bottom:14px;">
+      "대지권등록부" — <b>드릴다운 2단계</b>(collective_unit 다음): cbldg_seqno+dong+flr+ho+sil이 전부
+      필요합니다(docs/reference/kras.md §6). 응답의 LAND_RGT는 <code>kras.land_right</code>로,
+      OWN_HIST는 <code>kras.unit_ownership_history</code>로(source_service='land_right') 갑니다.
+      부모(collective_unit)를 먼저 승격해둬야 승격이 성공합니다. conn_svc_id 미확인이라 실제 호출은
+      막혀 있습니다.
+    </p>
+    <div th:unless="${landRightStatus == 'VERIFIED' and landRightEnabled}">
+      <form method="post" action="/kras-db/verify-dataset" id="verify-form-land-right">
+        <input type="hidden" name="datasetCode" value="land_right">
+        <div class="confirm-row">
+          <input type="checkbox" id="verify-confirm-land-right" onchange="document.getElementById('verify-submit-land-right').disabled = !this.checked;">
+          <label for="verify-confirm-land-right">실제 운영 응답으로 land_right 계약을 확인했음</label>
+        </div>
+        <input type="hidden" name="confirmed" id="verify-confirmed-land-right" value="false">
+        <button type="submit" id="verify-submit-land-right" class="btn btn-primary" disabled
+                onclick="document.getElementById('verify-confirmed-land-right').value='true';">계약 확인 → VERIFIED로 전환</button>
+      </form>
+    </div>
+    <form th:if="${landRightStatus == 'VERIFIED' and landRightEnabled}" method="post" action="/kras-db/revert-dataset"
+          onsubmit="return confirm('land_right 검증을 원복하시겠습니까?');">
+      <input type="hidden" name="datasetCode" value="land_right">
+      <button type="submit" class="btn btn-secondary">검증 원복</button>
+    </form>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:14px;">
+      <input type="text" id="land-right-pnu" placeholder="PNU 19자리" maxlength="19"
+             style="padding:8px 12px;border-radius:8px;border:1px solid #2e3640;background:#14171c;color:#e7eaee;font-family:'JetBrains Mono',monospace;width:220px;">
+      <input type="text" id="land-right-extra-params" placeholder='추가 파라미터(JSON), 예: {"cbldg_seqno":"0285","dong":"","flr":"1","ho":"102","sil":""}'
+             style="padding:8px 12px;border-radius:8px;border:1px solid #2e3640;background:#14171c;color:#e7eaee;font-family:'JetBrains Mono',monospace;flex:1;min-width:320px;">
+    </div>
+    <div style="display:flex;gap:10px;margin-top:10px;">
+      <button class="btn btn-primary" id="btn-land-right-ingest" th:disabled="${landRightRunning}" onclick="runLandRightIngest()">테스트 수집</button>
+      <button class="btn btn-secondary" id="btn-land-right-promote" th:disabled="${landRightRunning}" disabled onclick="runLandRightPromote()">업무 테이블로 승격</button>
+    </div>
+    <div id="land-right-result" class="result-box" th:if="${lastLandRightResult}" th:text="${lastLandRightResult}"></div>
+    <div id="land-right-result-js" class="result-box" style="display:none;"></div>
+    <pre id="land-right-preview" class="result-box" style="display:none;"></pre>
+  </div>
+
+  <!-- 카드 1b-16: 데이터셋 계약 상태 + 테스트 — unit_ownership_history -->
+  <div class="card">
+    <div class="card-title">
+      데이터셋 계약 상태 — unit_ownership_history
+      <span th:if="${unitOwnershipHistoryStatus == 'VERIFIED' and unitOwnershipHistoryEnabled}" class="badge badge-on">VERIFIED · enabled</span>
+      <span th:unless="${unitOwnershipHistoryStatus == 'VERIFIED' and unitOwnershipHistoryEnabled}" class="badge badge-warn"
+            th:text="${unitOwnershipHistoryStatus} + ' · ' + (${unitOwnershipHistoryEnabled} ? 'enabled' : 'disabled')"></span>
+      <span class="badge" style="background:#3a1f1f;color:#e88a82;">conn_svc_id 미확인</span>
+      <span th:if="${unitOwnershipHistoryRunning}" class="badge badge-warn">실행 중</span>
+    </div>
+    <p style="font-size:13px;color:#9aa2ad;margin-bottom:14px;">
+      "집합건물소유권연혁" — land_right와 같은 깊이의 드릴다운이지만 <b>이 서비스는 PNU를 아예 입력받지
+      않습니다</b>(docs/reference/kras.md §9, 소재지코드+cbldg_seqno+동/층/호/실만 받음). 아래 PNU
+      입력은 KRAS로 보내는 값이 아니라 이 매퍼가 부모(collective_unit)를 찾는 용도로만 씁니다 — 실제
+      호출 시 PNU를 분해한 본번/부번까지 같이 전송될 수 있는데 이 서비스가 그걸 원치 않을 수도 있습니다
+      (확인 전까지는 모름). 응답은 <code>kras.unit_ownership_history</code>에 source_service=
+      'unit_ownership_history'로 쌓입니다.
+    </p>
+    <div th:unless="${unitOwnershipHistoryStatus == 'VERIFIED' and unitOwnershipHistoryEnabled}">
+      <form method="post" action="/kras-db/verify-dataset" id="verify-form-unit-ownership-history">
+        <input type="hidden" name="datasetCode" value="unit_ownership_history">
+        <div class="confirm-row">
+          <input type="checkbox" id="verify-confirm-unit-ownership-history" onchange="document.getElementById('verify-submit-unit-ownership-history').disabled = !this.checked;">
+          <label for="verify-confirm-unit-ownership-history">실제 운영 응답으로 unit_ownership_history 계약을 확인했음</label>
+        </div>
+        <input type="hidden" name="confirmed" id="verify-confirmed-unit-ownership-history" value="false">
+        <button type="submit" id="verify-submit-unit-ownership-history" class="btn btn-primary" disabled
+                onclick="document.getElementById('verify-confirmed-unit-ownership-history').value='true';">계약 확인 → VERIFIED로 전환</button>
+      </form>
+    </div>
+    <form th:if="${unitOwnershipHistoryStatus == 'VERIFIED' and unitOwnershipHistoryEnabled}" method="post" action="/kras-db/revert-dataset"
+          onsubmit="return confirm('unit_ownership_history 검증을 원복하시겠습니까?');">
+      <input type="hidden" name="datasetCode" value="unit_ownership_history">
+      <button type="submit" class="btn btn-secondary">검증 원복</button>
+    </form>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:14px;">
+      <input type="text" id="unit-ownership-history-pnu" placeholder="PNU 19자리(장부 정리용)" maxlength="19"
+             style="padding:8px 12px;border-radius:8px;border:1px solid #2e3640;background:#14171c;color:#e7eaee;font-family:'JetBrains Mono',monospace;width:220px;">
+      <input type="text" id="unit-ownership-history-extra-params" placeholder='추가 파라미터(JSON), 예: {"cbldg_seqno":"0018","dong":"","flr":"1","ho":"102","sil":""}'
+             style="padding:8px 12px;border-radius:8px;border:1px solid #2e3640;background:#14171c;color:#e7eaee;font-family:'JetBrains Mono',monospace;flex:1;min-width:320px;">
+    </div>
+    <div style="display:flex;gap:10px;margin-top:10px;">
+      <button class="btn btn-primary" id="btn-unit-ownership-history-ingest" th:disabled="${unitOwnershipHistoryRunning}" onclick="runUnitOwnershipHistoryIngest()">테스트 수집</button>
+      <button class="btn btn-secondary" id="btn-unit-ownership-history-promote" th:disabled="${unitOwnershipHistoryRunning}" disabled onclick="runUnitOwnershipHistoryPromote()">업무 테이블로 승격</button>
+    </div>
+    <div id="unit-ownership-history-result" class="result-box" th:if="${lastUnitOwnershipHistoryResult}" th:text="${lastUnitOwnershipHistoryResult}"></div>
+    <div id="unit-ownership-history-result-js" class="result-box" style="display:none;"></div>
+    <pre id="unit-ownership-history-preview" class="result-box" style="display:none;"></pre>
+  </div>
+
   <!-- 카드 1c: PNU 단건 API 계약 상태 — land_info/land_bldg_check/shr_ymb/own_rgt_hist/land_mov_hist 제외 14개 -->
   <div class="card">
     <div class="card-title">데이터셋 계약 상태 — PNU 단건 API 14개</div>
     <p style="font-size:13px;color:#9aa2ad;margin-bottom:14px;">
-      아직 실제 파싱·적재 매퍼는 없습니다(land_info/land_bldg_check/collective_building/shr_ymb/own_rgt_hist/land_mov_hist/collective_unit만 구현됨) — 이 표는 각 API가 나중에 어떤 업무 테이블로
+      아직 실제 파싱·적재 매퍼는 없습니다(land_info/land_bldg_check/collective_building/shr_ymb/own_rgt_hist/land_mov_hist/collective_unit/land_right/unit_ownership_history만 구현됨) — 이 표는 각 API가 나중에 어떤 업무 테이블로
       승격될지 미리 정리해 둔 것입니다. "테스트"로 실제 응답을 먼저 확인한 뒤 VERIFIED로 전환하세요.
     </p>
     <div style="overflow-x:auto;">
@@ -812,6 +911,10 @@ function runLandMovHistIngest() { return runPnuIngest('land-mov-hist'); }
 function runLandMovHistPromote() { return runPnuPromote('land-mov-hist'); }
 function runCollectiveUnitIngest() { return runPnuIngest('collective-unit'); }
 function runCollectiveUnitPromote() { return runPnuPromote('collective-unit'); }
+function runLandRightIngest() { return runPnuIngest('land-right'); }
+function runLandRightPromote() { return runPnuPromote('land-right'); }
+function runUnitOwnershipHistoryIngest() { return runPnuIngest('unit-ownership-history'); }
+function runUnitOwnershipHistoryPromote() { return runPnuPromote('unit-ownership-history'); }
 </script>
 </th:block>
 </body>
