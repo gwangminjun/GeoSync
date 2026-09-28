@@ -22,3 +22,6 @@ workspace/kras/**/*.json
 *.iml
 .worktrees/
 out/
+CLAUDE.local.md
+.claude/settings.local.json
+__pycache__/
