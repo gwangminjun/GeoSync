@@ -24,7 +24,7 @@
 <body>
 
 <!-- ===== nav ===== -->
-<div style="border-bottom:1px solid #232830;background:#171b21;position:sticky;top:0;z-index:10;">
+<div id="app-nav" style="border-bottom:1px solid #232830;background:#171b21;position:sticky;top:0;z-index:10;">
   <div style="max-width:1200px;margin:0 auto;display:flex;align-items:center;gap:18px;padding:0 28px;height:60px;">
     <div style="font-size:18px;font-weight:800;color:#f3f5f7;letter-spacing:-0.02em;">
       Geo<span style="color:#0e9b94;">Sync</span>
@@ -53,12 +53,16 @@
       <a th:href="@{/conn-stats}"
          th:style="${currentPage == 'conn-stats'} ? 'padding:8px 14px;border-radius:8px;font-weight:600;color:#66c4be;background:rgba(14,155,148,0.16);' : 'padding:8px 14px;border-radius:8px;font-weight:500;color:#8a919c;'">
         API 통계</a>
+      <!-- 로그 메뉴 (주석 처리)
       <a th:href="@{/logs}"
          th:style="${currentPage == 'logs'} ? 'padding:8px 14px;border-radius:8px;font-weight:600;color:#66c4be;background:rgba(14,155,148,0.16);' : 'padding:8px 14px;border-radius:8px;font-weight:500;color:#8a919c;'">
         로그</a>
+      -->
+      <!-- 데이터베이스 메뉴 (주석 처리)
       <a th:href="@{/ods}"
          th:style="${currentPage == 'ods'} ? 'padding:8px 14px;border-radius:8px;font-weight:600;color:#66c4be;background:rgba(14,155,148,0.16);' : 'padding:8px 14px;border-radius:8px;font-weight:500;color:#8a919c;'">
         데이터베이스</a>
+      -->
       <a th:href="@{/schedule}"
          th:style="${currentPage == 'schedule'} ? 'padding:8px 14px;border-radius:8px;font-weight:600;color:#66c4be;background:rgba(14,155,148,0.16);' : 'padding:8px 14px;border-radius:8px;font-weight:500;color:#8a919c;'">
         스케줄</a>
@@ -71,6 +75,9 @@
       <a th:href="@{/kras-db}"
          th:style="${currentPage == 'kras-db'} ? 'padding:8px 14px;border-radius:8px;font-weight:600;color:#66c4be;background:rgba(14,155,148,0.16);' : 'padding:8px 14px;border-radius:8px;font-weight:500;color:#8a919c;'">
         KRAS 연계 관리</a>
+      <a th:href="@{/kras-stats}"
+         th:style="${currentPage == 'kras-stats'} ? 'padding:8px 14px;border-radius:8px;font-weight:600;color:#66c4be;background:rgba(14,155,148,0.16);' : 'padding:8px 14px;border-radius:8px;font-weight:500;color:#8a919c;'">
+        KRAS 통계</a>
     </div>
   </div>
 </div>

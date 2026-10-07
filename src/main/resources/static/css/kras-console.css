@@ -1,0 +1,86 @@
+  .card{background:#1b2029;border:1px solid #232a34;border-radius:14px;padding:26px 28px;margin-bottom:20px;}
+  .card-title{font-size:16px;font-weight:700;color:#e7eaee;margin-bottom:20px;display:flex;align-items:center;gap:10px;}
+  .badge{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:600;}
+  .badge-on{background:#0e3530;color:#3dddd4;}
+  .badge-off{background:#1e242c;color:#69707b;}
+  .badge-warn{background:#2a2117;color:#d9b066;}
+  .stat-row{display:flex;gap:32px;}
+  .stat-box{flex:1;padding:16px 18px;border-radius:10px;background:#14171c;border:1px solid #232a34;}
+  .stat-label{font-size:11px;color:#69707b;font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;}
+  .stat-value{font-size:26px;font-weight:700;color:#e7eaee;font-family:'JetBrains Mono',monospace;}
+  .stat-value.accent{color:#3dddd4;}
+  .btn{font-size:13px;padding:8px 16px;border-radius:8px;border:none;font-weight:600;cursor:pointer;font-family:inherit;}
+  .btn-primary{background:#0e9b94;color:#fff;}
+  .btn-primary:hover{background:#0c8880;}
+  .btn-primary:disabled{opacity:.4;cursor:not-allowed;}
+  .btn-secondary{background:#1e242c;color:#9aa2ad;border:1px solid #2e3640;}
+  .btn-secondary:hover{border-color:#5fa8e8;color:#7aafe8;}
+  .btn-secondary:disabled{opacity:.4;cursor:not-allowed;}
+  .result-box{margin-top:14px;padding:10px 14px;border-radius:8px;font-size:12.5px;font-family:'JetBrains Mono',monospace;
+    background:#14171c;border:1px solid #232a34;color:#c8cdd4;white-space:pre-wrap;word-break:break-all;}
+  .result-box.ok{border-color:#1a4a44;color:#5fc98a;}
+  .result-box.err{border-color:#4a2a2a;color:#e88a82;}
+  .result-box.warn{border-color:#6b5227;color:#e0b963;}
+  .history-scroll{overflow-x:auto;margin-top:12px;}
+  .history-scroll table{min-width:980px;}
+  .history-scroll td{white-space:pre-line;overflow-wrap:anywhere;max-width:330px;}
+  .history-scroll button{white-space:nowrap;}
+  .history-toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+  .history-toolbar select{background:#14171c;color:#c8cdd4;border:1px solid #2e3640;border-radius:8px;padding:8px;max-width:100%;}
+  .history-help{color:#9aa2ad;font-size:13px;line-height:1.7;margin:10px 0;}
+  #history-preview{max-height:400px;overflow:auto;}
+  #history-detail{margin-top:18px;border-top:1px solid #2e3640;padding-top:16px;}
+  .history-status{white-space:nowrap;}
+  @media(max-width:640px){.card{padding:18px 14px;}.stat-row{gap:12px;flex-wrap:wrap;}}
+  table.hist-table{width:100%;border-collapse:collapse;font-size:12.5px;}
+  table.hist-table th{text-align:left;padding:8px 10px;color:#69707b;font-weight:500;font-size:11px;
+    text-transform:uppercase;letter-spacing:.04em;border-bottom:1px solid #232a34;}
+  table.hist-table td{padding:8px 10px;border-bottom:1px solid #1a1f28;font-family:'JetBrains Mono',monospace;color:#c8cdd4;}
+  table.hist-table tr:last-child td{border-bottom:none;}
+  .flash-banner{padding:10px 16px;border-radius:8px;background:#14171c;border:1px solid #232a34;color:#c8cdd4;
+    font-size:13px;margin-bottom:20px;}
+  .confirm-row{display:flex;align-items:center;gap:8px;margin-bottom:12px;font-size:13px;color:#9aa2ad;}
+  .dataset-nav{position:sticky;top:0;z-index:5;background:#14171c;border:1px solid #232a34;border-radius:12px;
+    padding:14px 16px;margin-bottom:20px;}
+  .dataset-nav-toolbar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;}
+  .dataset-nav-toolbar input[type=search]{flex:1;min-width:160px;background:#1b2029;color:#e7eaee;
+    border:1px solid #2e3640;border-radius:8px;padding:7px 10px;font-size:13px;}
+  .dataset-nav-toolbar select{background:#1b2029;color:#e7eaee;border:1px solid #2e3640;border-radius:8px;
+    padding:7px 10px;font-size:13px;}
+  .dataset-nav-groups{display:flex;flex-wrap:wrap;gap:10px 18px;max-height:220px;overflow-y:auto;}
+  .dataset-nav-group{min-width:200px;}
+  .dataset-nav-group h4{font-size:11px;color:#69707b;text-transform:uppercase;letter-spacing:.04em;margin:6px 0 4px;}
+  .dataset-nav-item{display:flex;align-items:center;gap:6px;padding:3px 0;font-size:12.5px;}
+  .dataset-nav-item a{color:#c8cdd4;text-decoration:none;}
+  .dataset-nav-item a:hover{color:#5fa8e8;}
+  .dataset-nav-item .dot{width:7px;height:7px;border-radius:50%;flex:none;background:#69707b;}
+  .dataset-nav-item .dot.on{background:#3dddd4;}
+  .dataset-nav-item .dot.running{background:#e0b963;}
+  .dataset-nav-empty{color:#69707b;font-size:12.5px;}
+  /* 데이터셋별 카드는 기본적으로 숨기고, 목록에서 클릭했을 때만 팝업 안에서 보여준다(스크롤로 다 훑어야 했던
+     기존 방식 대신). 팝업으로 옮길 때 JS가 이 클래스를 잠깐 떼어낸다. */
+  .kras-hide{display:none;}
+  /* 기존 스크롤 이동 + 하이라이트 방식(팝업으로 교체됨) — 참고용으로 남겨둔다.
+  .card.card-highlight{outline:2px solid #5fa8e8;outline-offset:2px;}
+  */
+  .dataset-modal-backdrop{position:fixed;inset:0;background:rgba(10,12,16,.72);z-index:50;
+    display:flex;align-items:flex-start;justify-content:center;padding:5vh 16px;overflow-y:auto;}
+  .dataset-modal-backdrop[hidden]{display:none;}
+  .dataset-modal{background:#101319;border:1px solid #2e3640;border-radius:14px;width:100%;max-width:820px;
+    max-height:90vh;overflow-y:auto;padding:20px 22px 28px;position:relative;}
+  .dataset-modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;
+    position:sticky;top:-20px;background:#101319;padding:20px 0 10px;margin-top:-20px;z-index:1;}
+  .dataset-modal-header h3{font-size:15px;color:#e7eaee;margin:0;}
+  .dataset-modal-close{background:#1e242c;color:#9aa2ad;border:1px solid #2e3640;border-radius:8px;
+    padding:6px 12px;font-size:13px;cursor:pointer;font-family:inherit;}
+  .dataset-modal-close:hover{border-color:#5fa8e8;color:#7aafe8;}
+  .dataset-modal-body .card{margin-bottom:14px;}
+  .dataset-modal-body .card:last-child{margin-bottom:0;}
+  .verify-fields{margin-bottom:12px;}
+  .verify-fields label{display:block;font-size:11px;color:#69707b;margin-bottom:4px;}
+  .verify-fields .verify-fields-row{display:flex;gap:10px;margin-bottom:8px;}
+  .verify-fields .verify-fields-row > div{flex:1;}
+  .verify-fields input[type=text],.verify-fields textarea{width:100%;background:#14171c;color:#c8cdd4;
+    border:1px solid #2e3640;border-radius:6px;padding:6px 8px;font-size:12.5px;font-family:inherit;box-sizing:border-box;}
+  .verify-fields textarea{font-family:'JetBrains Mono',monospace;resize:vertical;}
+  .verify-fields .verify-hint{font-size:11px;color:#69707b;margin:-2px 0 8px;}

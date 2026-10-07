@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}" lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>KRAS 연계 통계</title>
+  <link rel="stylesheet" href="/css/kras-console.css">
+</head>
+<main layout:fragment="content">
+
+  <div style="margin-bottom:24px;">
+    <h1 style="font-size:22px;font-weight:700;color:#e7eaee;">KRAS 연계 통계</h1>
+    <p style="margin-top:6px;font-size:13.5px;color:#69707b;">
+      적재된 건수와 연계별 수집 이력을 확인합니다. 수집·검증 조작은 <a href="/kras-db" style="color:#66c4be;">KRAS 연계 관리</a>에서 합니다.
+    </p>
+  </div>
+
+  <section class="card" style="margin-bottom:24px;">
+    <h2 style="font-size:16px;font-weight:700;color:#e7eaee;margin-bottom:14px;">필지 (연속지적)</h2>
+    <div class="stat-row">
+      <div class="stat-box">
+        <div class="stat-label">kras.lp_pa_cbnd (게시본)</div>
+        <div class="stat-value accent" th:text="${krasCount}">0</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-label">public.lp_pa_cbnd (GeoServer 테이블)</div>
+        <div class="stat-value" th:text="${publicCount}">0</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card" style="margin-bottom:24px;">
+    <h2 style="font-size:16px;font-weight:700;color:#e7eaee;margin-bottom:14px;">용도지역</h2>
+    <div class="stat-row">
+      <div class="stat-box">
+        <div class="stat-label">kras.lt_c_uzone (게시본)</div>
+        <div class="stat-value accent" th:text="${uzoneKrasCount}">0</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-label">public.lt_c_uzone</div>
+        <div class="stat-value" th:text="${uzonePublicCount}">0</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card" style="margin-bottom:24px;">
+    <h2 style="font-size:16px;font-weight:700;color:#e7eaee;margin-bottom:14px;">전체 TXT</h2>
+    <div class="stat-row">
+      <div class="stat-box">
+        <div class="stat-label">kras.land_basic 현재 건수</div>
+        <div class="stat-value accent" th:text="${landBasicCount}">0</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-label">kras.land_price_file_row 현재 건수</div>
+        <div class="stat-value accent" th:text="${landPriceFileRowCount}">0</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 수집 이력: 규격 상세에서 넘어오면 그 연계만 선택된 상태로 열린다 -->
+  <div id="history-initial" hidden th:attr="data-dataset=${selectedDataset}"></div>
+  <th:block th:each="code : ${datasetCodes}">
+    <input type="hidden" name="datasetCode" th:value="${code}">
+  </th:block>
+
+  <section class="card" id="integration-history" aria-labelledby="history-title" style="margin-bottom:24px;">
+    <h2 class="card-title" id="history-title"
+        th:text="${selectedDataset != null and selectedDataset != ''} ? ('규격 상세 · ' + ${selectedLabel}) : '전체 연계 작업 이력'">전체 연계 작업 이력</h2>
+    <div class="history-toolbar">
+      <span id="history-dataset-field">
+        <label for="history-dataset">연계 선택</label>
+        <select id="history-dataset"><option value="">전체 연계</option></select>
+      </span>
+      <button type="button" class="btn btn-secondary" id="history-refresh">이력 새로고침</button>
+      <button type="button" class="btn btn-secondary" id="history-check">실행 조건 확인</button>
+    </div>
+    <p class="history-help">수집 건을 선택하면 새로고침 후에도 미리보기를 확인하고 반영을 이어갈 수 있습니다. 최신 50건을 표시합니다.</p>
+    <div id="history-message" class="result-box" role="status" aria-live="polite">이력을 불러오는 중입니다.</div>
+    <details open>
+      <summary>수집 이력</summary>
+      <div class="history-scroll"><table class="hist-table">
+        <thead><tr><th>수집 ID</th><th>연계 / 대상</th><th>수집 상태</th><th>정상 / 제외</th><th>수집 기간 / 실행 시작</th><th>확인</th></tr></thead>
+        <tbody id="history-items"></tbody>
+      </table></div>
+    </details>
+    <details>
+      <summary>실행 기록 · 실패 원인</summary>
+      <p class="history-help">수집·반영의 실행 결과를 기록합니다. 과거 기록이 없는 건의 반영 여부는 별도 확인이 필요합니다. 실행 중 표시가 오래 지속되면 서버 로그와 실제 작업 상태를 확인하세요.</p>
+      <div class="history-scroll"><table class="hist-table">
+        <thead><tr><th>연계 / 작업</th><th>결과</th><th>시작 / 종료</th><th>수집 ID</th><th>내용</th></tr></thead>
+        <tbody id="history-operations"></tbody>
+      </table></div>
+    </details>
+    <div id="history-detail" hidden>
+      <h3 id="history-detail-title" class="card-title"></h3>
+      <p class="history-help">테이블별 최대 100행의 미리보기입니다. 이전 수집 건을 반영하면 최신 업무 데이터가 과거 값으로 바뀔 수 있으므로 대상과 시점을 확인하세요.</p>
+      <div id="history-detail-reasons" class="result-box"></div>
+      <div id="history-comparison" class="result-box" hidden></div>
+      <pre id="history-preview" class="result-box"></pre>
+      <button type="button" id="history-promote" class="btn btn-primary" disabled>선택한 수집 건 업무 테이블 반영</button>
+    </div>
+  </section>
+
+</main>
+
+<th:block layout:fragment="scripts">
+<script src="/js/kras-history.js"></script>
+</th:block>
+</html>

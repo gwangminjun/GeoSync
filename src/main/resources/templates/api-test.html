@@ -842,7 +842,13 @@ function copyXml() {
 document.addEventListener('DOMContentLoaded', () => {
   renderList();
   resetConnSettings();  // 서버 기본값으로 입력 필드 채우기
-  const apiId = new URLSearchParams(location.search).get('api');
+  const params = new URLSearchParams(location.search);
+  // 연계 관리 화면의 팝업(iframe)으로 열린 경우 전역 메뉴를 숨긴다
+  if (params.get('embed') === '1') {
+    const nav = document.getElementById('app-nav');
+    if (nav) nav.style.display = 'none';
+  }
+  const apiId = params.get('api');
   if (apiId) openModal(apiId);
 });
 </script>

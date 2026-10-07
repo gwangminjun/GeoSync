@@ -119,6 +119,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  // 규격 상세(/kras-stats?dataset=…)에서 열린 경우 해당 연계를 처음부터 선택한다
+  const initialDataset = byId('history-initial')?.dataset.dataset;
+  if (initialDataset && [...filter.options].some(o => o.value === initialDataset)) {
+    filter.value = initialDataset;
+  }
+
   async function loadHistory() {
     const version = ++historyVersion;
     showMessage('이력을 불러오는 중입니다.');

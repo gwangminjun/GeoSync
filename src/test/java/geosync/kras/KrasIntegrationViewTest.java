@@ -59,11 +59,27 @@ class KrasIntegrationViewTest {
         indexRow.put("lastVerifiedAt", null);
         indexRow.put("lastVerifiedBy", null);
         context.setVariable("datasetIndex", List.of(indexRow));
+        List<Map<String, Object>> specRows = KrasSchemaController.toSpecItemRows(Map.of());
+        KrasSchemaController.withRunInfo(specRows, Map.of());
+        context.setVariable("specItems", specRows);
+        context.setVariable("legacyNextRun", "기존 KRAS 동기화(KrasWorker) 다음 실행: 2026-10-08 04:30 (cron 0 30 4 * * *)");
+        context.setVariable("specCallableCount", 0L);
+        context.setVariable("specNoIdCount", 7L);
+        context.setVariable("specDocErrorCount", 2L);
         String html = engine.process("kras-db", context);
         Files.createDirectories(Path.of("build/kras-ui"));
         Files.writeString(Path.of("build/kras-ui/kras-db.html"), html);
-        assertThat(html).contains("전체 연계 작업 이력", "data-slug=\"use-zone\"",
+        assertThat(html).contains("data-slug=\"use-zone\"",
                 "onclick=\"runPnuIngest(this.dataset.slug)\"", "KRAS 연계 관리",
-                "id=\"dataset-nav-search\"", "href=\"#card-use-zone\"", "id=\"card-use-zone\"", ">토지<");
+                "id=\"dataset-nav-search\"", "href=\"#card-use-zone\"", "id=\"card-use-zone\"", ">토지<",
+                "규격 16개 항목 연계 현황", "id=\"spec-items\"", "KRAS000002", "상세 보기 →",
+                "href=\"/kras-stats?dataset=land_info&amp;label=",
+                "규격서 오류 · 미구현", "서비스 ID 없음 · 호출 불가", "전체 연계 목록 · 데이터셋 카드",
+                "기존 KRAS 동기화(KrasWorker) 다음 실행", ">수동<", "실행 이력 없음", "API 테스트",
+                "API 없음", "krasApiTestPopup(&#39;conn/land_info&#39;", "id=\"api-test-modal-backdrop\"");
+        // 규격 상세(수집 이력)는 통계 페이지로 옮겼다
+        assertThat(html).doesNotContain("전체 연계 작업 이력", "id=\"integration-history\"", "id=\"spec-detail\"",
+                "krasSpecDetail", "kras ↔ public 건수 비교", "kras.lp_pa_cbnd (게시본)", "kras.land_basic 현재 건수");
+        assertThat(html.indexOf("id=\"spec-items\"")).isLessThan(html.indexOf("id=\"dataset-modal-backdrop\""));
     }
 }

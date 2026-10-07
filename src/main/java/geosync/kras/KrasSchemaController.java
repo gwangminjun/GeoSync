@@ -129,6 +129,160 @@ public class KrasSchemaController {
         new FixedDataset("land-price-file", "land_price_file", "공시지가 전체 TXT", "전체TXT")
     );
 
+    /**
+     * kras.md 규격 16개 항목 한눈에 보기. 번호는 규격서 목차 기준이다.
+     * serviceId=null이면 호출 불가. docError=true는 규격서 자체가 잘못된 항목(§11·§12)이라 구현하지 않는다.
+     * 서비스 ID를 여기서 손으로 적는 건 임시다 — 레지스트리 설계(2026-10-07)가 끝나면 그쪽에서 읽도록 바꾼다.
+     */
+    private record SpecItem(int specNo, String name, String serviceId, String slug, String datasetCode,
+                            String pathLabel, boolean docError) {}
+
+    private static final List<SpecItem> SPEC_ITEMS = List.of(
+        new SpecItem(1, "토지(임야)대장", "KRAS000002", "land-info", "land_info", "PNU 단건", false),
+        new SpecItem(2, "공유지연명부", "KRAS000003", "shr-ymb", "shr_ymb", "PNU 단건", false),
+        new SpecItem(3, "토지(건물) 존재 여부", "KRAS000101", "land-bldg-check", "land_bldg_check", "PNU 단건", false),
+        new SpecItem(4, "대지권등록부(건물조회)", null, "collective-building", "collective_building", "PNU", false),
+        new SpecItem(5, "대지권등록부(전유부조회)", null, "collective-unit", "collective_unit", "PNU + 드릴다운", false),
+        new SpecItem(6, "대지권등록부", null, "land-right", "land_right", "PNU + 드릴다운", false),
+        new SpecItem(7, "토지이동연혁", "KRAS000006", "land-mov-hist", "land_mov_hist", "PNU 단건", false),
+        new SpecItem(8, "소유권변동연혁", "KRAS000007", "own-rgt-hist", "own_rgt_hist", "PNU 단건", false),
+        new SpecItem(9, "집합건물소유권연혁", null, "unit-ownership-history", "unit_ownership_history", "드릴다운", false),
+        new SpecItem(10, "토지이동내역", null, "land-change", "land_change", "기간 조회 (최대 10일)", false),
+        new SpecItem(11, "소유권변경내역", null, null, null, "—", true),
+        new SpecItem(12, "집합건물소유권변경내역", null, null, null, "—", true),
+        new SpecItem(13, "건물통합정보", null, "integrated-building", "integrated_building", "PNU", false),
+        new SpecItem(14, "건물통합도면", null, "building-image", "building_image", "PNU", false),
+        new SpecItem(15, "SHAPE 다운로드", "KRAS000038", "cadastral-file", "cadastral_file",
+            "파일(SHP) · 레이어 목록 KRAS000037 포함", false),
+        new SpecItem(16, "토지기본정보 다운로드", "KRAS000040", "land-basic-file", "land_basic_file", "파일(TXT, 전체)", false)
+    );
+
+    /**
+     * 규격 16개 항목 표시 행. 계약 상태는 kras.sync_dataset 값을 그대로 보여주기만 한다(바꾸지 않음).
+     * 호출 가능 = 서비스 ID 있음 + 계약 VERIFIED + 활성. 세 조건 중 하나라도 빠지면 불가다.
+     */
+    static List<Map<String, Object>> toSpecItemRows(Map<String, Map<String, Object>> statusByCode) {
+        List<Map<String, Object>> rows = new ArrayList<>();
+        for (SpecItem item : SPEC_ITEMS) {
+            String contract = null;
+            boolean enabled = false;
+            if (item.datasetCode() != null) {
+                Map<String, Object> st = statusByCode.getOrDefault(item.datasetCode(), Map.of());
+                Object c = st.get("contract_status");
+                contract = c == null ? "UNVERIFIED" : c.toString();
+                enabled = Boolean.TRUE.equals(st.get("enabled"));
+            }
+            boolean callable = item.serviceId() != null && !item.docError() && "VERIFIED".equals(contract) && enabled;
+            String state;
+            if (item.docError()) {
+                state = "규격서 오류 · 미구현";
+            } else if (item.serviceId() == null) {
+                state = "서비스 ID 없음 · 호출 불가";
+            } else {
+                state = "계약 " + contract;
+            }
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("specNo", item.specNo());
+            row.put("name", item.name());
+            row.put("serviceId", item.serviceId() == null ? "없음" : item.serviceId());
+            row.put("slug", item.slug());
+            row.put("datasetCode", item.datasetCode());
+            row.put("pathLabel", item.pathLabel());
+            row.put("docError", item.docError());
+            row.put("state", state);
+            row.put("callable", callable);
+            rows.add(row);
+        }
+        return rows;
+    }
+
+    private static final java.time.format.DateTimeFormatter RUN_TIME_FORMAT =
+            java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+
+    private static final Map<String, String> SYNC_STATUS_LABELS = Map.of(
+            "SUCCESS", "완료", "FAILED", "실패", "PARTIAL", "일부 실패", "WARNING", "확인 필요",
+            "RUNNING", "실행 중", "PLANNED", "대기", "COLLECTING", "수집 중", "READY", "준비 완료",
+            "BLOCKED", "차단", "INTERRUPTED", "중단");
+
+    /**
+     * 규격 표 행에 운영 정보를 덧붙인다: 스케줄, 다음 실행, 마지막 적재.
+     * 신규 경로(/kras-db)는 아직 정기 스케줄이 없어 "수동"으로 표시한다.
+     */
+    /** 연계 수집 이력의 선택 목록에 넣는 데이터셋 코드: 규격 항목 + 파일(SHP/TXT) 데이터셋. */
+    static List<String> historyDatasetCodes() {
+        return Stream.concat(
+                SPEC_ITEMS.stream().map(SpecItem::datasetCode).filter(java.util.Objects::nonNull),
+                Stream.of("cadastral_file", "layer_list", "usezone_file", "land_basic_file", "land_price_file"))
+                .distinct().sorted().toList();
+    }
+
+    /** /api-test 카탈로그(conn/…)에 있어 팝업으로 바로 호출할 수 있는 데이터셋. 나머지는 API 테스트 대상이 없다. */
+    private static final Set<String> API_TEST_DATASETS =
+            Set.of("land_info", "shr_ymb", "land_bldg_check", "land_mov_hist", "own_rgt_hist");
+
+    static void withRunInfo(List<Map<String, Object>> rows, Map<String, Map<String, Object>> lastByCode) {
+        for (Map<String, Object> row : rows) {
+            String code = (String) row.get("datasetCode");
+            if (code == null) {
+                row.put("schedule", "—");
+                row.put("nextRun", "—");
+                row.put("lastRun", "—");
+                row.put("apiId", null);
+                continue;
+            }
+            row.put("apiId", API_TEST_DATASETS.contains(code) ? "conn/" + code : null);
+            row.put("schedule", "수동");
+            row.put("nextRun", "—");
+            Map<String, Object> last = lastByCode.get(code);
+            row.put("lastRun", last == null ? "실행 이력 없음" : describeRun(last));
+        }
+    }
+
+    private static String describeRun(Map<String, Object> last) {
+        Object status = last.get("status");
+        String label = SYNC_STATUS_LABELS.getOrDefault(String.valueOf(status), String.valueOf(status));
+        Object requested = last.get("requested_at");
+        String when = requested instanceof java.sql.Timestamp ts
+                ? ts.toLocalDateTime().format(RUN_TIME_FORMAT) : "시각 없음";
+        return label + " · " + when + " · 기간 " + last.get("window_start") + " ~ " + last.get("window_end_exclusive");
+    }
+
+    /** 데이터셋별 가장 최근 수집 건(sync_item). 없는 데이터셋은 맵에 없다. */
+    private Map<String, Map<String, Object>> lastSyncByDataset(JdbcTemplate jdbc, List<String> codes) {
+        if (codes.isEmpty()) return Map.of();
+        String placeholders = String.join(",", codes.stream().map(c -> "?").toList());
+        List<Object> args = new ArrayList<>();
+        args.add(settings.orgCode());
+        args.addAll(codes);
+        List<Map<String, Object>> rows = jdbc.queryForList("""
+            SELECT DISTINCT ON (dataset_code) dataset_code, status, window_start, window_end_exclusive, requested_at
+            FROM kras.sync_item
+            WHERE org_cd = ? AND dataset_code IN (""" + placeholders + """
+            ) ORDER BY dataset_code, item_id DESC
+            """, args.toArray());
+        Map<String, Map<String, Object>> byCode = new HashMap<>();
+        for (Map<String, Object> row : rows) {
+            byCode.put((String) row.get("dataset_code"), row);
+        }
+        return byCode;
+    }
+
+    /** 기존 KrasWorker 동기화(kras.schedule)의 다음 실행 시각. 신규 경로와 무관하다. */
+    String legacyNextRun() {
+        String expr = settings.krasSchedule();
+        if (expr == null || expr.isBlank() || "-".equals(expr.trim())) {
+            return "기존 KRAS 동기화 사용 안 함";
+        }
+        try {
+            java.time.LocalDateTime next = org.springframework.scheduling.support.CronExpression.parse(expr)
+                    .next(java.time.LocalDateTime.now());
+            return "기존 KRAS 동기화(KrasWorker) 다음 실행: "
+                    + (next == null ? "없음" : next.format(RUN_TIME_FORMAT)) + " (cron " + expr + ")";
+        } catch (IllegalArgumentException e) {
+            return "기존 KRAS 동기화 스케줄 형식 오류: " + expr;
+        }
+    }
+
     /** verify/revert-dataset이 건드릴 수 있는 dataset_code 화이트리스트 — 임의 문자열로 다른 데이터셋을 켜지 못하게 막는다. */
     private static final Set<String> VERIFIABLE_DATASETS = Stream.of(
             Stream.of("cadastral_file", "layer_list", "usezone_file", "land_basic_file", "land_price_file"),
@@ -253,12 +407,18 @@ public class KrasSchemaController {
 
         model.addAttribute("specServices", loadSpecServiceRows(jdbc));
         model.addAttribute("datasetIndex", buildDatasetIndex(jdbc));
+        List<String> specCodes = SPEC_ITEMS.stream()
+                .map(SpecItem::datasetCode).filter(java.util.Objects::nonNull).distinct().toList();
+        List<Map<String, Object>> specRows = toSpecItemRows(batchDatasetStatus(jdbc, specCodes));
+        withRunInfo(specRows, lastSyncByDataset(jdbc, specCodes));
+        model.addAttribute("legacyNextRun", legacyNextRun());
+        model.addAttribute("specItems", specRows);
+        model.addAttribute("specCallableCount", specRows.stream().filter(r -> Boolean.TRUE.equals(r.get("callable"))).count());
+        model.addAttribute("specNoIdCount", specRows.stream()
+                .filter(r -> "없음".equals(r.get("serviceId")) && !Boolean.TRUE.equals(r.get("docError"))).count());
+        model.addAttribute("specDocErrorCount", specRows.stream().filter(r -> Boolean.TRUE.equals(r.get("docError"))).count());
         model.addAttribute("datasetGroups", List.of("토지", "건물", "공간(SHP)", "가격", "전체TXT", "기간조회"));
 
-        Long krasCount = jdbc.queryForObject("SELECT count(*) FROM kras.lp_pa_cbnd", Long.class);
-        Long publicCount = jdbc.queryForObject("SELECT count(*) FROM public.lp_pa_cbnd", Long.class);
-        model.addAttribute("krasCount", krasCount);
-        model.addAttribute("publicCount", publicCount);
 
         List<Map<String, Object>> recentRuns = jdbc.queryForList("""
             SELECT si.item_id, si.status, si.rows_valid, si.rows_rejected, sr.started_at
@@ -309,10 +469,6 @@ public class KrasSchemaController {
             model.addAttribute("usezoneReleaseLayers", List.of());
         }
 
-        Long uzoneKrasCount = jdbc.queryForObject("SELECT count(*) FROM kras.lt_c_uzone", Long.class);
-        Long uzonePublicCount = jdbc.queryForObject("SELECT count(*) FROM public.lt_c_uzone", Long.class);
-        model.addAttribute("uzoneKrasCount", uzoneKrasCount);
-        model.addAttribute("uzonePublicCount", uzonePublicCount);
 
         // 전체 TXT 2종
         Map<String, Map<String, Object>> txtStatus = batchDatasetStatus(jdbc,
@@ -328,10 +484,6 @@ public class KrasSchemaController {
         model.addAttribute("landPriceFileRunning", landPriceFileRunning.get());
         model.addAttribute("lastLandPriceFileResult", lastLandPriceFileResult);
 
-        model.addAttribute("landBasicCount", jdbc.queryForObject("SELECT count(*) FROM kras.land_basic", Long.class));
-        model.addAttribute("landPriceFileRowCount",
-                jdbc.queryForObject("SELECT count(*) FROM kras.land_price_file_row WHERE org_cd=?",
-                        Long.class, settings.orgCode()));
 
         return "kras-db";
     }
