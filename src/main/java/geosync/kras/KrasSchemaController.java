@@ -458,6 +458,13 @@ public class KrasSchemaController {
                 .map(SpecItem::datasetCode).filter(java.util.Objects::nonNull).distinct().toList();
         List<Map<String, Object>> specRows = toSpecItemRows(batchDatasetStatus(jdbc, specCodes));
         withRunInfo(specRows, lastSyncByDataset(jdbc, specCodes), mappersByDatasetCode.keySet());
+        Map<String, Map<String, Object>> pendingByCode = historyService.pendingPromotion(jdbc, settings.orgCode(),
+                specCodes.stream().filter(mappersByDatasetCode::containsKey).toList());
+        for (Map<String, Object> row : specRows) {
+            Map<String, Object> pending = pendingByCode.get(row.get("datasetCode"));
+            row.put("pendingCount", pending == null ? 0L : ((Number) pending.get("pending_count")).longValue());
+            row.put("pendingItemId", pending == null ? null : pending.get("latest_item_id"));
+        }
         model.addAttribute("legacyNextRun", legacyNextRun());
         model.addAttribute("specItems", specRows);
         model.addAttribute("specCallableCount", specRows.stream().filter(r -> Boolean.TRUE.equals(r.get("callable"))).count());

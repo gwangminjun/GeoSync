@@ -63,6 +63,10 @@ class KrasIntegrationViewTest {
         context.setVariable("datasetIndex", List.of(indexRow));
         List<Map<String, Object>> specRows = KrasSchemaController.toSpecItemRows(Map.of());
         KrasSchemaController.withRunInfo(specRows, Map.of(), java.util.Set.of("land_info", "shr_ymb"));
+        specRows.stream().filter(r -> "land_info".equals(r.get("datasetCode"))).findFirst().ifPresent(r -> {
+            r.put("pendingCount", 2L);
+            r.put("pendingItemId", 77L);
+        });
         context.setVariable("specItems", specRows);
         context.setVariable("legacyNextRun", "기존 KRAS 동기화(KrasWorker) 다음 실행: 2026-10-08 04:30 (cron 0 30 4 * * *)");
         context.setVariable("specCallableCount", 0L);
@@ -76,6 +80,8 @@ class KrasIntegrationViewTest {
                 "규격 16개 항목 연계 현황", "id=\"spec-items\"", "KRAS000002", "상세 보기 →",
                 "krasOpenHistoryPopup(&#39;land_info&#39;, &#39;토지(임야)대장&#39;)",
                 "id=\"hist-modal-backdrop\"", "id=\"hist-items\"", "id=\"hist-promote\"", "/kras-db/history?dataset=",
+                // 반영 대기 건이 있는 행만 이어하기 버튼이 뜨고, 그 건을 바로 연다.
+                "반영 대기 2건 · 이어하기", "krasOpenHistoryPopup(&#39;land_info&#39;, &#39;토지(임야)대장&#39;, 77)",
                 "규격서 오류 · 미구현", "서비스 ID 없음 · 호출 불가", "전체 연계 목록 · 데이터셋 카드",
                 "기존 KRAS 동기화(KrasWorker) 다음 실행", ">수동<", "실행 이력 없음",
                 "krasOpenDatasetPopup(&#39;land-info&#39;, &#39;land_info&#39;, &#39;토지(임야)대장&#39;, &#39;UNVERIFIED&#39;, false, true)",
@@ -107,5 +113,6 @@ class KrasIntegrationViewTest {
         // (상단 메뉴의 "KRAS 통계" 링크만 주석 처리했을 뿐 페이지 자체는 남아있어, 본문의 다른 안내 링크는 그대로다.)
         assertThat(html).doesNotContain("href=\"/kras-stats?dataset=");
         assertThat(html.indexOf("id=\"spec-items\"")).isLessThan(html.indexOf("id=\"dset-modal-backdrop\""));
+        assertThat(html.split("건 · 이어하기", -1)).hasSize(2);
     }
 }

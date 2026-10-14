@@ -39,6 +39,65 @@ class KrasHistoryServiceTest {
     }
 
     @Test
+    void pendingPromotionCountsSuccessItemsWithoutSuccessfulPromoteLog() {
+        when(jdbc.queryForObject(contains("to_regclass"), eq(String.class))).thenReturn("kras.ui_operation_log");
+        when(jdbc.queryForList(contains("NOT EXISTS"), eq("12830"), eq("land_info"), eq("shr_ymb"))).thenReturn(List.of(
+                Map.of("dataset_code", "land_info", "pending_count", 2L, "latest_item_id", 77L)));
+
+        var pending = service.pendingPromotion(jdbc, "12830", List.of("land_info", "shr_ymb"));
+
+        assertThat(pending).containsOnlyKeys("land_info");
+        assertThat(pending.get("land_info")).containsEntry("latest_item_id", 77L);
+        verify(jdbc).queryForList(argThat((String sql) -> sql.contains("si.status='SUCCESS'")
+                && sql.contains("ol.action='PROMOTE'")), any(Object[].class));
+    }
+
+    @Test
+    void pendingPromotionSkipsItemsSupersededByNewerPromotedCollection() {
+        when(jdbc.queryForObject(contains("to_regclass"), eq(String.class))).thenReturn("kras.ui_operation_log");
+        service.pendingPromotion(jdbc, "12830", List.of("land_info"));
+        verify(jdbc).queryForList(argThat((String sql) -> sql.contains("nx.scope_key=si.scope_key")
+                && sql.contains("nx.item_id>si.item_id")), any(Object[].class));
+    }
+
+    @Test
+    void previewBlocksItemWhenNewerCollectionOfSameScopeWasPromoted() {
+        when(jdbc.queryForList(contains("si.item_id=? AND si.org_cd=?"), eq(44L), eq("12830")))
+                .thenReturn(List.of(Map.of("item_id", 44L, "dataset_code", "land_info", "status", "SUCCESS",
+                        "scope_key", "PNU-A")));
+        when(jdbc.queryForList(contains("sync_dataset"), eq("land_info"))).thenReturn(List.of(
+                Map.of("contract_status", "VERIFIED", "enabled", true, "service_code", "KRAS000002")));
+        when(jdbc.queryForObject(contains("to_regclass"), eq(String.class))).thenReturn("kras.ui_operation_log");
+        when(jdbc.queryForList(contains("LATERAL"), eq(Long.class), eq(44L), eq("12830"))).thenReturn(List.of(90L));
+        when(jdbc.queryForList(contains("action='PROMOTE' ORDER BY"), eq("12830"), eq(44L))).thenReturn(List.of(
+                Map.of("status", "FAILED", "message", "승격 실패: Older collection cannot overwrite newer business data")));
+
+        Map<String, Object> result = service.preview(jdbc, "12830", 44L);
+
+        assertThat(result).containsEntry("promotable", false);
+        assertThat((List<?>) result.get("reasons")).anyMatch(r -> r.toString().contains("수집 ID 90"));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> attempt = (Map<String, Object>) result.get("lastPromoteAttempt");
+        assertThat(attempt).containsEntry("status", "FAILED");
+        assertThat(attempt.get("hint").toString()).contains("더 최신 수집 건");
+    }
+
+    @Test
+    void promoteFailureHintExplainsKnownDbErrorsOnly() {
+        assertThat(KrasHistoryService.promoteFailureHint("FAILED",
+                "Incorrect result size: expected 1, actual 0")).contains("상위(부모)");
+        assertThat(KrasHistoryService.promoteFailureHint("RUNNING", null)).contains("중단");
+        assertThat(KrasHistoryService.promoteFailureHint("FAILED", "알 수 없는 오류")).isNull();
+    }
+
+    @Test
+    void pendingPromotionIsEmptyWithoutOperationLog() {
+        when(jdbc.queryForObject(contains("to_regclass"), eq(String.class))).thenReturn(null);
+        assertThat(service.pendingPromotion(jdbc, "12830", List.of("land_info"))).isEmpty();
+        verify(jdbc, never()).queryForList(contains("NOT EXISTS"), any(Object[].class));
+    }
+
+    @Test
     void failedItemCannotBeResumed() {
         when(jdbc.queryForList(contains("si.item_id=? AND si.org_cd=?"), eq(44L), eq("12830")))
                 .thenReturn(List.of(Map.of("item_id", 44L, "dataset_code", "land_info", "status", "FAILED")));

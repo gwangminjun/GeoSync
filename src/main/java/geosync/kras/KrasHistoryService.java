@@ -98,6 +98,45 @@ public class KrasHistoryService {
         }
     }
 
+    /**
+     * 같은 대상(기관·데이터셋·scope_key)의 더 최신 수집 건이 이미 반영됐는지 — 그렇다면 이 건은 DB 트리거
+     * (guard_business_row: "Older collection cannot overwrite newer business data")가 막아 영원히 반영할 수 없다.
+     * 바깥 쿼리의 sync_item 별칭은 si여야 한다.
+     */
+    private static final String NEWER_PROMOTED_SQL = """
+            SELECT nx.item_id FROM kras.sync_item nx
+            JOIN kras.ui_operation_log nl ON nl.item_id=nx.item_id AND nl.action='PROMOTE' AND nl.status IN ('SUCCESS','WARNING')
+            WHERE nx.org_cd=si.org_cd AND nx.dataset_code=si.dataset_code AND nx.scope_key=si.scope_key
+              AND nx.item_id>si.item_id
+            """;
+
+    /**
+     * 수집은 SUCCESS인데 업무 테이블 반영(PROMOTE) 성공 기록이 없는 건 — 데이터셋별 건수와 가장 최근 건.
+     * 더 최신 건이 이미 반영돼 반영할 수 없게 된 오래된 건은 세지 않는다.
+     * ponytail: 반영 여부 전용 컬럼이 없어 ui_operation_log로 판단한다. 로그 도입 전에 반영한 건은 대기로 보인다.
+     */
+    public Map<String, Map<String, Object>> pendingPromotion(JdbcTemplate jdbc, String orgCd, List<String> codes) {
+        if (codes.isEmpty()) return Map.of();
+        if (jdbc.queryForObject("SELECT to_regclass('kras.ui_operation_log')::text", String.class) == null) return Map.of();
+        List<Object> args = new ArrayList<>();
+        args.add(orgCd);
+        args.addAll(codes);
+        List<Map<String, Object>> rows = jdbc.queryForList("""
+            SELECT si.dataset_code, count(*) AS pending_count, max(si.item_id) AS latest_item_id
+            FROM kras.sync_item si
+            WHERE si.org_cd=? AND si.status='SUCCESS' AND si.dataset_code IN (""" + "?,".repeat(codes.size() - 1) + """
+            ?)
+              AND NOT EXISTS (SELECT 1 FROM kras.ui_operation_log ol
+                              WHERE ol.item_id=si.item_id AND ol.action='PROMOTE' AND ol.status IN ('SUCCESS','WARNING'))
+            AND NOT EXISTS (""" + NEWER_PROMOTED_SQL + """
+            )
+            GROUP BY si.dataset_code
+            """, args.toArray());
+        Map<String, Map<String, Object>> byCode = new LinkedHashMap<>();
+        for (Map<String, Object> row : rows) byCode.put((String) row.get("dataset_code"), row);
+        return byCode;
+    }
+
     public Map<String, Object> history(JdbcTemplate jdbc, String orgCd, String dataset, int limit) {
         int boundedLimit = Math.max(1, Math.min(100, limit));
         String filter = dataset == null ? "" : dataset;
@@ -144,6 +183,24 @@ public class KrasHistoryService {
         if (!"SUCCESS".equals(item.get("status"))) reasons.add("수집 검증을 통과한 SUCCESS 상태만 반영할 수 있습니다.");
         String promotePath = promotePaths.get(dataset);
         if (promotePath == null) reasons.add("이 데이터셋은 이력에서 직접 반영하지 않습니다. 해당 수집 카드에서 후속 작업을 확인하세요.");
+        Map<String, Object> lastPromoteAttempt = null;
+        if (jdbc.queryForObject("SELECT to_regclass('kras.ui_operation_log')::text", String.class) != null) {
+            List<Long> newer = jdbc.queryForList("SELECT max(t.item_id) FROM kras.sync_item si, LATERAL ("
+                    + NEWER_PROMOTED_SQL + ") t WHERE si.item_id=? AND si.org_cd=?", Long.class, itemId, orgCd);
+            if (!newer.isEmpty() && newer.get(0) != null) {
+                reasons.add("더 최신 수집 건(수집 ID " + newer.get(0) + ")이 이미 반영돼 있어 이 건은 반영할 수 없습니다. "
+                        + "최신 업무 데이터를 과거 값으로 덮어쓰지 않도록 DB가 막습니다.");
+            }
+            List<Map<String, Object>> attempts = jdbc.queryForList("""
+                SELECT status, message, started_at, ended_at FROM kras.ui_operation_log
+                WHERE org_cd=? AND item_id=? AND action='PROMOTE' ORDER BY operation_id DESC LIMIT 1
+                """, orgCd, itemId);
+            if (!attempts.isEmpty()) {
+                lastPromoteAttempt = new LinkedHashMap<>(attempts.get(0));
+                lastPromoteAttempt.put("hint", promoteFailureHint(
+                        (String) lastPromoteAttempt.get("status"), (String) lastPromoteAttempt.get("message")));
+            }
+        }
 
         List<Map<String, Object>> previews = new ArrayList<>();
         for (String table : stageTables.getOrDefault(dataset, List.of())) {
@@ -161,9 +218,40 @@ public class KrasHistoryService {
         result.put("promotable", reasons.isEmpty());
         result.put("reasons", reasons);
         result.put("promotePath", promotePath);
+        result.put("lastPromoteAttempt", lastPromoteAttempt);
         // 반영 버튼 옆 참고 정보다 — 비교 조회가 실패해도 반영 자체는 막지 않는다(§2차-3 실패 조건).
         if (promotePath != null) result.put("comparison", comparePreview(jdbc, itemId, dataset));
         return result;
+    }
+
+    /** 반영 실패 메시지 중 DB·드라이버가 내는 알아보기 힘든 것만 한글 안내로 풀어준다. 모르는 메시지면 null. */
+    static String promoteFailureHint(String status, String message) {
+        if ("RUNNING".equals(status)) {
+            return "끝난 기록이 없습니다. 지금 실행 중이 아니라면 반영 도중 중단된 것(서버 재시작 등)이니 다시 반영하세요.";
+        }
+        if (message == null) return null;
+        if (message.contains("Older collection cannot overwrite")) {
+            return "더 최신 수집 건이 이미 반영돼 있어 이 건은 반영할 수 없습니다.";
+        }
+        if (message.contains("expected 1, actual 0")) {
+            return "상위(부모) 데이터가 업무 테이블에 아직 없습니다. 상위 데이터셋을 먼저 반영한 뒤 다시 시도하세요.";
+        }
+        if (message.contains("cannot populate")) {
+            return "이 데이터셋이 해당 업무 테이블에 쓸 수 있도록 DB(kras.business_dataset)에 등록돼 있지 않습니다.";
+        }
+        if (message.contains("Stable identity")) {
+            return "삭제가 금지된 업무 테이블에서 삭제가 발생했습니다. 매퍼의 반영 방식을 점검해야 합니다.";
+        }
+        if (message.contains("Invalid business source item/organization")) {
+            return "수집 건의 상태나 기관코드가 맞지 않아 DB가 반영을 거부했습니다.";
+        }
+        if (message.contains("not-null")) return "필수값이 비어 있습니다. 응답 매핑(데이터 구조)을 확인하세요.";
+        if (message.contains("value too long")) return "값이 컬럼 길이보다 깁니다. 응답 매핑(데이터 구조)을 확인하세요.";
+        if (message.contains("invalid input syntax")) return "값의 형식이 컬럼 타입과 맞지 않습니다. 응답 매핑(데이터 구조)을 확인하세요.";
+        if (message.contains("onnection") || message.contains("I/O error")) {
+            return "DB 연결 문제로 실패했습니다. 잠시 후 다시 반영하세요.";
+        }
+        return null;
     }
 
     /**

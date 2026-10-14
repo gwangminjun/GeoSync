@@ -59,6 +59,11 @@
             <td>
               <button type="button" class="btn btn-secondary" th:if="${s.datasetCode != null}"
                       th:attr="onclick=|krasOpenHistoryPopup('${s.datasetCode}', '${s.name}');|">상세 보기 →</button>
+              <button type="button" class="btn btn-primary" th:if="${s['pendingCount'] != null and s['pendingCount'] > 0}"
+                      style="display:block;margin-top:6px;font-size:11.5px;padding:5px 10px;"
+                      th:title="'수집은 끝났지만 업무 테이블에 반영되지 않은 건이 ' + ${s.pendingCount} + '건 있습니다'"
+                      th:text="'반영 대기 ' + ${s.pendingCount} + '건 · 이어하기'"
+                      th:attr="onclick=|krasOpenHistoryPopup('${s.datasetCode}', '${s.name}', ${s.pendingItemId});|"></button>
             </td>
           </tr>
         </tbody>
@@ -131,13 +136,14 @@
       </div>
       <div class="dset-modal-body">
         <div id="hist-message" class="result-box" role="status" aria-live="polite">이력을 불러오는 중입니다.</div>
-        <div class="history-scroll" style="margin-top:12px;"><table class="hist-table">
+        <div class="history-scroll" style="margin-top:12px;"><table class="hist-table" style="min-width:0;">
           <thead><tr><th>수집 ID</th><th>수집 상태</th><th>정상 / 제외</th><th>수집 기간 / 실행 시작</th><th>확인</th></tr></thead>
           <tbody id="hist-items"></tbody>
         </table></div>
         <div id="hist-detail" hidden style="margin-top:16px;border-top:1px solid #2e3640;padding-top:14px;">
           <h4 id="hist-detail-title" style="font-size:14px;font-weight:700;color:#e7eaee;margin-bottom:8px;"></h4>
           <div id="hist-detail-reasons" class="result-box"></div>
+          <div id="hist-last-attempt" class="result-box" hidden style="margin-top:10px;"></div>
           <div id="hist-comparison" class="result-box" hidden style="margin-top:10px;"></div>
           <pre id="hist-preview" class="result-box" style="margin-top:10px;"></pre>
           <button type="button" id="hist-promote" class="btn btn-primary" disabled style="margin-top:10px;">선택한 수집 건 업무 테이블 반영</button>
@@ -1285,6 +1291,7 @@ const krasHistoryPopup = (function() {
   const detail = document.getElementById('hist-detail');
   const detailTitle = document.getElementById('hist-detail-title');
   const reasonsBox = document.getElementById('hist-detail-reasons');
+  const lastAttemptBox = document.getElementById('hist-last-attempt');
   const comparisonBox = document.getElementById('hist-comparison');
   const previewBox = document.getElementById('hist-preview');
   const promoteBtn = document.getElementById('hist-promote');
@@ -1302,11 +1309,15 @@ const krasHistoryPopup = (function() {
   function resetDetail() {
     current.selected = null;
     detail.hidden = true;
+    lastAttemptBox.hidden = true;
     promoteBtn.disabled = true;
   }
 
   async function selectItem(itemId) {
     resetDetail();
+    itemsBody.querySelectorAll('tr').forEach(tr => {
+      tr.style.background = tr.dataset.itemId === String(itemId) ? 'rgba(14,155,148,0.14)' : '';
+    });
     detail.hidden = false;
     reasonsBox.className = 'result-box';
     reasonsBox.textContent = '확인하는 중...';
@@ -1316,6 +1327,18 @@ const krasHistoryPopup = (function() {
       detailTitle.textContent = '수집 ID ' + data.item.item_id;
       reasonsBox.textContent = data.reasons.length ? data.reasons.join('\n') : '수집 검증 완료. 내용을 확인한 뒤 반영하세요.';
       reasonsBox.className = 'result-box ' + (data.promotable ? 'ok' : 'warn');
+      const attempt = data.lastPromoteAttempt;
+      lastAttemptBox.hidden = !attempt;
+      if (attempt) {
+        const failed = attempt.status === 'FAILED';
+        lastAttemptBox.className = 'result-box ' + (failed ? 'err' : attempt.status === 'RUNNING' ? 'warn' : 'ok');
+        lastAttemptBox.textContent = '마지막 반영 시도: ' + (statusLabels[attempt.status] || attempt.status)
+          + ' (' + (attempt.ended_at || attempt.started_at) + ')'
+          + (attempt.message ? '\n' + attempt.message : '')
+          + (attempt.hint ? '\n→ ' + attempt.hint : '');
+      } else {
+        lastAttemptBox.textContent = '';
+      }
       previewBox.textContent = JSON.stringify(data.preview, null, 2);
       if (data.comparison && data.comparison.length) {
         comparisonBox.hidden = false;
@@ -1340,6 +1363,7 @@ const krasHistoryPopup = (function() {
       itemsBody.replaceChildren();
       data.items.forEach(item => {
         const tr = document.createElement('tr');
+        tr.dataset.itemId = String(item.item_id);
         cell(tr, item.item_id);
         cell(tr, item.status === 'SUCCESS' ? '수집 검증 완료' : (statusLabels[item.status] || item.status));
         cell(tr, item.rows_valid + ' / ' + item.rows_rejected);
@@ -1365,11 +1389,11 @@ const krasHistoryPopup = (function() {
     }
   }
 
-  function open(datasetCode, label) {
+  function open(datasetCode, label, focusItemId) {
     current = { datasetCode, selected: null };
     title.textContent = (label || datasetCode) + ' · 수집 이력';
     backdrop.hidden = false;
-    load();
+    load().then(() => { if (focusItemId) selectItem(focusItemId); });
   }
 
   function close() { backdrop.hidden = true; }
@@ -1400,7 +1424,7 @@ const krasHistoryPopup = (function() {
   return { open, close };
 })();
 
-function krasOpenHistoryPopup(datasetCode, label) { krasHistoryPopup.open(datasetCode, label); }
+function krasOpenHistoryPopup(datasetCode, label, focusItemId) { krasHistoryPopup.open(datasetCode, label, focusItemId); }
 
 (function initDatasetNav() {
   const search = document.getElementById('dataset-nav-search');
