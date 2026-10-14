@@ -18,7 +18,7 @@ GeoSync는 지자체 지적·용도지역 데이터(KRAS/KAIS)를 운영 Postgre
 - `src/main/java/geosync/kras/`: KRAS(부동산행정정보) API 연계 — GPKI 인증, XML/TXT 파싱, mapper별 테이블 적재
 - `src/main/java/geosync/synchronization/`: 동기화 스케줄러·실행 이력·상태 조회
 - `conf/kras/base-tables.xml`, `conf/kais/base-tables.xml`: 소스-타겟 컬럼 매핑 정의 (코드가 아니라 이 XML로 동기화 대상을 바꾼다)
-- `conf/application.yml`: 서버별 실제 운영 설정 (DB 비밀번호 포함, git 추적 안 됨) — `src/main/resources/application.yml`은 `${VAR:기본값}` 템플릿
+- `conf/application.yml`: 서버별 실제 운영 설정 (DB 비밀번호 포함, git 추적 안 됨) — `src/main/resources/application.yml`은 값을 직접 적은 기본 설정(환경변수 미사용)
 - `api-tests/`: KRAS 게이트웨이 수동 테스트용 Postman 컬렉션 + PowerShell 스크립트
 - `INSTALL.md`: 운영 서버 신규 설치 체크리스트 (실행 절차는 `/deploy-server` 스킬 참고)
 

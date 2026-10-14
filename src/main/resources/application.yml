@@ -1,12 +1,12 @@
 server:
-  port: ${SERVER_PORT:18080}
+  port: 18080
 
 spring:
   datasource:
     driver-class-name: org.postgresql.Driver
-    url: ${DB_URL:jdbc:postgresql://112.216.98.130:31613/YG-Space_260714?autoReconnect=true&useUnicode=true&characterEncoding=utf8&allowMultiQueries=true&zeroDateTimeBehavior=convertToNull}
-    username: ${DB_USER:postgres}
-    password: ${DB_PASSWORD:daeho1990!}
+    url: "jdbc:postgresql://112.216.98.130:31613/YG-Space_260714?autoReconnect=true&useUnicode=true&characterEncoding=utf8&allowMultiQueries=true&zeroDateTimeBehavior=convertToNull"
+    username: "postgres"
+    password: "daeho1990!"
     hikari:
       connection-timeout: 30000
       maximum-pool-size: 5
@@ -15,55 +15,68 @@ spring:
     banner-mode: off
 
 kras:
-  url: ${KRAS_URL:http://110.20.1.12:8385/conn/estateGateway}
-  conn-svc-id: ${KRAS_CONN_SVC_ID:KRAS000037}
-  conn-sys-id: ${KRAS_CONN_SYS_ID:HOH4-N9PX-73Y6-B393}
-  chk-pnu: ${KRAS_CHK_PNU:1283025625111190010}
-  config: ${KRAS_CONFIG:conf/kras/base-tables.xml}
-  schedule: ${KRAS_SCHEDULE:0 30 4 * * *}
+  url: "http://110.20.1.12:8385/conn/estateGateway"
+  conn-svc-id: "KRAS000037"
+  conn-sys-id: "HOH4-N9PX-73Y6-B393"
+  chk-pnu: "1283025625111190010"
+  config: "conf/kras/base-tables.xml"
+  schedule: "0 30 4 * * *"
   timeout-seconds: 300
   api-timeout-seconds: 30
-  work-dir: ${KRAS_WORK_DIR:./workspace/kras}
-  shp-charset: ${KRAS_SHP_CHARSET:MS949}
+  work-dir: "./workspace/kras"
+  shp-charset: "MS949"
   file-download:
-    schedule: ${KRAS_FILE_DOWNLOAD_SCHEDULE:}
-    output-dir: ${KRAS_FILE_DOWNLOAD_DIR:}
+    schedule: ""
+    output-dir: ""
     cbnd-shp: true
     usezone-shp: true
     jiga-txt: false
     land-txt: false
 
+# 토지 증분 동기화 (토지이동 변동내역 §10 일일 + 토지기본정보 TXT 월 보정).
+# kras 블록 밖에 둔다 — 설정 화면에서 저장하면 kras 블록이 통째로 화면 항목으로 교체되기 때문이다.
+# 서비스 ID·요청 필드명은 배포 시 확인해 conf/application.yml에 채운다. 변경 후 재시작해야 적용된다.
+kras-incremental:
+  land-change:
+    service-id: ""          # land_change 서비스 ID. kras.sync_dataset.service_code와 같은 값. 비우면 호출 안 함
+    start-param: ""         # 처리일자(시작일) 요청 필드명
+    end-param: ""           # 처리일자(종료일) 요청 필드명
+    date-format: "yyyyMMdd"
+    schedule: ""            # 일일 증분 cron, 비우면 꺼짐. 제안: "0 0 6 * * *"
+  land-basic:
+    correction-schedule: "" # 월 보정 cron, 비우면 꺼짐. 제안: "0 0 2 1 * *"
+
 koreps:
-  url: ${KOREPS_URL:http://10.188.226.221:8385/conn/estateGateway}
-  conn-sys-id: ${KOREPS_CONN_SYS_ID:VUHK-MFG4-XUME-M9AO}
+  url: "http://10.188.226.221:8385/conn/estateGateway"
+  conn-sys-id: "VUHK-MFG4-XUME-M9AO"
 
 # 개발 환경 전용 mock estateGateway (/mock/estateGateway).
 # true로 켜면 API 테스트 화면에서 실 게이트웨이 없이 테스트할 수 있다.
 mock:
   gateway:
-    enabled: ${MOCK_GATEWAY:false}
+    enabled: false
 
 # /conn·/svc 요청 로그 보존기간 (0 이하면 정리 안 함)
 conn-log:
-  retention-days: ${CONN_LOG_RETENTION_DAYS:90}
+  retention-days: 90
 
 ods:
-  schema: ${ODS_SCHEMA:ods}
-  schedule: ${ODS_SCHEDULE:0 30 5 * * *}
+  schema: "ods"
+  schedule: "0 30 5 * * *"
 
 sync:
-  org-code: ${SYNC_ORG_CODE:12830}
-  enabled: ${SYNC_ENABLED:true}
+  org-code: "12830"
+  enabled: true
 
 logging:
   charset:
     console: UTF-8
     file: UTF-8
   file:
-    name: ${LOG_DIR:./logs}/geosync.log
+    name: "./logs/geosync.log"
   logback:
     rollingpolicy:
-      file-name-pattern: ${LOG_DIR:./logs}/geosync.%d{yyyy-MM-dd}.log
+      file-name-pattern: "./logs/geosync.%d{yyyy-MM-dd}.log"
       max-history: 90
   level:
     root: INFO
