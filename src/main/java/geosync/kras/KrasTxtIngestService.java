@@ -68,6 +68,12 @@ public class KrasTxtIngestService {
      * 앞 5개를 이어붙이면 19자리 PNU다 — 기존 KrasTxtLoaderService의 8컬럼 순서와도 일치한다.
      */
     public IngestResult ingestLandBasic(JdbcTemplate targetJdbc, String orgCd, String triggeredBy) throws Exception {
+        return ingestLandBasic(targetJdbc, orgCd, triggeredBy, "MANUAL");
+    }
+
+    /** @param jobKind kras.sync_run.job_kind — 화면 수동 실행은 MANUAL, 월 보정 스케줄은 MONTHLY. */
+    public IngestResult ingestLandBasic(JdbcTemplate targetJdbc, String orgCd, String triggeredBy, String jobKind)
+            throws Exception {
         byte[] data = krasApiClient.downloadLandTxt();
         List<String[]> rows = parseTxt(data, 8);
         if (rows.isEmpty()) {
@@ -75,12 +81,12 @@ public class KrasTxtIngestService {
         }
         return targetJdbc.execute((ConnectionCallback<IngestResult>) conn ->
                 inTransaction(conn, LAND_BASIC_DATASET,
-                        tx -> ingestLandBasicInTransaction(tx, orgCd, rows, triggeredBy)));
+                        tx -> ingestLandBasicInTransaction(tx, orgCd, rows, triggeredBy, jobKind)));
     }
 
     private IngestResult ingestLandBasicInTransaction(JdbcTemplate tx, String orgCd, List<String[]> rows,
-                                                       String triggeredBy) {
-        long[] ids = createRunAndItem(tx, orgCd, LAND_BASIC_DATASET, triggeredBy);
+                                                       String triggeredBy, String jobKind) {
+        long[] ids = createRunAndItem(tx, orgCd, LAND_BASIC_DATASET, triggeredBy, jobKind);
         long runId = ids[0];
         long itemId = ids[1];
 
@@ -131,21 +137,76 @@ public class KrasTxtIngestService {
         return new IngestResult(runId, itemId, n, promotable, warnings);
     }
 
-    /** 승격: 부모(parcel) → 자식(land_basic) 순서. 둘 다 자연키(pnu) UPSERT — 패턴 A. */
+    /** 승격: 부모(parcel) → 자식(land_basic) 순서. 둘 다 자연키(pnu) UPSERT — 패턴 A, 파일의 전체 행. */
+    private static final List<KrasStagePromotionService.StagePromotionSpec> LAND_BASIC_SPECS = List.of(
+            KrasStagePromotionService.StagePromotionSpec.naturalKeyUpsertAll(
+                    "kras.stage_parcel", "kras.parcel", List.of("pnu"),
+                    List.of("pnu", "adm_sect_cd", "land_loc_cd", "ledg_gbn", "bobn", "bubn")),
+            KrasStagePromotionService.StagePromotionSpec.naturalKeyUpsertAll(
+                    "kras.stage_land_basic", "kras.land_basic", List.of("pnu"),
+                    List.of("pnu", "jimok", "parea", "own_gbn")));
+
     public PromoteResult promoteLandBasic(JdbcTemplate targetJdbc, String orgCd, long itemId) {
         return targetJdbc.execute((ConnectionCallback<PromoteResult>) conn ->
                 inTransaction(conn, LAND_BASIC_DATASET, tx -> {
                     requireSuccess(tx, orgCd, itemId);
-                    promotionService.promote(tx, itemId, List.of(
-                        KrasStagePromotionService.StagePromotionSpec.naturalKeyUpsert(
-                            "kras.stage_parcel", "kras.parcel", List.of("pnu"),
-                            List.of("pnu", "adm_sect_cd", "land_loc_cd", "ledg_gbn", "bobn", "bubn")),
-                        KrasStagePromotionService.StagePromotionSpec.naturalKeyUpsert(
-                            "kras.stage_land_basic", "kras.land_basic", List.of("pnu"),
-                            List.of("pnu", "jimok", "parea", "own_gbn"))
-                    ));
+                    promotionService.promote(tx, itemId, LAND_BASIC_SPECS);
                     return new PromoteResult(itemId);
                 }));
+    }
+
+    /**
+     * 월 보정 결과. guardTripped면 미관측 표시를 건너뛰었다(반영 자체는 유지).
+     * @param reactivated 이번 파일에 있어 ACTIVE로 되돌린 필지 수(SOURCE_CLOSED/NOT_OBSERVED였던 것)
+     * @param notObserved 이번 파일에 없어 NOT_OBSERVED로 표시한 필지 수
+     */
+    public record CorrectionResult(long itemId, long reactivated, long notObserved, boolean guardTripped) {}
+
+    /**
+     * ponytail: 고정 임계값 5% — 정상적인 대규모 감소(행정구역 통폐합 등)가 실제로 나오면 설정으로 뺀다.
+     * 미관측으로 바뀔 필지가 현재 ACTIVE의 이 비율을 넘으면 파일이 잘렸거나 일부가 빠졌다고 보고 표시를 막는다.
+     */
+    static final double MAX_NOT_OBSERVED_RATIO = 0.05;
+
+    /**
+     * 월 보정(설계 2026-10-14 §5): 전체 TXT를 반영한 뒤, 같은 트랜잭션에서 필지 상태를 파일과 맞춘다.
+     * 파일에 있는 필지는 ACTIVE로, 파일에 없는 ACTIVE 필지는 NOT_OBSERVED로 — 행은 지우지 않는다.
+     */
+    public CorrectionResult promoteLandBasicWithCorrection(JdbcTemplate targetJdbc, String orgCd, long itemId) {
+        return targetJdbc.execute((ConnectionCallback<CorrectionResult>) conn ->
+                inTransaction(conn, LAND_BASIC_DATASET, tx -> {
+                    requireSuccess(tx, orgCd, itemId);
+                    promotionService.promote(tx, itemId, LAND_BASIC_SPECS);
+                    return correctRecordStatus(tx, orgCd, itemId);
+                }));
+    }
+
+    private CorrectionResult correctRecordStatus(JdbcTemplate tx, String orgCd, long itemId) {
+        String inFile = "EXISTS (SELECT 1 FROM kras.stage_parcel s WHERE s.item_id=? AND s.pnu=t.pnu)";
+        long reactivated = 0;
+        for (String table : List.of("kras.parcel", "kras.land_basic")) {
+            // 방금 UPSERT로 source_item_id가 이번 건이 됐으므로 상태만 바꾼다.
+            long n = tx.update("UPDATE " + table + " t SET record_status='ACTIVE' "
+                    + "WHERE t.org_cd=? AND t.record_status<>'ACTIVE' AND " + inFile, orgCd, itemId);
+            if (table.equals("kras.parcel")) reactivated = n;   // 건수는 필지(parcel) 기준
+        }
+        Long active = tx.queryForObject("SELECT count(*) FROM kras.parcel WHERE org_cd=? AND record_status='ACTIVE'",
+                Long.class, orgCd);
+        Long missing = tx.queryForObject("SELECT count(*) FROM kras.parcel t WHERE t.org_cd=? "
+                + "AND t.record_status='ACTIVE' AND NOT " + inFile, Long.class, orgCd, itemId);
+        if (active != null && missing != null && active > 0 && missing > active * MAX_NOT_OBSERVED_RATIO) {
+            log.warn("[KrasTxtIngest] 월 보정: 미관측 예정 {}건이 ACTIVE {}건의 {}%를 넘어 표시를 건너뜀 (item_id={})",
+                    missing, active, (int) (MAX_NOT_OBSERVED_RATIO * 100), itemId);
+            return new CorrectionResult(itemId, reactivated, 0, true);
+        }
+        long notObserved = 0;
+        for (String table : List.of("kras.parcel", "kras.land_basic")) {
+            // 행을 바꾸므로 source_item_id도 이번 보정 건으로 옮긴다(guard_business_row: 과거 건으로 덮기 금지).
+            long n = tx.update("UPDATE " + table + " t SET record_status='NOT_OBSERVED', source_item_id=? "
+                    + "WHERE t.org_cd=? AND t.record_status='ACTIVE' AND NOT " + inFile, itemId, orgCd, itemId);
+            if (table.equals("kras.parcel")) notObserved = n;
+        }
+        return new CorrectionResult(itemId, reactivated, notObserved, false);
     }
 
     // ── land_price_file (KRAS000039) ──────────────────────────────────
@@ -171,7 +232,7 @@ public class KrasTxtIngestService {
 
     private IngestResult ingestLandPriceInTransaction(JdbcTemplate tx, String orgCd, List<String[]> rows,
                                                        String triggeredBy) {
-        long[] ids = createRunAndItem(tx, orgCd, LAND_PRICE_DATASET, triggeredBy);
+        long[] ids = createRunAndItem(tx, orgCd, LAND_PRICE_DATASET, triggeredBy, "MANUAL");
         long runId = ids[0];
         long itemId = ids[1];
 
@@ -233,14 +294,15 @@ public class KrasTxtIngestService {
     }
 
     /** @return {runId, itemId}. FULL 수집모드라 scope_key는 기관 전체를 뜻하는 'ALL'이다. */
-    private long[] createRunAndItem(JdbcTemplate tx, String orgCd, String datasetCode, String triggeredBy) {
+    private long[] createRunAndItem(JdbcTemplate tx, String orgCd, String datasetCode, String triggeredBy,
+                                   String jobKind) {
         LocalDate today = LocalDate.now();
         LocalDate tomorrow = today.plusDays(1);
         Long runId = tx.queryForObject("""
             INSERT INTO kras.sync_run(org_cd, job_kind, triggered_by, period_start, period_end_exclusive)
-            VALUES (?, 'MANUAL', ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?)
             RETURNING run_id
-            """, Long.class, orgCd, triggeredBy, today, tomorrow);
+            """, Long.class, orgCd, jobKind, triggeredBy, today, tomorrow);
         Long itemId = tx.queryForObject("""
             INSERT INTO kras.sync_item(run_id, org_cd, dataset_code, scope_key, window_start, window_end_exclusive)
             VALUES (?, ?, ?, 'ALL', ?, ?)

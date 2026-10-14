@@ -23,7 +23,7 @@ import java.util.Map;
 public class KrasStagePromotionService {
 
     public enum PromotionPattern {
-        NATURAL_KEY_UPSERT, IDENTITY_MATCH_UPSERT, SCOPE_REPLACE, SCOPE_REPLACE_WITH_CHILDREN,
+        NATURAL_KEY_UPSERT, NATURAL_KEY_UPSERT_ALL, IDENTITY_MATCH_UPSERT, SCOPE_REPLACE, SCOPE_REPLACE_WITH_CHILDREN,
         PARENT_LOOKUP_IDENTITY_MATCH_UPSERT, APPEND_ONLY
     }
 
@@ -68,6 +68,13 @@ public class KrasStagePromotionService {
         public static StagePromotionSpec naturalKeyUpsert(String stageTable, String businessTable,
                                                             List<String> naturalKeyColumns, List<String> copyColumns) {
             return new StagePromotionSpec(stageTable, businessTable, PromotionPattern.NATURAL_KEY_UPSERT,
+                    naturalKeyColumns, copyColumns, null, null, List.of(), null);
+        }
+
+        /** 패턴 A의 전체 행 버전 — 기관 전체 파일(land_basic_file)처럼 stage 한 건에 행이 여러 개일 때. */
+        public static StagePromotionSpec naturalKeyUpsertAll(String stageTable, String businessTable,
+                                                               List<String> naturalKeyColumns, List<String> copyColumns) {
+            return new StagePromotionSpec(stageTable, businessTable, PromotionPattern.NATURAL_KEY_UPSERT_ALL,
                     naturalKeyColumns, copyColumns, null, null, List.of(), null);
         }
 
@@ -130,6 +137,7 @@ public class KrasStagePromotionService {
         for (StagePromotionSpec spec : specs) {
             switch (spec.pattern()) {
                 case NATURAL_KEY_UPSERT -> promoteNaturalKeyUpsert(tx, itemId, spec);
+                case NATURAL_KEY_UPSERT_ALL -> promoteNaturalKeyUpsertAll(tx, itemId, spec);
                 case IDENTITY_MATCH_UPSERT -> promoteIdentityMatchUpsert(tx, itemId, spec);
                 case SCOPE_REPLACE -> promoteScopeReplace(tx, itemId, spec);
                 case SCOPE_REPLACE_WITH_CHILDREN -> promoteScopeReplaceWithChildren(tx, itemId, spec);
@@ -241,8 +249,28 @@ public class KrasStagePromotionService {
         return String.join(",", java.util.Collections.nCopies(n, "?"));
     }
 
-    /** 패턴 A(§8.2/§8.3) — stage 전체를 한 문장으로 INSERT ... ON CONFLICT DO UPDATE. */
+    /** 패턴 A(§8.2/§8.3) — PNU 단건 조회의 stage 1행(row_no=1)을 INSERT ... ON CONFLICT DO UPDATE. */
     private void promoteNaturalKeyUpsert(JdbcTemplate tx, long itemId, StagePromotionSpec spec) {
+        int n = tx.update(naturalKeyUpsertSql(spec, " AND row_no=1"), itemId, itemId);
+        if (n != 1) {
+            throw new IllegalStateException(
+                    spec.businessTable() + " 승격 실패 — item_id=" + itemId + "의 " + spec.stageTable()
+                            + " 행을 찾을 수 없습니다.");
+        }
+    }
+
+    /** 패턴 A 전체 행 — stage의 모든 행을 한 문장으로 UPSERT. 반영 건수가 stage 건수와 다르면 실패시킨다. */
+    private void promoteNaturalKeyUpsertAll(JdbcTemplate tx, long itemId, StagePromotionSpec spec) {
+        Long expected = tx.queryForObject(
+                "SELECT count(*) FROM " + spec.stageTable() + " WHERE item_id=?", Long.class, itemId);
+        int n = tx.update(naturalKeyUpsertSql(spec, ""), itemId, itemId);
+        if (expected == null || expected == 0 || n != expected) {
+            throw new IllegalStateException(spec.businessTable() + " 승격 실패 — item_id=" + itemId
+                    + "의 stage " + expected + "건 중 " + n + "건만 반영됐습니다.");
+        }
+    }
+
+    private static String naturalKeyUpsertSql(StagePromotionSpec spec, String rowFilter) {
         List<String> cols = spec.copyColumns();
         String colList = String.join(",", cols);
         String updateSet = cols.stream()
@@ -252,19 +280,12 @@ public class KrasStagePromotionService {
                 .orElseThrow(() -> new IllegalStateException(
                         spec.businessTable() + ": 자연키 외 컬럼이 하나도 없습니다."));
 
-        String sql = """
+        return """
             INSERT INTO %s(%s, source_item_id)
-            SELECT %s, ? FROM %s WHERE item_id=? AND row_no=1
+            SELECT %s, ? FROM %s WHERE item_id=?%s
             ON CONFLICT (%s) DO UPDATE SET %s, source_item_id=EXCLUDED.source_item_id
-            """.formatted(spec.businessTable(), colList, colList, spec.stageTable(),
+            """.formatted(spec.businessTable(), colList, colList, spec.stageTable(), rowFilter,
                 String.join(",", spec.naturalKeyColumns()), updateSet);
-
-        int n = tx.update(sql, itemId, itemId);
-        if (n != 1) {
-            throw new IllegalStateException(
-                    spec.businessTable() + " 승격 실패 — item_id=" + itemId + "의 " + spec.stageTable()
-                            + " 행을 찾을 수 없습니다.");
-        }
     }
 
     /**

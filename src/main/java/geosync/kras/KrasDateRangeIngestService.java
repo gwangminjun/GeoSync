@@ -34,6 +34,7 @@ public class KrasDateRangeIngestService {
     private final KrasApiClient krasApiClient;
     private final KrasStagePromotionService promotionService;
     private final ObjectMapper objectMapper = new ObjectMapper();
+    private static final String PAYLOAD_HASH_SQL = "encode(sha256(convert_to(?::jsonb::text, 'UTF8')), 'hex')::kras.sha256";
 
     public record IngestResult(long runId, long itemId, boolean promotable,
                                 List<String> warnings, Map<String, Object> preview) {}
@@ -47,6 +48,13 @@ public class KrasDateRangeIngestService {
     public IngestResult ingest(JdbcTemplate targetJdbc, String orgCd, KrasDateRangeServiceMapper mapper,
                                 LocalDate startDate, LocalDate endDate, Map<String, String> extraParams,
                                 String triggeredBy) {
+        return ingest(targetJdbc, orgCd, mapper, startDate, endDate, extraParams, triggeredBy, "MANUAL");
+    }
+
+    /** @param jobKind kras.sync_run.job_kind — 화면 수동 실행은 MANUAL, 일일 증분 스케줄은 DAILY. */
+    public IngestResult ingest(JdbcTemplate targetJdbc, String orgCd, KrasDateRangeServiceMapper mapper,
+                                LocalDate startDate, LocalDate endDate, Map<String, String> extraParams,
+                                String triggeredBy, String jobKind) {
         if (startDate.isAfter(endDate)) {
             throw new IllegalArgumentException("시작일이 종료일보다 늦습니다.");
         }
@@ -60,7 +68,8 @@ public class KrasDateRangeIngestService {
             conn.setAutoCommit(false);
             try {
                 JdbcTemplate tx = new JdbcTemplate(new SingleConnectionDataSource(conn, true));
-                IngestResult result = ingestInTransaction(tx, orgCd, mapper, startDate, endDate, extraParams, triggeredBy);
+                IngestResult result = ingestInTransaction(tx, orgCd, mapper, startDate, endDate, extraParams,
+                        triggeredBy, jobKind);
                 conn.commit();
                 log.info("[KrasDateRangeIngest] 수집 완료 dataset={} itemId={} promotable={} warnings={}",
                         mapper.datasetCode(), result.itemId(), result.promotable(), result.warnings());
@@ -77,8 +86,8 @@ public class KrasDateRangeIngestService {
 
     private IngestResult ingestInTransaction(JdbcTemplate tx, String orgCd, KrasDateRangeServiceMapper mapper,
                                               LocalDate startDate, LocalDate endDate, Map<String, String> extraParams,
-                                              String triggeredBy) {
-        Long runId = findOrCreateTodayRun(tx, orgCd, triggeredBy);
+                                              String triggeredBy, String jobKind) {
+        Long runId = findOrCreateTodayRun(tx, orgCd, triggeredBy, jobKind);
 
         String scopeKey = tx.queryForObject("""
             SELECT kras.entity_key(jsonb_build_object('start', ?::text, 'end', ?::text) || ?::jsonb)
@@ -92,7 +101,9 @@ public class KrasDateRangeIngestService {
 
         Document doc;
         try {
-            byte[] xml = krasApiClient.query(mapper.connSvcId(), "", extraParams.isEmpty() ? null : extraParams);
+            Map<String, String> params = new LinkedHashMap<>(mapper.dateParams(startDate, endDate));
+            params.putAll(extraParams);
+            byte[] xml = krasApiClient.query(mapper.connSvcId(), "", params.isEmpty() ? null : params);
             doc = XmlUtil.parse(xml);
         } catch (Exception e) {
             throw new IllegalStateException(mapper.connSvcId() + " 호출/파싱 실패: " + e.getMessage(), e);
@@ -127,22 +138,22 @@ public class KrasDateRangeIngestService {
         return new IngestResult(runId, itemId, promotable, mapped.fieldWarnings(), preview);
     }
 
-    private Long findOrCreateTodayRun(JdbcTemplate tx, String orgCd, String triggeredBy) {
+    private Long findOrCreateTodayRun(JdbcTemplate tx, String orgCd, String triggeredBy, String jobKind) {
         LocalDate today = LocalDate.now();
         LocalDate tomorrow = today.plusDays(1);
         List<Long> existing = tx.query("""
             SELECT run_id FROM kras.sync_run
-            WHERE org_cd=? AND job_kind='MANUAL' AND period_start=? AND period_end_exclusive=?
+            WHERE org_cd=? AND job_kind=? AND period_start=? AND period_end_exclusive=?
             ORDER BY run_id DESC LIMIT 1
-            """, (rs, i) -> rs.getLong(1), orgCd, today, tomorrow);
+            """, (rs, i) -> rs.getLong(1), orgCd, jobKind, today, tomorrow);
         if (!existing.isEmpty()) {
             return existing.get(0);
         }
         return tx.queryForObject("""
             INSERT INTO kras.sync_run(org_cd, job_kind, triggered_by, period_start, period_end_exclusive)
-            VALUES (?, 'MANUAL', ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?)
             RETURNING run_id
-            """, Long.class, orgCd, triggeredBy, today, tomorrow);
+            """, Long.class, orgCd, jobKind, triggeredBy, today, tomorrow);
     }
 
     /**
@@ -171,8 +182,13 @@ public class KrasDateRangeIngestService {
             }
         }
         if (payloadJson != null) {
+            // land_change_event는 (source_item_id, record_no)로 sync_record를 FK 참조하고,
+            // payload_hash=sha256(payload::text)를 CHECK한다 — jsonb 정규화 텍스트로 해시해야 맞는다.
+            names.add("record_no");
+            placeholders.add("?");
+            values.add((long) rowNo);
             names.add("payload_hash");
-            placeholders.add("encode(sha256(convert_to(?, 'UTF8')), 'hex')::kras.sha256");
+            placeholders.add(PAYLOAD_HASH_SQL);
             values.add(payloadJson);
         }
         String sql = "INSERT INTO " + row.stageTable() + "(" + String.join(",", names) + ") VALUES ("
@@ -182,8 +198,8 @@ public class KrasDateRangeIngestService {
         if (payloadJson != null) {
             tx.update("""
                 INSERT INTO kras.sync_record(item_id, record_no, payload, payload_hash, parser_version, validation_status)
-                VALUES (?, ?, ?::jsonb, encode(sha256(convert_to(?, 'UTF8')), 'hex')::kras.sha256, '1', 'VALID')
-                """, itemId, rowNo, payloadJson, payloadJson);
+                VALUES (?, ?, ?::jsonb, %s, '1', 'VALID')
+                """.formatted(PAYLOAD_HASH_SQL), itemId, rowNo, payloadJson, payloadJson);
         }
     }
 
@@ -225,6 +241,71 @@ public class KrasDateRangeIngestService {
                     + "잘못된 item일 수 있습니다). status=" + status);
         }
         promotionService.promote(tx, itemId, mapper.promotionSpecs());
+        mapper.afterPromote(tx, orgCd, itemId);
         return new PromoteResult(itemId);
+    }
+
+    /**
+     * [start,end]를 데이터셋의 maxQueryDays 이하 조각으로 나눈다. 양끝 포함, 날짜 순서대로.
+     * 10일 제한(§10)처럼 한 번에 조회할 수 있는 기간이 좁은 데이터셋을 긴 구간으로 수집할 때 쓴다.
+     */
+    static List<LocalDate[]> splitWindows(LocalDate start, LocalDate end, int maxDays) {
+        if (start.isAfter(end)) {
+            throw new IllegalArgumentException("시작일이 종료일보다 늦습니다.");
+        }
+        if (maxDays <= 0) {
+            throw new IllegalArgumentException("maxDays는 1 이상이어야 합니다: " + maxDays);
+        }
+        List<LocalDate[]> chunks = new ArrayList<>();
+        LocalDate cursor = start;
+        while (!cursor.isAfter(end)) {
+            LocalDate chunkEnd = cursor.plusDays(maxDays - 1);
+            if (chunkEnd.isAfter(end)) {
+                chunkEnd = end;
+            }
+            chunks.add(new LocalDate[]{cursor, chunkEnd});
+            cursor = chunkEnd.plusDays(1);
+        }
+        return chunks;
+    }
+
+    /**
+     * 반영까지 끝난 마지막 구간의 종료일(포함) 다음 날 — 증분 수집의 시작점. 이력이 없으면 비어 있다.
+     * "반영까지 끝남" = 0건 구간이거나, 그 수집 건의 행이 업무 테이블(첫 승격 대상)에 들어가 있음.
+     * 수집만 되고 반영에 실패한 구간은 세지 않는다 — 다음 실행이 그 구간을 새로 수집해 다시 반영한다
+     * (예전 수집 건을 나중에 반영하면 guard_business_row가 'Older collection'으로 막을 수 있다).
+     */
+    java.util.Optional<LocalDate> nextWindowStart(JdbcTemplate jdbc, String orgCd, KrasDateRangeServiceMapper mapper) {
+        String businessTable = mapper.promotionSpecs().get(0).businessTable();
+        LocalDate next = jdbc.queryForObject("""
+            SELECT max(si.window_end_exclusive) FROM kras.sync_item si
+            WHERE si.org_cd = ? AND si.dataset_code = ? AND si.status = 'SUCCESS'
+              AND (si.rows_valid = 0 OR EXISTS (SELECT 1 FROM %s b WHERE b.source_item_id = si.item_id))
+            """.formatted(businessTable), LocalDate.class, orgCd, mapper.datasetCode());
+        return java.util.Optional.ofNullable(next);
+    }
+
+    /** 한 조각의 수집 결과 — 성공한 조각은 끝까지 유지되고, 실패한 조각에서 멈춘다. */
+    public record ChunkResult(LocalDate start, LocalDate end, boolean success, Long itemId, String error) {}
+
+    /**
+     * [start,end]를 maxQueryDays 조각으로 나눠 순서대로 수집한다. 한 조각이 실패하면 거기서 멈춘다 —
+     * 이미 성공한 앞 조각들은 그대로 남고, 다음 실행이 실패한 조각부터 다시 시도하면 된다.
+     * 승격(업무 테이블 반영)은 포함하지 않는다 — 조각별로 미리보기를 확인한 뒤 promote()를 따로 호출한다.
+     */
+    public List<ChunkResult> ingestRange(JdbcTemplate targetJdbc, String orgCd, KrasDateRangeServiceMapper mapper,
+                                          LocalDate start, LocalDate end, Map<String, String> extraParams,
+                                          String triggeredBy) {
+        List<ChunkResult> results = new ArrayList<>();
+        for (LocalDate[] window : splitWindows(start, end, mapper.maxQueryDays())) {
+            try {
+                IngestResult r = ingest(targetJdbc, orgCd, mapper, window[0], window[1], extraParams, triggeredBy);
+                results.add(new ChunkResult(window[0], window[1], true, r.itemId(), null));
+            } catch (Exception e) {
+                results.add(new ChunkResult(window[0], window[1], false, null, e.getMessage()));
+                break;
+            }
+        }
+        return results;
     }
 }

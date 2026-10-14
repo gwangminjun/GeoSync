@@ -676,6 +676,9 @@ CREATE TABLE kras.land_change_event (
     payload_hash kras.sha256,
     payload jsonb NOT NULL,
     UNIQUE(source_item_id,record_no),
+    -- 사건 자연키(가정, V-1 확인 전 — docs/database/2026-10-07/…-land-change-dedup-key.sql).
+    -- land_mov_no/hndl_ymd가 NULL인 행은 서로 다른 값으로 취급되어 제약에 걸리지 않는다.
+    UNIQUE(org_cd,land_mov_no,hndl_ymd),
     source_item_id bigint NOT NULL REFERENCES kras.sync_item(item_id),
     observed_at timestamptz NOT NULL DEFAULT now(),
     row_hash kras.sha256,
@@ -4004,6 +4007,7 @@ INSERT INTO kras.business_dataset VALUES
  ('land_right','land_right'),('unit_ownership_history','land_right'),('unit_ownership_history','unit_ownership_history'),
  ('land_movement_history','land_mov_hist'),('land_movement_relation','land_mov_hist'),
  ('land_ownership_history','own_rgt_hist'),('land_change_event','land_change'),
+ ('parcel','land_change'),('land_basic','land_change'),
  ('integrated_building','integrated_building'),('building_parcel','integrated_building'),('building_image','building_image'),
  ('building_register','bldg_dong_info'),('building_summary','bldg_ledg_gen_hds_info'),
  ('building_title','bldg_hds_info'),('building_title','cbldg_hds_info'),

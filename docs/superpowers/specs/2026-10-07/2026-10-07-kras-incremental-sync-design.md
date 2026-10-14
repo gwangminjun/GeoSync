@@ -129,18 +129,29 @@ UNIQUE(org_cd, land_mov_no, hndl_ymd)   ← 가정 (확인 필요 V-1)
 - 3회 실패한 조각은 `FAILED`로 남기고, 다음 실행에서 그 조각부터 다시 시도한다. 사람이 원인을 본 뒤 수동 재실행할 수 있다.
 - 실패 알림은 기존 실행 로그(`KrasOperationLogService`)에 남긴다. 신규 알림 채널은 만들지 않는다.
 
-## 8. 구현 범위
+## 8. 구현 범위 (2026-10-07 갱신 — 응답 데이터 기반으로 선구현)
 
-| 항목 | 상태 | 작업 |
+> 2026-10-14: 아래 "미구현" 항목(스케줄러, 월 보정, 화면 연결, 서비스 ID 설정)은 모두 구현됐다. 최신 상태와 바뀐 규칙은
+> `docs/superpowers/specs/2026-10-14/2026-10-14-kras-incremental-sync-remaining-design.md` §11,
+> 운영 규칙은 `docs/database/2026-10-14/2026-10-14-kras-incremental-sync-rules.md`.
+
+실서버 연동 없이 kras.md §10 응답 구조(이미 `LandChangeMapper`가 매핑해 둔 필드)만으로 만들 수
+있는 부분을 먼저 구현했다. `LandChangeMapper.connSvcId()`는 여전히 예외를 던진다 — 실제 호출은
+안 되지만, 승격 이후 반영 로직은 승격된 데이터(`kras.land_change_event`)만 보고 동작하므로
+서비스 ID와 무관하게 구현·테스트할 수 있었다.
+
+| 항목 | 상태 | 위치 |
 |---|---|---|
-| 기준선 적재 (`land_basic_file`) | 있음 | 없음 |
-| 10일 청크 분할 | 없음 | `KrasDateRangeIngestService`에 분할 루프 추가 (거부 → 분할) |
-| 커서 계산 | 없음 | `sync_item` 조회 쿼리 1개 |
-| 이벤트 → parcel 반영 | 없음 | 신규 반영 서비스. 패턴 A(upsert) + `SOURCE_CLOSED` 규칙 |
-| 중복 방지 키 | 없음 | 마이그레이션: `land_change_event` 유일 키 추가 (V-1 확인 후) |
-| 증분 스케줄러 | 없음 | `kras` 패키지 신규 컴포넌트 + `kras.change-schedule` |
-| 월 보정 | 없음 | `MONTHLY` 잡 (기존 TXT 경로 재사용) |
-| `LandChangeMapper.connSvcId()` | 미확정 | V-2 확인 후 값 입력 |
+| 기준선 적재 (`land_basic_file`) | 있음 | (기존) |
+| 10일 청크 분할 | **구현 + 테스트 완료** | `KrasDateRangeIngestService.splitWindows()`, `ingestRange()` |
+| 커서 계산 | **구현 + 테스트 완료** | `KrasDateRangeIngestService.nextWindowStart()` |
+| 이벤트 → parcel/land_basic 반영 | **구현 + 테스트 완료** | `KrasLandChangeReflectionService` (`decide()` 순수 로직 + `reflect()`/`apply()`) |
+| 중복 방지 키 | **구현** | `docs/database/2026-10-07/…-land-change-dedup-key.sql` + `kras-schema-create.sql` 갱신 |
+| `LandChangeMapper.afterPromote()` 연결 | **구현** | 승격 직후 반영 서비스 호출 (`KrasDateRangeServiceMapper.afterPromote` 기본 메서드) |
+| 증분 스케줄러 (`kras.change-schedule`) | 미구현 | — |
+| 화면/엔드포인트에서 `ingestRange`·`nextWindowStart` 호출 | 미구현 — 아직 아무도 호출하지 않는 빌딩 블록이다 | `/kras-db` 쪽 UI·컨트롤러 연결 필요 |
+| 월 보정 (`MONTHLY` 잡) | 미구현 | — |
+| `LandChangeMapper.connSvcId()` | 여전히 미확정 (V-2) | 실제 호출은 이 값이 없으면 안 됨 |
 
 ## 9. 테스트 계획
 

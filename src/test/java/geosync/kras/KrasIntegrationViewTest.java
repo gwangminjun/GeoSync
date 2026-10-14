@@ -63,6 +63,8 @@ class KrasIntegrationViewTest {
         context.setVariable("datasetIndex", List.of(indexRow));
         List<Map<String, Object>> specRows = KrasSchemaController.toSpecItemRows(Map.of());
         KrasSchemaController.withRunInfo(specRows, Map.of(), java.util.Set.of("land_info", "shr_ymb"));
+        KrasSchemaController.withIncrementalSchedule(specRows,
+                Map.of("land_change", new String[]{"일일 증분 · 0 0 6 * * *", "2026-10-15 06:00"}));
         specRows.stream().filter(r -> "land_info".equals(r.get("datasetCode"))).findFirst().ifPresent(r -> {
             r.put("pendingCount", 2L);
             r.put("pendingItemId", 77L);
@@ -84,6 +86,8 @@ class KrasIntegrationViewTest {
                 "반영 대기 2건 · 이어하기", "krasOpenHistoryPopup(&#39;land_info&#39;, &#39;토지(임야)대장&#39;, 77)",
                 "규격서 오류 · 미구현", "서비스 ID 없음 · 호출 불가", "전체 연계 목록 · 데이터셋 카드",
                 "기존 KRAS 동기화(KrasWorker) 다음 실행", ">수동<", "실행 이력 없음",
+                // 증분 스케줄이 켜진 행만 "수동" 대신 스케줄·다음 실행을 보여준다.
+                ">일일 증분 · 0 0 6 * * *<", ">2026-10-15 06:00<",
                 "krasOpenDatasetPopup(&#39;land-info&#39;, &#39;land_info&#39;, &#39;토지(임야)대장&#39;, &#39;UNVERIFIED&#39;, false, true)",
                 "id=\"dset-modal-backdrop\"", "id=\"dset-pane-structure\"",
                 "id=\"dset-approve-panel\"", "id=\"dset-approve-sample\"", "/kras-db/verify-check",

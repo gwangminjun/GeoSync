@@ -251,7 +251,7 @@ public class KrasSchemaController {
 
     /**
      * 규격 표 행에 운영 정보를 덧붙인다: 스케줄, 다음 실행, 마지막 적재.
-     * 신규 경로(/kras-db)는 아직 정기 스케줄이 없어 "수동"으로 표시한다.
+     * 기본은 "수동" — 증분 동기화 스케줄이 켜진 행은 withIncrementalSchedule이 덮어쓴다.
      */
     /** 연계 수집 이력의 선택 목록에 넣는 데이터셋 코드: 규격 항목 + 파일(SHP/TXT) 데이터셋. */
     static List<String> historyDatasetCodes() {
@@ -280,6 +280,17 @@ public class KrasSchemaController {
             row.put("nextRun", "—");
             Map<String, Object> last = lastByCode.get(code);
             row.put("lastRun", last == null ? "실행 이력 없음" : describeRun(last));
+        }
+    }
+
+    /** 증분 동기화 스케줄(일일 land_change, 월 보정 land_basic_file)이 켜져 있으면 그 행의 "수동"을 바꾼다. */
+    static void withIncrementalSchedule(List<Map<String, Object>> rows, Map<String, String[]> scheduleByCode) {
+        for (Map<String, Object> row : rows) {
+            Object code = row.get("datasetCode");
+            String[] s = code == null ? null : scheduleByCode.get(code);
+            if (s == null) continue;
+            row.put("schedule", s[0]);
+            row.put("nextRun", s[1]);
         }
     }
 
@@ -349,6 +360,7 @@ public class KrasSchemaController {
     private final KrasCadastralIngestService cadastralIngestService;
     private final KrasPnuIngestService pnuIngestService;
     private final KrasDateRangeIngestService dateRangeIngestService;
+    private final KrasIncrementalSyncService incrementalSync;
     private final KrasUsezoneIngestService usezoneIngestService;
     private final KrasTxtIngestService txtIngestService;
     private final Map<String, String> slugToDatasetCode;
@@ -380,7 +392,9 @@ public class KrasSchemaController {
                                  KrasUsezoneIngestService usezoneIngestService,
                                  KrasTxtIngestService txtIngestService,
                                  KrasOperationLogService operationLog, KrasHistoryService historyService,
-                                 KrasVerificationEvidenceService verificationEvidenceService) {
+                                 KrasVerificationEvidenceService verificationEvidenceService,
+                                 KrasIncrementalSyncService incrementalSync) {
+        this.incrementalSync = incrementalSync;
         this.operationLog = operationLog;
         this.historyService = historyService;
         this.verificationEvidenceService = verificationEvidenceService;
@@ -458,6 +472,7 @@ public class KrasSchemaController {
                 .map(SpecItem::datasetCode).filter(java.util.Objects::nonNull).distinct().toList();
         List<Map<String, Object>> specRows = toSpecItemRows(batchDatasetStatus(jdbc, specCodes));
         withRunInfo(specRows, lastSyncByDataset(jdbc, specCodes), mappersByDatasetCode.keySet());
+        withIncrementalSchedule(specRows, incrementalSync.scheduleDisplay());
         Map<String, Map<String, Object>> pendingByCode = historyService.pendingPromotion(jdbc, settings.orgCode(),
                 specCodes.stream().filter(mappersByDatasetCode::containsKey).toList());
         for (Map<String, Object> row : specRows) {
@@ -1082,7 +1097,7 @@ public class KrasSchemaController {
                 if (startDate != null && !startDate.isBlank()) {
                     start = LocalDate.parse(startDate);
                 } else {
-                    start = dateRangeIngestService.nextWindowStart(targetJdbc, orgCd, datasetCode).orElse(null);
+                    start = dateRangeIngestService.nextWindowStart(targetJdbc, orgCd, mapper).orElse(null);
                     if (start == null) {
                         return Map.of("success", false,
                                 "message", "이어서 시작할 이전 수집 이력이 없습니다 — 시작일을 직접 입력하세요.");
