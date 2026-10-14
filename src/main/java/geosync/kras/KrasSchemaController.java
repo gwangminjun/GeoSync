@@ -1,5 +1,6 @@
 package geosync.kras;
 
+import geosync.common.xml.XmlUtil;
 import geosync.database.TargetDbService;
 import geosync.settings.RuntimeSettingsService;
 import geosync.synchronization.TableMapper;
@@ -19,6 +20,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import java.nio.file.Path;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -118,6 +120,34 @@ public class KrasSchemaController {
             "kras.land_attribute", false, "", "토지")
     );
 
+    /**
+     * 추가 파라미터가 필요한 데이터셋과, 채워 넣을 키(순서 유지) + 기본값. "실제 수집" 패널은 이 맵에 있는
+     * 데이터셋에서만 키별 입력칸을 보여준다 — 나머지는 PNU만으로 충분하다. 값은 JS에서 키별 입력칸을 만든 뒤
+     * JSON으로 조립해 보낸다(사용자가 raw JSON을 직접 쓰지 않아도 됨).
+     */
+    private static final Map<String, Map<String, String>> EXTRA_PARAMS_HINTS = buildExtraParamsHints();
+
+    private static Map<String, String> orderedMap(String... kv) {
+        Map<String, String> m = new LinkedHashMap<>();
+        for (int i = 0; i < kv.length; i += 2) m.put(kv[i], kv[i + 1]);
+        return Collections.unmodifiableMap(m);
+    }
+
+    private static Map<String, Map<String, String>> buildExtraParamsHints() {
+        Map<String, Map<String, String>> hints = new LinkedHashMap<>();
+        hints.put("collective_unit", orderedMap("cbldg_seqno", "0285"));
+        hints.put("land_right", orderedMap("cbldg_seqno", "0285", "dong", "", "flr", "1", "ho", "102", "sil", ""));
+        hints.put("unit_ownership_history",
+                orderedMap("cbldg_seqno", "0018", "dong", "", "flr", "1", "ho", "102", "sil", ""));
+        hints.put("building_image", orderedMap("width", "800", "height", "600", "scale", "1000"));
+        for (SpecService svc : SPEC_SERVICES) {
+            if (svc.needsBno()) {
+                hints.put(svc.datasetCode(), orderedMap("bldg_gbn_no", ""));
+            }
+        }
+        return Collections.unmodifiableMap(hints);
+    }
+
     /** 개별 매퍼가 없는 고정 데이터셋(SHP/전체 TXT) — 목록·상세 사이드바 분류용. */
     private record FixedDataset(String slug, String datasetCode, String label, String group) {}
 
@@ -135,26 +165,39 @@ public class KrasSchemaController {
      * 서비스 ID를 여기서 손으로 적는 건 임시다 — 레지스트리 설계(2026-10-07)가 끝나면 그쪽에서 읽도록 바꾼다.
      */
     private record SpecItem(int specNo, String name, String serviceId, String slug, String datasetCode,
-                            String pathLabel, boolean docError) {}
+                            String pathLabel, boolean docError, String targetTable) {}
 
     private static final List<SpecItem> SPEC_ITEMS = List.of(
-        new SpecItem(1, "토지(임야)대장", "KRAS000002", "land-info", "land_info", "PNU 단건", false),
-        new SpecItem(2, "공유지연명부", "KRAS000003", "shr-ymb", "shr_ymb", "PNU 단건", false),
-        new SpecItem(3, "토지(건물) 존재 여부", "KRAS000101", "land-bldg-check", "land_bldg_check", "PNU 단건", false),
-        new SpecItem(4, "대지권등록부(건물조회)", null, "collective-building", "collective_building", "PNU", false),
-        new SpecItem(5, "대지권등록부(전유부조회)", null, "collective-unit", "collective_unit", "PNU + 드릴다운", false),
-        new SpecItem(6, "대지권등록부", null, "land-right", "land_right", "PNU + 드릴다운", false),
-        new SpecItem(7, "토지이동연혁", "KRAS000006", "land-mov-hist", "land_mov_hist", "PNU 단건", false),
-        new SpecItem(8, "소유권변동연혁", "KRAS000007", "own-rgt-hist", "own_rgt_hist", "PNU 단건", false),
-        new SpecItem(9, "집합건물소유권연혁", null, "unit-ownership-history", "unit_ownership_history", "드릴다운", false),
-        new SpecItem(10, "토지이동내역", null, "land-change", "land_change", "기간 조회 (최대 10일)", false),
-        new SpecItem(11, "소유권변경내역", null, null, null, "—", true),
-        new SpecItem(12, "집합건물소유권변경내역", null, null, null, "—", true),
-        new SpecItem(13, "건물통합정보", null, "integrated-building", "integrated_building", "PNU", false),
-        new SpecItem(14, "건물통합도면", null, "building-image", "building_image", "PNU", false),
+        new SpecItem(1, "토지(임야)대장", "KRAS000002", "land-info", "land_info", "PNU 단건", false,
+            "kras.land_register, kras.land_owner"),
+        new SpecItem(2, "공유지연명부", "KRAS000003", "shr-ymb", "shr_ymb", "PNU 단건", false,
+            "kras.land_share"),
+        new SpecItem(3, "토지(건물) 존재 여부", "KRAS000101", "land-bldg-check", "land_bldg_check", "PNU 단건", false,
+            "kras.land_presence"),
+        new SpecItem(4, "대지권등록부(건물조회)", null, "collective-building", "collective_building", "PNU", false,
+            "kras.collective_building"),
+        new SpecItem(5, "대지권등록부(전유부조회)", null, "collective-unit", "collective_unit", "PNU + 드릴다운", false,
+            "kras.collective_unit"),
+        new SpecItem(6, "대지권등록부", null, "land-right", "land_right", "PNU + 드릴다운", false,
+            "kras.land_right, kras.unit_ownership_history"),
+        new SpecItem(7, "토지이동연혁", "KRAS000006", "land-mov-hist", "land_mov_hist", "PNU 단건", false,
+            "kras.land_movement_history, kras.land_movement_relation"),
+        new SpecItem(8, "소유권변동연혁", "KRAS000007", "own-rgt-hist", "own_rgt_hist", "PNU 단건", false,
+            "kras.land_ownership_history"),
+        new SpecItem(9, "집합건물소유권연혁", null, "unit-ownership-history", "unit_ownership_history", "드릴다운", false,
+            "kras.unit_ownership_history"),
+        new SpecItem(10, "토지이동내역", null, "land-change", "land_change", "기간 조회 (최대 10일)", false,
+            "kras.land_change_event → kras.parcel, kras.land_basic"),
+        new SpecItem(11, "소유권변경내역", null, null, null, "—", true, null),
+        new SpecItem(12, "집합건물소유권변경내역", null, null, null, "—", true, null),
+        new SpecItem(13, "건물통합정보", null, "integrated-building", "integrated_building", "PNU", false,
+            "kras.integrated_building, kras.building_parcel"),
+        new SpecItem(14, "건물통합도면", null, "building-image", "building_image", "PNU", false,
+            "kras.building_image"),
         new SpecItem(15, "SHAPE 다운로드", "KRAS000038", "cadastral-file", "cadastral_file",
-            "파일(SHP) · 레이어 목록 KRAS000037 포함", false),
-        new SpecItem(16, "토지기본정보 다운로드", "KRAS000040", "land-basic-file", "land_basic_file", "파일(TXT, 전체)", false)
+            "파일(SHP) · 레이어 목록 KRAS000037 포함", false, "public.lp_pa_cbnd, public.lt_c_uzone"),
+        new SpecItem(16, "토지기본정보 다운로드", "KRAS000040", "land-basic-file", "land_basic_file", "파일(TXT, 전체)", false,
+            "kras.land_basic, kras.parcel")
     );
 
     /**
@@ -173,13 +216,14 @@ public class KrasSchemaController {
                 enabled = Boolean.TRUE.equals(st.get("enabled"));
             }
             boolean callable = item.serviceId() != null && !item.docError() && "VERIFIED".equals(contract) && enabled;
+            String approvalLabel = "VERIFIED".equals(contract) ? "승인" : "미승인";
             String state;
             if (item.docError()) {
                 state = "규격서 오류 · 미구현";
             } else if (item.serviceId() == null) {
                 state = "서비스 ID 없음 · 호출 불가";
             } else {
-                state = "계약 " + contract;
+                state = "계약 " + approvalLabel;
             }
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("specNo", item.specNo());
@@ -188,9 +232,12 @@ public class KrasSchemaController {
             row.put("slug", item.slug());
             row.put("datasetCode", item.datasetCode());
             row.put("pathLabel", item.pathLabel());
+            row.put("targetTable", item.targetTable() == null ? "—" : item.targetTable());
             row.put("docError", item.docError());
             row.put("state", state);
             row.put("callable", callable);
+            row.put("contractStatus", contract);
+            row.put("enabled", enabled);
             rows.add(row);
         }
         return rows;
@@ -199,10 +246,8 @@ public class KrasSchemaController {
     private static final java.time.format.DateTimeFormatter RUN_TIME_FORMAT =
             java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
-    private static final Map<String, String> SYNC_STATUS_LABELS = Map.of(
-            "SUCCESS", "완료", "FAILED", "실패", "PARTIAL", "일부 실패", "WARNING", "확인 필요",
-            "RUNNING", "실행 중", "PLANNED", "대기", "COLLECTING", "수집 중", "READY", "준비 완료",
-            "BLOCKED", "차단", "INTERRUPTED", "중단");
+    private static final java.time.format.DateTimeFormatter RUN_DATE_FORMAT =
+            java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
     /**
      * 규격 표 행에 운영 정보를 덧붙인다: 스케줄, 다음 실행, 마지막 적재.
@@ -216,21 +261,21 @@ public class KrasSchemaController {
                 .distinct().sorted().toList();
     }
 
-    /** /api-test 카탈로그(conn/…)에 있어 팝업으로 바로 호출할 수 있는 데이터셋. 나머지는 API 테스트 대상이 없다. */
-    private static final Set<String> API_TEST_DATASETS =
-            Set.of("land_info", "shr_ymb", "land_bldg_check", "land_mov_hist", "own_rgt_hist");
-
     static void withRunInfo(List<Map<String, Object>> rows, Map<String, Map<String, Object>> lastByCode) {
+        withRunInfo(rows, lastByCode, Set.of());
+    }
+
+    static void withRunInfo(List<Map<String, Object>> rows, Map<String, Map<String, Object>> lastByCode,
+                             Set<String> pnuMapperCodes) {
         for (Map<String, Object> row : rows) {
             String code = (String) row.get("datasetCode");
+            row.put("hasPnuMapper", code != null && pnuMapperCodes.contains(code));
             if (code == null) {
                 row.put("schedule", "—");
                 row.put("nextRun", "—");
                 row.put("lastRun", "—");
-                row.put("apiId", null);
                 continue;
             }
-            row.put("apiId", API_TEST_DATASETS.contains(code) ? "conn/" + code : null);
             row.put("schedule", "수동");
             row.put("nextRun", "—");
             Map<String, Object> last = lastByCode.get(code);
@@ -238,13 +283,14 @@ public class KrasSchemaController {
         }
     }
 
+    /** 마지막 적재 날짜만 보여준다 — 칸이 좁아 상태·기간까지 넣으면 줄바꿈이 심해진다. */
     private static String describeRun(Map<String, Object> last) {
-        Object status = last.get("status");
-        String label = SYNC_STATUS_LABELS.getOrDefault(String.valueOf(status), String.valueOf(status));
         Object requested = last.get("requested_at");
-        String when = requested instanceof java.sql.Timestamp ts
-                ? ts.toLocalDateTime().format(RUN_TIME_FORMAT) : "시각 없음";
-        return label + " · " + when + " · 기간 " + last.get("window_start") + " ~ " + last.get("window_end_exclusive");
+        if (requested instanceof java.sql.Timestamp ts) {
+            return ts.toLocalDateTime().format(RUN_DATE_FORMAT);
+        }
+        Object end = last.get("window_end_exclusive");
+        return end == null ? "날짜 없음" : end.toString();
     }
 
     /** 데이터셋별 가장 최근 수집 건(sync_item). 없는 데이터셋은 맵에 없다. */
@@ -406,11 +452,12 @@ public class KrasSchemaController {
         }
 
         model.addAttribute("specServices", loadSpecServiceRows(jdbc));
+        model.addAttribute("extraParamsHints", EXTRA_PARAMS_HINTS);
         model.addAttribute("datasetIndex", buildDatasetIndex(jdbc));
         List<String> specCodes = SPEC_ITEMS.stream()
                 .map(SpecItem::datasetCode).filter(java.util.Objects::nonNull).distinct().toList();
         List<Map<String, Object>> specRows = toSpecItemRows(batchDatasetStatus(jdbc, specCodes));
-        withRunInfo(specRows, lastSyncByDataset(jdbc, specCodes));
+        withRunInfo(specRows, lastSyncByDataset(jdbc, specCodes), mappersByDatasetCode.keySet());
         model.addAttribute("legacyNextRun", legacyNextRun());
         model.addAttribute("specItems", specRows);
         model.addAttribute("specCallableCount", specRows.stream().filter(r -> Boolean.TRUE.equals(r.get("callable"))).count());
@@ -542,8 +589,72 @@ public class KrasSchemaController {
             UPDATE kras.sync_dataset SET contract_status='UNVERIFIED', enabled=false
             WHERE dataset_code=?
             """, datasetCode);
-        ra.addFlashAttribute("message", datasetCode + " 데이터셋 검증을 원복했습니다 (UNVERIFIED · disabled).");
+        ra.addFlashAttribute("message", datasetCode + " 데이터셋 승인을 취소했습니다 (미승인 · 비활성).");
         return "redirect:/kras-db";
+    }
+
+    /**
+     * 실제 API 응답을 붙여넣으면 이 데이터셋의 매퍼로 바로 파싱해 본다 — 승인 전에 "정상인지"를
+     * 사람이 눈으로 태그를 대조하는 대신 기계적으로 확인한다. 담당자/매퍼 버전 같은 입력은 받지 않는다 —
+     * 응답 자체가 맞으면 그걸로 충분하다는 판단(2026-10-14).
+     * land_change/cadastral_file 등 PNU 단건 XML 매퍼가 아닌 데이터셋은 자동 확인을 지원하지 않는다 —
+     * 그 경우 사람이 직접 확인했다는 전제로 승인 버튼을 바로 열어준다.
+     */
+    @PostMapping("/kras-db/verify-check")
+    @ResponseBody
+    public Map<String, Object> verifyCheck(@RequestParam String datasetCode,
+                                            @RequestParam(required = false) String responseSample) {
+        KrasXmlServiceMapper mapper = mappersByDatasetCode.get(datasetCode);
+        if (mapper == null) {
+            return Map.of("supported", false,
+                    "message", "이 데이터셋은 응답 붙여넣기로 자동 확인을 지원하지 않습니다(파일·기간조회형). "
+                            + "직접 확인했다면 아래에서 바로 승인하세요.");
+        }
+        if (responseSample == null || responseSample.isBlank()) {
+            return Map.of("supported", true, "valid", false, "message", "응답 데이터를 먼저 붙여넣으세요.");
+        }
+        org.w3c.dom.Document doc;
+        try {
+            doc = XmlUtil.parse(responseSample.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        } catch (Exception e) {
+            return Map.of("supported", true, "valid", false, "message", "XML 파싱 실패: " + e.getMessage());
+        }
+        String pnu = reconstructPnuFromResponse(doc);
+        try {
+            KrasXmlServiceMapper.MappingResult result = mapper.map(doc, pnu);
+            if (result.rows().isEmpty()) {
+                return Map.of("supported", true, "valid", false,
+                        "message", "응답에서 데이터 행을 찾지 못했습니다 — BODY가 비었거나 구조가 다릅니다.");
+            }
+            if (!result.fieldWarnings().isEmpty()) {
+                return Map.of("supported", true, "valid", false,
+                        "message", "일부 필드를 읽지 못했습니다: " + String.join(" / ", result.fieldWarnings()));
+            }
+            List<String> tables = result.rows().stream().map(KrasXmlServiceMapper.StageRow::stageTable)
+                    .distinct().toList();
+            return Map.of("supported", true, "valid", true,
+                    "message", "정상 — " + result.rows().size() + "건 파싱됨 (" + String.join(", ", tables) + ")");
+        } catch (IllegalStateException e) {
+            return Map.of("supported", true, "valid", false, "message", e.getMessage());
+        } catch (Exception e) {
+            return Map.of("supported", true, "valid", false, "message", "확인 중 오류: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 손으로 쓴 매퍼 대부분이 응답의 필지 식별 5태그(ADM_SECT_CD/LAND_LOC_CD/LEDG_GBN/BOBN/BUBN)를
+     * 요청 PNU와 문자열 대조한다(§6.2) — 그 식별값이 응답 안에 있으면 그대로 조합해 되돌려주면
+     * 신원 검사가 항상 통과해서, 진짜 보고 싶은 "나머지 필드가 맞는지"만 가린다.
+     * 식별 태그가 없는 응답(일부 미검증 서비스)은 운영 점검용 chk-pnu로 대체한다.
+     */
+    private String reconstructPnuFromResponse(org.w3c.dom.Document doc) {
+        String adm = XmlUtil.textOf(doc, "ADM_SECT_CD");
+        String loc = XmlUtil.textOf(doc, "LAND_LOC_CD");
+        String gbn = XmlUtil.textOf(doc, "LEDG_GBN");
+        String bobn = XmlUtil.textOf(doc, "BOBN");
+        String bubn = XmlUtil.textOf(doc, "BUBN");
+        String combined = String.valueOf(adm) + loc + gbn + bobn + bubn;
+        return combined.matches("\\d{19}") ? combined : settings.krasChkPnu();
     }
 
     /** 수집만(설계 절차 1~6). SHP를 새로 다운로드해 kras 스키마에 적재한다 — public 테이블은 안 건드림. */
@@ -930,6 +1041,75 @@ public class KrasSchemaController {
         });
     }
 
+    /**
+     * 기간 조회 매퍼의 자동 분할 수집. 긴 기간을 maxQueryDays 조각으로 나눠 순서대로 수집한다(승격은
+     * 하지 않음 — 조각마다 생긴 수집 건을 KRAS 통계의 수집 이력에서 확인 후 승격한다).
+     * startDate를 비우면 이 데이터셋이 마지막으로 성공한 수집의 종료일 다음부터 이어서 수집한다.
+     */
+    @PostMapping("/kras-db/ingest-range-auto/{slug}")
+    @ResponseBody
+    public Map<String, Object> ingestDateRangeAuto(@PathVariable String slug,
+                                                     @RequestParam(required = false) String startDate,
+                                                     @RequestParam String endDate,
+                                                     @RequestParam(required = false) String extraParamsJson) {
+        return executeOperation(dateRangeSlugToDatasetCode.getOrDefault(slug, ""), "INGEST", null,
+                "자동분할 ~" + endDate, (targetJdbc, orgCd) -> {
+            String datasetCode = dateRangeSlugToDatasetCode.get(slug);
+            if (datasetCode == null) {
+                return Map.of("success", false, "message", "알 수 없는 서비스: " + slug);
+            }
+            Map<String, String> extraParams;
+            try {
+                extraParams = parseExtraParams(extraParamsJson);
+            } catch (Exception e) {
+                return Map.of("success", false, "message", "추가 파라미터 JSON 형식 오류: " + e.getMessage());
+            }
+            KrasDateRangeServiceMapper mapper = dateRangeMappersByDatasetCode.get(datasetCode);
+            AtomicBoolean running = runningByDatasetCode.get(datasetCode);
+            if (!running.compareAndSet(false, true)) {
+                return Map.of("error", "이미 실행 중입니다.");
+            }
+            try {
+                LocalDate end = LocalDate.parse(endDate);
+                LocalDate start;
+                if (startDate != null && !startDate.isBlank()) {
+                    start = LocalDate.parse(startDate);
+                } else {
+                    start = dateRangeIngestService.nextWindowStart(targetJdbc, orgCd, datasetCode).orElse(null);
+                    if (start == null) {
+                        return Map.of("success", false,
+                                "message", "이어서 시작할 이전 수집 이력이 없습니다 — 시작일을 직접 입력하세요.");
+                    }
+                }
+                List<KrasDateRangeIngestService.ChunkResult> chunks =
+                        dateRangeIngestService.ingestRange(targetJdbc, orgCd, mapper, start, end, extraParams, "UI");
+                List<Map<String, Object>> chunkRows = chunks.stream().map(c -> {
+                    Map<String, Object> row = new LinkedHashMap<String, Object>();
+                    row.put("start", c.start().toString());
+                    row.put("end", c.end().toString());
+                    row.put("success", c.success());
+                    row.put("itemId", c.itemId());
+                    row.put("error", c.error());
+                    return row;
+                }).toList();
+                long succeeded = chunks.stream().filter(KrasDateRangeIngestService.ChunkResult::success).count();
+                boolean allSucceeded = !chunks.isEmpty() && succeeded == chunks.size();
+                String msg = "%d/%d 조각 수집 완료%s".formatted(succeeded, chunks.size(),
+                        allSucceeded ? " — KRAS 통계의 수집 이력에서 조각별로 확인 후 승격하세요."
+                                : " — 중단된 조각부터 다시 시도하세요.");
+                lastResultByDatasetCode.put(datasetCode, msg);
+                return Map.of("success", succeeded > 0, "chunks", chunkRows, "message", msg);
+            } catch (Exception e) {
+                log.error("[KrasSchema] {} 자동분할 수집 실패: {}", datasetCode, e.getMessage(), e);
+                String msg = "자동분할 수집 실패: " + e.getMessage();
+                lastResultByDatasetCode.put(datasetCode, msg);
+                return Map.of("success", false, "message", msg);
+            } finally {
+                running.set(false);
+            }
+        });
+    }
+
     private static final com.fasterxml.jackson.databind.ObjectMapper EXTRA_PARAMS_MAPPER =
             new com.fasterxml.jackson.databind.ObjectMapper();
 
@@ -1058,6 +1238,7 @@ public class KrasSchemaController {
         out.put("running", running);
         out.put("lastVerifiedAt", evidence != null ? evidence.get("verified_at") : null);
         out.put("lastVerifiedBy", evidence != null ? evidence.get("verified_by") : null);
+        out.put("hasPnuMapper", mappersByDatasetCode.containsKey(datasetCode));
         return out;
     }
 

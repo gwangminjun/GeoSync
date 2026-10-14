@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -61,7 +62,7 @@ class KrasSpecItemRowsTest {
         List<Map<String, Object>> verifiedOn = KrasSchemaController.toSpecItemRows(
                 statuses("land_info", status("VERIFIED", true)));
         assertThat(rowOf(verifiedOn, 1).get("callable")).isEqualTo(true);
-        assertThat(rowOf(verifiedOn, 1).get("state")).isEqualTo("계약 VERIFIED");
+        assertThat(rowOf(verifiedOn, 1).get("state")).isEqualTo("계약 승인");
 
         List<Map<String, Object>> verifiedOff = KrasSchemaController.toSpecItemRows(
                 statuses("land_info", status("VERIFIED", false)));
@@ -70,7 +71,7 @@ class KrasSpecItemRowsTest {
         List<Map<String, Object>> unverifiedOn = KrasSchemaController.toSpecItemRows(
                 statuses("land_info", status("UNVERIFIED", true)));
         assertThat(rowOf(unverifiedOn, 1).get("callable")).isEqualTo(false);
-        assertThat(rowOf(unverifiedOn, 1).get("state")).isEqualTo("계약 UNVERIFIED");
+        assertThat(rowOf(unverifiedOn, 1).get("state")).isEqualTo("계약 미승인");
     }
 
     @Test
@@ -86,28 +87,36 @@ class KrasSpecItemRowsTest {
 
         assertThat(rowOf(rows, 1).get("schedule")).isEqualTo("수동");
         assertThat(rowOf(rows, 1).get("nextRun")).isEqualTo("—");
-        assertThat(rowOf(rows, 1).get("lastRun")).isEqualTo("완료 · 2026-10-06 04:31 · 기간 2026-10-01 ~ 2026-10-06");
+        assertThat(rowOf(rows, 1).get("lastRun")).isEqualTo("2026-10-06");
         assertThat(rowOf(rows, 2).get("lastRun")).isEqualTo("실행 이력 없음");
         assertThat(rowOf(rows, 11).get("schedule")).isEqualTo("—");
     }
 
     @Test
-    void apiTestIdOnlyForDatasetsInApiTestCatalog() {
+    void hasPnuMapperOnlyForDatasetsWithARegisteredMapper() {
+        List<Map<String, Object>> rows = KrasSchemaController.toSpecItemRows(Map.of());
+        KrasSchemaController.withRunInfo(rows, Map.of(), Set.of("land_info", "land_mov_hist"));
+
+        assertThat(rowOf(rows, 1).get("hasPnuMapper")).isEqualTo(true);
+        assertThat(rowOf(rows, 7).get("hasPnuMapper")).isEqualTo(true);
+        assertThat(rowOf(rows, 2).get("hasPnuMapper")).isEqualTo(false);
+        assertThat(rowOf(rows, 4).get("hasPnuMapper")).isEqualTo(false);
+        assertThat(rowOf(rows, 11).get("hasPnuMapper")).isEqualTo(false);
+    }
+
+    @Test
+    void withRunInfoTwoArgOverloadDefaultsHasPnuMapperToFalse() {
         List<Map<String, Object>> rows = KrasSchemaController.toSpecItemRows(Map.of());
         KrasSchemaController.withRunInfo(rows, Map.of());
 
-        assertThat(rowOf(rows, 1).get("apiId")).isEqualTo("conn/land_info");
-        assertThat(rowOf(rows, 7).get("apiId")).isEqualTo("conn/land_mov_hist");
-        assertThat(rowOf(rows, 4).get("apiId")).isNull();
-        assertThat(rowOf(rows, 10).get("apiId")).isNull();
-        assertThat(rowOf(rows, 15).get("apiId")).isNull();
+        assertThat(rowOf(rows, 1).get("hasPnuMapper")).isEqualTo(false);
     }
 
     @Test
     void missingDatasetRowDefaultsToUnverifiedAndNotCallable() {
         List<Map<String, Object>> rows = KrasSchemaController.toSpecItemRows(Map.of());
 
-        assertThat(rowOf(rows, 16).get("state")).isEqualTo("계약 UNVERIFIED");
+        assertThat(rowOf(rows, 16).get("state")).isEqualTo("계약 미승인");
         assertThat(rowOf(rows, 16).get("callable")).isEqualTo(false);
     }
 }

@@ -18,6 +18,18 @@
     *::-webkit-scrollbar{width:8px;height:8px;}
     *::-webkit-scrollbar-thumb{background:#2e3640;border-radius:8px;border:2px solid #14171c;}
     *::-webkit-scrollbar-track{background:transparent;}
+
+    .nav-row{max-width:1200px;margin:0 auto;display:flex;align-items:center;gap:18px;padding:0 28px;
+      height:60px;overflow-x:auto;scrollbar-width:none;}
+    .nav-row::-webkit-scrollbar{display:none;}
+    .nav-row > *{flex-shrink:0;}
+    .nav-links{display:flex;gap:2px;font-size:13.5px;margin-left:auto;}
+    .nav-links a{white-space:nowrap;}
+    .app-main{max-width:1200px;margin:0 auto;padding:30px 28px 44px;}
+    @media(max-width:640px){
+      .nav-row{padding:0 14px;gap:12px;}
+      .app-main{padding:18px 14px 30px;}
+    }
   </style>
   <th:block layout:fragment="head"></th:block>
 </head>
@@ -25,7 +37,7 @@
 
 <!-- ===== nav ===== -->
 <div id="app-nav" style="border-bottom:1px solid #232830;background:#171b21;position:sticky;top:0;z-index:10;">
-  <div style="max-width:1200px;margin:0 auto;display:flex;align-items:center;gap:18px;padding:0 28px;height:60px;">
+  <div class="nav-row">
     <div style="font-size:18px;font-weight:800;color:#f3f5f7;letter-spacing:-0.02em;">
       Geo<span style="color:#0e9b94;">Sync</span>
     </div>
@@ -43,7 +55,7 @@
       </span>
     </div>
 
-    <div style="margin-left:auto;display:flex;gap:2px;font-size:13.5px;">
+    <div class="nav-links">
       <a th:href="@{/}"
          th:style="${currentPage == 'dashboard'} ? 'padding:8px 14px;border-radius:8px;font-weight:600;color:#66c4be;background:rgba(14,155,148,0.16);' : 'padding:8px 14px;border-radius:8px;font-weight:500;color:#8a919c;'">
         대시보드</a>
@@ -75,14 +87,16 @@
       <a th:href="@{/kras-db}"
          th:style="${currentPage == 'kras-db'} ? 'padding:8px 14px;border-radius:8px;font-weight:600;color:#66c4be;background:rgba(14,155,148,0.16);' : 'padding:8px 14px;border-radius:8px;font-weight:500;color:#8a919c;'">
         KRAS 연계 관리</a>
+      <!-- KRAS 통계 화면은 kras-db 팝업(상세 보기)에 흡수돼 메뉴에서 뺐다. 페이지·컨트롤러는 그대로 남아있다.
       <a th:href="@{/kras-stats}"
          th:style="${currentPage == 'kras-stats'} ? 'padding:8px 14px;border-radius:8px;font-weight:600;color:#66c4be;background:rgba(14,155,148,0.16);' : 'padding:8px 14px;border-radius:8px;font-weight:500;color:#8a919c;'">
         KRAS 통계</a>
+      -->
     </div>
   </div>
 </div>
 
-<main layout:fragment="content" style="max-width:1200px;margin:0 auto;padding:30px 28px 44px;">
+<main layout:fragment="content" class="app-main">
 </main>
 
 <th:block layout:fragment="scripts"></th:block>

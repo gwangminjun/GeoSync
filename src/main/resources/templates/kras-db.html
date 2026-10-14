@@ -24,7 +24,7 @@
   <section class="card" id="spec-items" aria-labelledby="spec-items-title" style="margin-bottom:24px;">
     <h2 id="spec-items-title" style="font-size:17px;font-weight:700;color:#e7eaee;">규격 16개 항목 연계 현황</h2>
     <p style="margin-top:6px;font-size:13px;color:#69707b;">
-      번호는 연계 규격서(kras.md) 목차 기준입니다. <b style="color:#c9ced6;">호출 가능</b> = 서비스 ID 있음 + 계약 VERIFIED + 활성.
+      번호는 연계 규격서(kras.md) 목차 기준입니다. <b style="color:#c9ced6;">호출 가능</b> = 서비스 ID 있음 + 계약 승인 + 활성.
     </p>
     <p style="margin-top:8px;font-size:13px;color:#c9ced6;">
       호출 가능 <b th:text="${specCallableCount}">0</b>개 ·
@@ -32,32 +32,33 @@
       규격서 오류 <b th:text="${specDocErrorCount}">0</b>개
     </p>
     <p style="margin-bottom:12px;font-size:13px;color:#c9ced6;" th:text="${legacyNextRun}"></p>
-    <div class="history-scroll">
-      <table class="hist-table" aria-label="규격 16개 항목 연계 현황">
+    <div class="spec-scroll">
+      <table class="hist-table spec-table" aria-label="규격 16개 항목 연계 현황">
         <thead>
-          <tr><th>§</th><th>규격 항목</th><th>서비스 ID</th><th>데이터셋</th><th>경로</th><th>상태</th><th>호출</th><th>스케줄</th><th>다음 실행</th><th>마지막 적재</th><th>API 테스트</th><th>상세</th></tr>
+          <tr><th>§</th><th>규격 항목</th><th>API 서비스 ID</th><th>데이터셋</th><th>→ 적재 DB 테이블</th><th>경로</th><th>상태</th><th>호출</th><th>스케줄</th><th>다음 실행</th><th>마지막 적재</th><th>상세</th></tr>
         </thead>
         <tbody>
           <tr th:each="s : ${specItems}" th:style="${s.docError} ? 'opacity:0.55;' : ''">
             <td th:text="${s.specNo}"></td>
-            <td th:text="${s.name}"></td>
-            <td style="white-space:nowrap;"><code th:text="${s.serviceId}"></code></td>
-            <td style="white-space:nowrap;"><code th:text="${s.datasetCode != null} ? ${s.datasetCode} : '—'"></code></td>
+            <td class="spec-name" th:text="${s.name}"></td>
+            <td><code th:text="${s.serviceId}"></code></td>
+            <td>
+              <button type="button" class="spec-link-btn" th:if="${s.datasetCode != null}"
+                      th:attr="onclick=|krasOpenDatasetPopup('${s.slug}', '${s.datasetCode}', '${s.name}', '${s.contractStatus}', ${s.enabled}, ${s.hasPnuMapper});|"
+                      th:text="${s.datasetCode}"></button>
+              <code th:if="${s.datasetCode == null}">—</code>
+            </td>
+            <td class="spec-table-col"><code th:text="${s.targetTable}"></code></td>
             <td th:text="${s.pathLabel}"></td>
             <td th:text="${s.state}"></td>
-            <td style="white-space:nowrap;"><span th:text="${s.callable} ? '가능' : '불가'"
-                      th:style="${s.callable} ? 'color:#66c4be;font-weight:600;white-space:nowrap;' : 'color:#e07a5f;font-weight:600;white-space:nowrap;'"></span></td>
-            <td style="white-space:nowrap;" th:text="${s.schedule}"></td>
-            <td style="white-space:nowrap;" th:text="${s.nextRun}"></td>
+            <td><span th:text="${s.callable} ? '가능' : '불가'"
+                      th:style="${s.callable} ? 'color:#66c4be;font-weight:600;' : 'color:#e07a5f;font-weight:600;'"></span></td>
+            <td th:text="${s.schedule}"></td>
+            <td th:text="${s.nextRun}"></td>
             <td th:text="${s.lastRun}"></td>
-            <td style="white-space:nowrap;">
-              <button type="button" class="btn btn-secondary" th:if="${s.apiId != null}"
-                      th:attr="onclick=|krasApiTestPopup('${s.apiId}', '${s.name}');|">API 테스트</button>
-              <span th:if="${s.apiId == null}" style="font-size:12px;color:#5b626d;">API 없음</span>
-            </td>
-            <td style="white-space:nowrap;">
-              <a class="btn btn-secondary" th:if="${s.datasetCode != null}"
-                 th:href="@{/kras-stats(dataset=${s.datasetCode},label=${s.name})}">상세 보기 →</a>
+            <td>
+              <button type="button" class="btn btn-secondary" th:if="${s.datasetCode != null}"
+                      th:attr="onclick=|krasOpenHistoryPopup('${s.datasetCode}', '${s.name}');|">상세 보기 →</button>
             </td>
           </tr>
         </tbody>
@@ -65,27 +66,83 @@
     </div>
   </section>
 
-  <div class="dataset-modal-backdrop" id="dataset-modal-backdrop" hidden>
-    <div class="dataset-modal" role="dialog" aria-modal="true" aria-labelledby="dataset-modal-title">
-      <div class="dataset-modal-header">
-        <h3 id="dataset-modal-title"></h3>
-        <button type="button" class="dataset-modal-close" id="dataset-modal-close">닫기 ✕</button>
+  <!-- 데이터셋 팝업: 응답 확인·승인(위) + 구조(아래)를 한 화면에서 같이 본다. -->
+  <div class="dset-modal-backdrop" id="dset-modal-backdrop" hidden>
+    <div class="dset-modal" role="dialog" aria-modal="true" aria-labelledby="dset-modal-title">
+      <div class="dset-modal-head">
+        <h3 id="dset-modal-title"></h3>
+        <button type="button" class="dset-modal-close" id="dset-modal-close">닫기 ✕</button>
       </div>
-      <div class="dataset-modal-body" id="dataset-modal-body"></div>
+      <div class="dset-modal-body">
+        <div class="dset-section-label">응답 확인 · 승인</div>
+        <div id="dset-approve-panel">
+          <p id="dset-approve-status" style="font-size:13px;color:#9aa2ad;margin-bottom:10px;"></p>
+
+          <div id="dset-live-row" hidden>
+            <p style="font-size:12px;color:#5b626d;margin-bottom:8px;">
+              PNU로 실제 KRAS 서버를 호출해 stage 테이블에 수집하고, 문제 없으면 업무 테이블로 승격합니다
+              (DB에 실제로 씁니다 · sync_item 이력 남음).
+            </p>
+            <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+              <input type="text" id="dset-live-pnu" placeholder="PNU 19자리" maxlength="19"
+                     style="padding:8px 12px;border-radius:8px;border:1px solid #2e3640;background:#14171c;color:#e7eaee;font-family:'JetBrains Mono',monospace;width:220px;">
+              <div id="dset-live-extra-fields" hidden style="gap:8px;flex-wrap:wrap;align-items:flex-end;"></div>
+              <button type="button" class="btn btn-primary" id="dset-live-collect" onclick="krasLiveCollect()">실제 수집</button>
+              <button type="button" class="btn btn-secondary" id="dset-live-promote" disabled onclick="krasLivePromote()">업무 테이블로 승격</button>
+            </div>
+            <div id="dset-live-result" class="result-box" style="display:none;margin-top:10px;"></div>
+            <pre id="dset-live-preview" class="result-box" style="display:none;margin-top:10px;"></pre>
+            <p style="font-size:12px;color:#5b626d;margin:14px 0 8px;">또는 실서버 연결 없이, 이미 받아둔 응답을 그대로 붙여넣어 구조만 확인할 수도 있습니다:</p>
+          </div>
+
+          <textarea id="dset-approve-sample" rows="6" placeholder="API 응답을 그대로 붙여넣으세요 (위에서 실제 수집을 했다면 자동으로 채워집니다)"
+                    style="width:100%;background:#14171c;color:#c8cdd4;border:1px solid #2e3640;border-radius:8px;
+                    padding:10px;font-family:'JetBrains Mono',monospace;font-size:12.5px;box-sizing:border-box;"></textarea>
+          <div style="display:flex;gap:10px;margin-top:10px;align-items:center;flex-wrap:wrap;">
+            <button type="button" class="btn btn-secondary" id="dset-approve-check" onclick="krasVerifyCheck()">확인</button>
+            <button type="button" class="btn btn-primary" id="dset-approve-submit" disabled onclick="krasSubmitApprove()">승인</button>
+            <button type="button" class="btn btn-secondary" id="dset-approve-revert" hidden onclick="krasSubmitRevert()">승인 취소</button>
+          </div>
+          <div id="dset-approve-result" class="result-box" style="display:none;margin-top:10px;"></div>
+        </div>
+
+        <div class="dset-section-label" style="margin-top:18px;">데이터 구조</div>
+        <div id="dset-pane-structure" class="dset-pane"></div>
+      </div>
     </div>
   </div>
 
-  <!-- API 테스트 팝업: /api-test 화면을 임베드해 해당 API 모달을 바로 연다 -->
-  <div class="dataset-modal-backdrop" id="api-test-modal-backdrop" hidden
-       onclick="if (event.target === this) krasCloseApiTestPopup();">
-    <div class="dataset-modal" role="dialog" aria-modal="true" aria-labelledby="api-test-modal-title"
-         style="width:min(1100px,96vw);">
-      <div class="dataset-modal-header">
-        <h3 id="api-test-modal-title"></h3>
-        <button type="button" class="dataset-modal-close" onclick="krasCloseApiTestPopup()">닫기 ✕</button>
+  <form id="dset-approve-form" method="post" action="/kras-db/verify-dataset" style="display:none;">
+    <input type="hidden" name="datasetCode" id="dset-approve-form-code">
+    <input type="hidden" name="confirmed" value="true">
+    <input type="hidden" name="responseSample" id="dset-approve-form-sample">
+  </form>
+  <form id="dset-revert-form" method="post" action="/kras-db/revert-dataset" style="display:none;">
+    <input type="hidden" name="datasetCode" id="dset-revert-form-code">
+  </form>
+
+  <!-- 수집 이력 팝업: 규격 표 "상세 보기" 전용. 통계 화면(kras-stats)과는 별개로 새로 작성했다
+       (REST API는 재사용: /kras-db/history, /kras-db/items/{id}, 해당 아이템의 promotePath). -->
+  <div class="dset-modal-backdrop" id="hist-modal-backdrop" hidden>
+    <div class="dset-modal" role="dialog" aria-modal="true" aria-labelledby="hist-modal-title">
+      <div class="dset-modal-head">
+        <h3 id="hist-modal-title"></h3>
+        <button type="button" class="dset-modal-close" id="hist-modal-close">닫기 ✕</button>
       </div>
-      <iframe id="api-test-frame" title="API 테스트"
-              style="display:block;width:100%;height:min(80vh,820px);border:0;background:#0f1216;"></iframe>
+      <div class="dset-modal-body">
+        <div id="hist-message" class="result-box" role="status" aria-live="polite">이력을 불러오는 중입니다.</div>
+        <div class="history-scroll" style="margin-top:12px;"><table class="hist-table">
+          <thead><tr><th>수집 ID</th><th>수집 상태</th><th>정상 / 제외</th><th>수집 기간 / 실행 시작</th><th>확인</th></tr></thead>
+          <tbody id="hist-items"></tbody>
+        </table></div>
+        <div id="hist-detail" hidden style="margin-top:16px;border-top:1px solid #2e3640;padding-top:14px;">
+          <h4 id="hist-detail-title" style="font-size:14px;font-weight:700;color:#e7eaee;margin-bottom:8px;"></h4>
+          <div id="hist-detail-reasons" class="result-box"></div>
+          <div id="hist-comparison" class="result-box" hidden style="margin-top:10px;"></div>
+          <pre id="hist-preview" class="result-box" style="margin-top:10px;"></pre>
+          <button type="button" id="hist-promote" class="btn btn-primary" disabled style="margin-top:10px;">선택한 수집 건 업무 테이블 반영</button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -96,8 +153,8 @@
       <input type="search" id="dataset-nav-search" placeholder="연계 코드·이름 검색 (예: land_info, 용도지역)">
       <select id="dataset-nav-status">
         <option value="">전체 상태</option>
-        <option value="VERIFIED">VERIFIED만</option>
-        <option value="UNVERIFIED">UNVERIFIED만</option>
+        <option value="VERIFIED">승인만</option>
+        <option value="UNVERIFIED">미승인만</option>
       </select>
     </div>
     <div class="dataset-nav-groups" id="dataset-nav-groups">
@@ -108,7 +165,7 @@
           <span class="dot" th:classappend="${d.running} ? 'running' : (${d.status == 'VERIFIED' and d.enabled} ? 'on' : '')"></span>
           <a th:href="'#card-' + ${d.slug}" th:text="${d.datasetCode} + ' · ' + ${d.label}"
              th:title="${d.lastVerifiedAt != null} ? ('마지막 검증: ' + ${d.lastVerifiedAt} + ' · ' + (${d.lastVerifiedBy} ?: '담당자 미기록')) : '검증 근거 없음'"
-             th:attr="onclick=|krasOpenDatasetModal('${d.slug}', '${d.datasetCode} · ${d.label}');return false;|"></a>
+             th:attr="onclick=|krasOpenDatasetPopup('${d.slug}', '${d.datasetCode}', '${d.datasetCode} · ${d.label}', '${d.status}', ${d.enabled}, ${d.hasPnuMapper});return false;|"></a>
         </div>
       </div>
     </div>
@@ -119,58 +176,20 @@
   <div class="card kras-hide" id="card-cadastral-file">
     <div class="card-title">
       데이터셋 계약 상태 — cadastral_file
-      <span th:if="${datasetStatus == 'VERIFIED' and datasetEnabled}" class="badge badge-on">VERIFIED · enabled</span>
+      <span th:if="${datasetStatus == 'VERIFIED' and datasetEnabled}" class="badge badge-on">승인 · 활성</span>
       <span th:unless="${datasetStatus == 'VERIFIED' and datasetEnabled}" class="badge badge-warn"
-            th:text="${datasetStatus} + ' · ' + (${datasetEnabled} ? 'enabled' : 'disabled')"></span>
+            th:text="(${datasetStatus} == 'VERIFIED' ? '승인' : '미승인') + ' · ' + (${datasetEnabled} ? '활성' : '비활성')"></span>
     </div>
 
-    <div th:unless="${datasetStatus == 'VERIFIED' and datasetEnabled}">
-      <p style="font-size:13px;color:#9aa2ad;margin-bottom:14px;">
-        이 버튼은 검증을 대신하지 않습니다 — 실제 운영 응답으로 계약을 사람이 먼저 확인한 뒤,
-        그 결과를 DB에 반영만 합니다. 미검증 상태에서는 수집이 <code>guard_item_transition</code>에 막혀 SUCCESS로 못 갑니다.
-      </p>
-      <form method="post" action="/kras-db/verify-dataset" id="verify-form">
-        <input type="hidden" name="datasetCode" value="cadastral_file">
-        <div class="confirm-row">
-          <input type="checkbox" id="verify-confirm" onchange="document.getElementById('verify-submit').disabled = !this.checked;">
-          <label for="verify-confirm">실제 운영 응답으로 cadastral_file 계약을 확인했음</label>
-        </div>
-        <input type="hidden" name="confirmed" id="verify-confirmed" value="false">
-        <div class="verify-fields">
-          <div class="verify-fields-row">
-            <div>
-              <label for="verify-by-cadastral">담당자</label>
-              <input type="text" name="verifiedBy" id="verify-by-cadastral">
-            </div>
-            <div>
-              <label for="verify-mapver-cadastral">매퍼 버전(수동 입력)</label>
-              <input type="text" name="mapperVersion" id="verify-mapver-cadastral" placeholder="예: git 커밋 앞자리">
-            </div>
-          </div>
-          <label for="verify-sample-cadastral">응답 샘플</label>
-          <div class="verify-hint">개인정보(OWNER_NM/OWNER_ADDR 등)는 저장 전 서버에서 자동 마스킹됩니다.</div>
-          <textarea name="responseSample" id="verify-sample-cadastral" rows="4"></textarea>
-          <label for="verify-note-cadastral" style="margin-top:8px;">비고</label>
-          <input type="text" name="note" id="verify-note-cadastral">
-        </div>
-        <button type="submit" id="verify-submit" class="btn btn-primary" disabled
-                onclick="document.getElementById('verify-confirmed').value='true';">계약 확인 → VERIFIED로 전환</button>
-      </form>
-    </div>
-    <form th:if="${datasetStatus == 'VERIFIED' and datasetEnabled}" method="post" action="/kras-db/revert-dataset"
-          onsubmit="return confirm('cadastral_file 검증을 원복하시겠습니까? UNVERIFIED/disabled로 되돌아가고, 앞으로의 신규 수집이 다시 막힙니다.');">
-      <input type="hidden" name="datasetCode" value="cadastral_file">
-      <button type="submit" class="btn btn-secondary">검증 원복</button>
-    </form>
   </div>
 
   <!-- 카드 1b: 데이터셋 계약 상태 — land_info -->
   <div class="card kras-hide" id="card-land-info">
     <div class="card-title">
       데이터셋 계약 상태 — land_info
-      <span th:if="${landInfoStatus == 'VERIFIED' and landInfoEnabled}" class="badge badge-on">VERIFIED · enabled</span>
+      <span th:if="${landInfoStatus == 'VERIFIED' and landInfoEnabled}" class="badge badge-on">승인 · 활성</span>
       <span th:unless="${landInfoStatus == 'VERIFIED' and landInfoEnabled}" class="badge badge-warn"
-            th:text="${landInfoStatus} + ' · ' + (${landInfoEnabled} ? 'enabled' : 'disabled')"></span>
+            th:text="(${landInfoStatus} == 'VERIFIED' ? '승인' : '미승인') + ' · ' + (${landInfoEnabled} ? '활성' : '비활성')"></span>
     </div>
 
     <p style="font-size:12px;color:#69707b;font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;">
@@ -203,78 +222,15 @@
       </table>
     </div>
 
-    <div th:unless="${landInfoStatus == 'VERIFIED' and landInfoEnabled}">
-      <p style="font-size:13px;color:#9aa2ad;margin-bottom:14px;">
-        위 3개 stage/업무 테이블에 실제로 채워지는 값이 문서와 일치하는지 확인한 뒤에만 전환하세요.
-        미검증 상태에서는 <code>guard_item_transition</code>이 SUCCESS 전환을 막습니다.
-      </p>
-      <form method="post" action="/kras-db/verify-dataset" id="verify-form-land-info">
-        <input type="hidden" name="datasetCode" value="land_info">
-        <div class="confirm-row">
-          <input type="checkbox" id="verify-confirm-land-info" onchange="document.getElementById('verify-submit-land-info').disabled = !this.checked;">
-          <label for="verify-confirm-land-info">실제 운영 응답으로 land_info 계약을 확인했음</label>
-        </div>
-        <input type="hidden" name="confirmed" id="verify-confirmed-land-info" value="false">
-        <div class="verify-fields">
-          <div class="verify-fields-row">
-            <div>
-              <label for="verify-by-land-info">담당자</label>
-              <input type="text" name="verifiedBy" id="verify-by-land-info">
-            </div>
-            <div>
-              <label for="verify-mapver-land-info">매퍼 버전(수동 입력)</label>
-              <input type="text" name="mapperVersion" id="verify-mapver-land-info" placeholder="예: git 커밋 앞자리">
-            </div>
-          </div>
-          <label for="verify-sample-land-info">응답 샘플</label>
-          <div class="verify-hint">개인정보(OWNER_NM/OWNER_ADDR 등)는 저장 전 서버에서 자동 마스킹됩니다.</div>
-          <textarea name="responseSample" id="verify-sample-land-info" rows="4"></textarea>
-          <label for="verify-note-land-info" style="margin-top:8px;">비고</label>
-          <input type="text" name="note" id="verify-note-land-info">
-        </div>
-        <button type="submit" id="verify-submit-land-info" class="btn btn-primary" disabled
-                onclick="document.getElementById('verify-confirmed-land-info').value='true';">계약 확인 → VERIFIED로 전환</button>
-      </form>
-    </div>
-    <form th:if="${landInfoStatus == 'VERIFIED' and landInfoEnabled}" method="post" action="/kras-db/revert-dataset"
-          onsubmit="return confirm('land_info 검증을 원복하시겠습니까? UNVERIFIED/disabled로 되돌아가고, 앞으로의 신규 수집이 다시 막힙니다.');">
-      <input type="hidden" name="datasetCode" value="land_info">
-      <button type="submit" class="btn btn-secondary">검증 원복</button>
-    </form>
-  </div>
-
-  <!-- 카드 1b-2: land_info PNU 테스트 수집/승격 -->
-  <div class="card kras-hide" data-companion-of="land-info">
-    <div class="card-title">
-      land_info PNU 테스트 수집/승격
-      <span th:if="${landInfoRunning}" class="badge badge-warn">실행 중</span>
-    </div>
-    <p style="font-size:12px;color:#5b626d;margin-bottom:12px;">
-      수집은 kras.stage_parcel/stage_land_register/stage_land_owner까지만 채웁니다. 필드 파싱 경고가
-      하나도 없어야 item이 SUCCESS로 전환되고, 그래야 승격(kras.parcel/land_register/land_owner 반영)이
-      가능합니다. land_info가 VERIFIED · enabled 상태가 아니면 수집 자체는 되지만 SUCCESS 전환은
-      <code>guard_item_transition</code>이 막습니다.
-    </p>
-    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
-      <input type="text" id="land-info-pnu" placeholder="PNU 19자리" maxlength="19"
-             style="padding:8px 12px;border-radius:8px;border:1px solid #2e3640;background:#14171c;color:#e7eaee;font-family:'JetBrains Mono',monospace;width:220px;">
-      <button class="btn btn-primary" id="btn-land-info-ingest" th:disabled="${landInfoRunning}"
-              onclick="runLandInfoIngest()">테스트 수집</button>
-      <button class="btn btn-secondary" id="btn-land-info-promote" disabled
-              onclick="runLandInfoPromote()">업무 테이블로 승격</button>
-    </div>
-    <div id="land-info-result" class="result-box" th:if="${lastLandInfoResult}" th:text="${lastLandInfoResult}"></div>
-    <div id="land-info-result-js" class="result-box" style="display:none;"></div>
-    <pre id="land-info-preview" class="result-box" style="display:none;"></pre>
   </div>
 
   <!-- 카드 1b-3: 데이터셋 계약 상태 — land_bldg_check -->
   <div class="card kras-hide" id="card-land-bldg-check">
     <div class="card-title">
       데이터셋 계약 상태 — land_bldg_check
-      <span th:if="${landBldgCheckStatus == 'VERIFIED' and landBldgCheckEnabled}" class="badge badge-on">VERIFIED · enabled</span>
+      <span th:if="${landBldgCheckStatus == 'VERIFIED' and landBldgCheckEnabled}" class="badge badge-on">승인 · 활성</span>
       <span th:unless="${landBldgCheckStatus == 'VERIFIED' and landBldgCheckEnabled}" class="badge badge-warn"
-            th:text="${landBldgCheckStatus} + ' · ' + (${landBldgCheckEnabled} ? 'enabled' : 'disabled')"></span>
+            th:text="(${landBldgCheckStatus} == 'VERIFIED' ? '승인' : '미승인') + ' · ' + (${landBldgCheckEnabled} ? '활성' : '비활성')"></span>
     </div>
     <p style="font-size:12px;color:#69707b;font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;">
       이 API가 동기화하는 테이블 (KRAS000101 · /conn/land_bldg_check)
@@ -299,71 +255,15 @@
         </tbody>
       </table>
     </div>
-    <div th:unless="${landBldgCheckStatus == 'VERIFIED' and landBldgCheckEnabled}">
-      <p style="font-size:13px;color:#9aa2ad;margin-bottom:14px;">
-        위 2개 stage/업무 테이블에 실제로 채워지는 값이 문서와 일치하는지 확인한 뒤에만 전환하세요.
-      </p>
-      <form method="post" action="/kras-db/verify-dataset" id="verify-form-land-bldg-check">
-        <input type="hidden" name="datasetCode" value="land_bldg_check">
-        <div class="confirm-row">
-          <input type="checkbox" id="verify-confirm-land-bldg-check" onchange="document.getElementById('verify-submit-land-bldg-check').disabled = !this.checked;">
-          <label for="verify-confirm-land-bldg-check">실제 운영 응답으로 land_bldg_check 계약을 확인했음</label>
-        </div>
-        <input type="hidden" name="confirmed" id="verify-confirmed-land-bldg-check" value="false">
-        <div class="verify-fields">
-          <div class="verify-fields-row">
-            <div>
-              <label for="verify-by-land-bldg-check">담당자</label>
-              <input type="text" name="verifiedBy" id="verify-by-land-bldg-check">
-            </div>
-            <div>
-              <label for="verify-mapver-land-bldg-check">매퍼 버전(수동 입력)</label>
-              <input type="text" name="mapperVersion" id="verify-mapver-land-bldg-check" placeholder="예: git 커밋 앞자리">
-            </div>
-          </div>
-          <label for="verify-sample-land-bldg-check">응답 샘플</label>
-          <div class="verify-hint">개인정보(OWNER_NM/OWNER_ADDR 등)는 저장 전 서버에서 자동 마스킹됩니다.</div>
-          <textarea name="responseSample" id="verify-sample-land-bldg-check" rows="4"></textarea>
-          <label for="verify-note-land-bldg-check" style="margin-top:8px;">비고</label>
-          <input type="text" name="note" id="verify-note-land-bldg-check">
-        </div>
-        <button type="submit" id="verify-submit-land-bldg-check" class="btn btn-primary" disabled
-                onclick="document.getElementById('verify-confirmed-land-bldg-check').value='true';">계약 확인 → VERIFIED로 전환</button>
-      </form>
-    </div>
-    <form th:if="${landBldgCheckStatus == 'VERIFIED' and landBldgCheckEnabled}" method="post" action="/kras-db/revert-dataset"
-          onsubmit="return confirm('land_bldg_check 검증을 원복하시겠습니까? UNVERIFIED/disabled로 되돌아갑니다.');">
-      <input type="hidden" name="datasetCode" value="land_bldg_check">
-      <button type="submit" class="btn btn-secondary">검증 원복</button>
-    </form>
-  </div>
-
-  <!-- 카드 1b-4: land_bldg_check PNU 테스트 수집/승격 -->
-  <div class="card kras-hide" data-companion-of="land-bldg-check">
-    <div class="card-title">
-      land_bldg_check PNU 테스트 수집/승격
-      <span th:if="${landBldgCheckRunning}" class="badge badge-warn">실행 중</span>
-    </div>
-    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
-      <input type="text" id="land-bldg-check-pnu" placeholder="PNU 19자리" maxlength="19"
-             style="padding:8px 12px;border-radius:8px;border:1px solid #2e3640;background:#14171c;color:#e7eaee;font-family:'JetBrains Mono',monospace;width:220px;">
-      <button class="btn btn-primary" id="btn-land-bldg-check-ingest" th:disabled="${landBldgCheckRunning}"
-              onclick="runLandBldgCheckIngest()">테스트 수집</button>
-      <button class="btn btn-secondary" id="btn-land-bldg-check-promote" disabled
-              onclick="runLandBldgCheckPromote()">업무 테이블로 승격</button>
-    </div>
-    <div id="land-bldg-check-result" class="result-box" th:if="${lastLandBldgCheckResult}" th:text="${lastLandBldgCheckResult}"></div>
-    <div id="land-bldg-check-result-js" class="result-box" style="display:none;"></div>
-    <pre id="land-bldg-check-preview" class="result-box" style="display:none;"></pre>
   </div>
 
   <!-- 카드 1b-5: 데이터셋 계약 상태 — collective_building -->
   <div class="card kras-hide" id="card-collective-building">
     <div class="card-title">
       데이터셋 계약 상태 — collective_building
-      <span th:if="${collectiveBuildingStatus == 'VERIFIED' and collectiveBuildingEnabled}" class="badge badge-on">VERIFIED · enabled</span>
+      <span th:if="${collectiveBuildingStatus == 'VERIFIED' and collectiveBuildingEnabled}" class="badge badge-on">승인 · 활성</span>
       <span th:unless="${collectiveBuildingStatus == 'VERIFIED' and collectiveBuildingEnabled}" class="badge badge-warn"
-            th:text="${collectiveBuildingStatus} + ' · ' + (${collectiveBuildingEnabled} ? 'enabled' : 'disabled')"></span>
+            th:text="(${collectiveBuildingStatus} == 'VERIFIED' ? '승인' : '미승인') + ' · ' + (${collectiveBuildingEnabled} ? '활성' : '비활성')"></span>
       <span class="badge" style="background:#3a1f1f;color:#e88a82;">conn_svc_id 미확인</span>
     </div>
     <p style="font-size:13px;color:#9aa2ad;margin-bottom:14px;">
@@ -392,69 +292,15 @@
         </tbody>
       </table>
     </div>
-    <div th:unless="${collectiveBuildingStatus == 'VERIFIED' and collectiveBuildingEnabled}">
-      <form method="post" action="/kras-db/verify-dataset" id="verify-form-collective-building">
-        <input type="hidden" name="datasetCode" value="collective_building">
-        <div class="confirm-row">
-          <input type="checkbox" id="verify-confirm-collective-building" onchange="document.getElementById('verify-submit-collective-building').disabled = !this.checked;">
-          <label for="verify-confirm-collective-building">실제 운영 응답으로 collective_building 계약을 확인했음</label>
-        </div>
-        <input type="hidden" name="confirmed" id="verify-confirmed-collective-building" value="false">
-        <div class="verify-fields">
-          <div class="verify-fields-row">
-            <div>
-              <label for="verify-by-collective-building">담당자</label>
-              <input type="text" name="verifiedBy" id="verify-by-collective-building">
-            </div>
-            <div>
-              <label for="verify-mapver-collective-building">매퍼 버전(수동 입력)</label>
-              <input type="text" name="mapperVersion" id="verify-mapver-collective-building" placeholder="예: git 커밋 앞자리">
-            </div>
-          </div>
-          <label for="verify-sample-collective-building">응답 샘플</label>
-          <div class="verify-hint">개인정보(OWNER_NM/OWNER_ADDR 등)는 저장 전 서버에서 자동 마스킹됩니다.</div>
-          <textarea name="responseSample" id="verify-sample-collective-building" rows="4"></textarea>
-          <label for="verify-note-collective-building" style="margin-top:8px;">비고</label>
-          <input type="text" name="note" id="verify-note-collective-building">
-        </div>
-        <button type="submit" id="verify-submit-collective-building" class="btn btn-primary" disabled
-                onclick="document.getElementById('verify-confirmed-collective-building').value='true';">계약 확인 → VERIFIED로 전환</button>
-      </form>
-    </div>
-    <form th:if="${collectiveBuildingStatus == 'VERIFIED' and collectiveBuildingEnabled}" method="post" action="/kras-db/revert-dataset"
-          onsubmit="return confirm('collective_building 검증을 원복하시겠습니까? UNVERIFIED/disabled로 되돌아갑니다.');">
-      <input type="hidden" name="datasetCode" value="collective_building">
-      <button type="submit" class="btn btn-secondary">검증 원복</button>
-    </form>
-  </div>
-
-  <!-- 카드 1b-6: collective_building PNU 테스트 수집/승격 -->
-  <div class="card kras-hide" data-companion-of="collective-building">
-    <div class="card-title">
-      collective_building PNU 테스트 수집/승격
-      <span th:if="${collectiveBuildingRunning}" class="badge badge-warn">실행 중</span>
-    </div>
-    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
-      <input type="text" id="collective-building-pnu" placeholder="PNU 19자리" maxlength="19"
-             style="padding:8px 12px;border-radius:8px;border:1px solid #2e3640;background:#14171c;color:#e7eaee;font-family:'JetBrains Mono',monospace;width:220px;">
-      <button class="btn btn-primary" id="btn-collective-building-ingest" th:disabled="${collectiveBuildingRunning}"
-              onclick="runCollectiveBuildingIngest()">테스트 수집</button>
-      <button class="btn btn-secondary" id="btn-collective-building-promote" disabled
-              onclick="runCollectiveBuildingPromote()">업무 테이블로 승격</button>
-    </div>
-    <p style="font-size:12px;color:#5b626d;margin-top:10px;">conn_svc_id가 없어 지금은 테스트 수집을 눌러도 바로 실패 메시지가 뜹니다 — 위 카드 설명 참고.</p>
-    <div id="collective-building-result" class="result-box" th:if="${lastCollectiveBuildingResult}" th:text="${lastCollectiveBuildingResult}"></div>
-    <div id="collective-building-result-js" class="result-box" style="display:none;"></div>
-    <pre id="collective-building-preview" class="result-box" style="display:none;"></pre>
   </div>
 
   <!-- 카드 1b-7: 데이터셋 계약 상태 — shr_ymb -->
   <div class="card kras-hide" id="card-shr-ymb">
     <div class="card-title">
       데이터셋 계약 상태 — shr_ymb
-      <span th:if="${shrYmbStatus == 'VERIFIED' and shrYmbEnabled}" class="badge badge-on">VERIFIED · enabled</span>
+      <span th:if="${shrYmbStatus == 'VERIFIED' and shrYmbEnabled}" class="badge badge-on">승인 · 활성</span>
       <span th:unless="${shrYmbStatus == 'VERIFIED' and shrYmbEnabled}" class="badge badge-warn"
-            th:text="${shrYmbStatus} + ' · ' + (${shrYmbEnabled} ? 'enabled' : 'disabled')"></span>
+            th:text="(${shrYmbStatus} == 'VERIFIED' ? '승인' : '미승인') + ' · ' + (${shrYmbEnabled} ? '활성' : '비활성')"></span>
     </div>
     <p style="font-size:12px;color:#69707b;font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;">
       이 API가 동기화하는 테이블 (KRAS000003 · /conn/shr_ymb)
@@ -485,68 +331,15 @@
         </tbody>
       </table>
     </div>
-    <div th:unless="${shrYmbStatus == 'VERIFIED' and shrYmbEnabled}">
-      <form method="post" action="/kras-db/verify-dataset" id="verify-form-shr-ymb">
-        <input type="hidden" name="datasetCode" value="shr_ymb">
-        <div class="confirm-row">
-          <input type="checkbox" id="verify-confirm-shr-ymb" onchange="document.getElementById('verify-submit-shr-ymb').disabled = !this.checked;">
-          <label for="verify-confirm-shr-ymb">실제 운영 응답으로 shr_ymb 계약을 확인했음</label>
-        </div>
-        <input type="hidden" name="confirmed" id="verify-confirmed-shr-ymb" value="false">
-        <div class="verify-fields">
-          <div class="verify-fields-row">
-            <div>
-              <label for="verify-by-shr-ymb">담당자</label>
-              <input type="text" name="verifiedBy" id="verify-by-shr-ymb">
-            </div>
-            <div>
-              <label for="verify-mapver-shr-ymb">매퍼 버전(수동 입력)</label>
-              <input type="text" name="mapperVersion" id="verify-mapver-shr-ymb" placeholder="예: git 커밋 앞자리">
-            </div>
-          </div>
-          <label for="verify-sample-shr-ymb">응답 샘플</label>
-          <div class="verify-hint">개인정보(OWNER_NM/OWNER_ADDR 등)는 저장 전 서버에서 자동 마스킹됩니다.</div>
-          <textarea name="responseSample" id="verify-sample-shr-ymb" rows="4"></textarea>
-          <label for="verify-note-shr-ymb" style="margin-top:8px;">비고</label>
-          <input type="text" name="note" id="verify-note-shr-ymb">
-        </div>
-        <button type="submit" id="verify-submit-shr-ymb" class="btn btn-primary" disabled
-                onclick="document.getElementById('verify-confirmed-shr-ymb').value='true';">계약 확인 → VERIFIED로 전환</button>
-      </form>
-    </div>
-    <form th:if="${shrYmbStatus == 'VERIFIED' and shrYmbEnabled}" method="post" action="/kras-db/revert-dataset"
-          onsubmit="return confirm('shr_ymb 검증을 원복하시겠습니까? UNVERIFIED/disabled로 되돌아갑니다.');">
-      <input type="hidden" name="datasetCode" value="shr_ymb">
-      <button type="submit" class="btn btn-secondary">검증 원복</button>
-    </form>
-  </div>
-
-  <!-- 카드 1b-8: shr_ymb PNU 테스트 수집/승격 -->
-  <div class="card kras-hide" data-companion-of="shr-ymb">
-    <div class="card-title">
-      shr_ymb PNU 테스트 수집/승격
-      <span th:if="${shrYmbRunning}" class="badge badge-warn">실행 중</span>
-    </div>
-    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
-      <input type="text" id="shr-ymb-pnu" placeholder="PNU 19자리" maxlength="19"
-             style="padding:8px 12px;border-radius:8px;border:1px solid #2e3640;background:#14171c;color:#e7eaee;font-family:'JetBrains Mono',monospace;width:220px;">
-      <button class="btn btn-primary" id="btn-shr-ymb-ingest" th:disabled="${shrYmbRunning}"
-              onclick="runShrYmbIngest()">테스트 수집</button>
-      <button class="btn btn-secondary" id="btn-shr-ymb-promote" disabled
-              onclick="runShrYmbPromote()">업무 테이블로 승격</button>
-    </div>
-    <div id="shr-ymb-result" class="result-box" th:if="${lastShrYmbResult}" th:text="${lastShrYmbResult}"></div>
-    <div id="shr-ymb-result-js" class="result-box" style="display:none;"></div>
-    <pre id="shr-ymb-preview" class="result-box" style="display:none;"></pre>
   </div>
 
   <!-- 카드 1b-9: 데이터셋 계약 상태 — own_rgt_hist -->
   <div class="card kras-hide" id="card-own-rgt-hist">
     <div class="card-title">
       데이터셋 계약 상태 — own_rgt_hist
-      <span th:if="${ownRgtHistStatus == 'VERIFIED' and ownRgtHistEnabled}" class="badge badge-on">VERIFIED · enabled</span>
+      <span th:if="${ownRgtHistStatus == 'VERIFIED' and ownRgtHistEnabled}" class="badge badge-on">승인 · 활성</span>
       <span th:unless="${ownRgtHistStatus == 'VERIFIED' and ownRgtHistEnabled}" class="badge badge-warn"
-            th:text="${ownRgtHistStatus} + ' · ' + (${ownRgtHistEnabled} ? 'enabled' : 'disabled')"></span>
+            th:text="(${ownRgtHistStatus} == 'VERIFIED' ? '승인' : '미승인') + ' · ' + (${ownRgtHistEnabled} ? '활성' : '비활성')"></span>
     </div>
     <p style="font-size:12px;color:#69707b;font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;">
       이 API가 동기화하는 테이블 (KRAS000007 · /conn/own_rgt_hist)
@@ -574,68 +367,15 @@
         </tbody>
       </table>
     </div>
-    <div th:unless="${ownRgtHistStatus == 'VERIFIED' and ownRgtHistEnabled}">
-      <form method="post" action="/kras-db/verify-dataset" id="verify-form-own-rgt-hist">
-        <input type="hidden" name="datasetCode" value="own_rgt_hist">
-        <div class="confirm-row">
-          <input type="checkbox" id="verify-confirm-own-rgt-hist" onchange="document.getElementById('verify-submit-own-rgt-hist').disabled = !this.checked;">
-          <label for="verify-confirm-own-rgt-hist">실제 운영 응답으로 own_rgt_hist 계약을 확인했음</label>
-        </div>
-        <input type="hidden" name="confirmed" id="verify-confirmed-own-rgt-hist" value="false">
-        <div class="verify-fields">
-          <div class="verify-fields-row">
-            <div>
-              <label for="verify-by-own-rgt-hist">담당자</label>
-              <input type="text" name="verifiedBy" id="verify-by-own-rgt-hist">
-            </div>
-            <div>
-              <label for="verify-mapver-own-rgt-hist">매퍼 버전(수동 입력)</label>
-              <input type="text" name="mapperVersion" id="verify-mapver-own-rgt-hist" placeholder="예: git 커밋 앞자리">
-            </div>
-          </div>
-          <label for="verify-sample-own-rgt-hist">응답 샘플</label>
-          <div class="verify-hint">개인정보(OWNER_NM/OWNER_ADDR 등)는 저장 전 서버에서 자동 마스킹됩니다.</div>
-          <textarea name="responseSample" id="verify-sample-own-rgt-hist" rows="4"></textarea>
-          <label for="verify-note-own-rgt-hist" style="margin-top:8px;">비고</label>
-          <input type="text" name="note" id="verify-note-own-rgt-hist">
-        </div>
-        <button type="submit" id="verify-submit-own-rgt-hist" class="btn btn-primary" disabled
-                onclick="document.getElementById('verify-confirmed-own-rgt-hist').value='true';">계약 확인 → VERIFIED로 전환</button>
-      </form>
-    </div>
-    <form th:if="${ownRgtHistStatus == 'VERIFIED' and ownRgtHistEnabled}" method="post" action="/kras-db/revert-dataset"
-          onsubmit="return confirm('own_rgt_hist 검증을 원복하시겠습니까? UNVERIFIED/disabled로 되돌아갑니다.');">
-      <input type="hidden" name="datasetCode" value="own_rgt_hist">
-      <button type="submit" class="btn btn-secondary">검증 원복</button>
-    </form>
-  </div>
-
-  <!-- 카드 1b-10: own_rgt_hist PNU 테스트 수집/승격 -->
-  <div class="card kras-hide" data-companion-of="own-rgt-hist">
-    <div class="card-title">
-      own_rgt_hist PNU 테스트 수집/승격
-      <span th:if="${ownRgtHistRunning}" class="badge badge-warn">실행 중</span>
-    </div>
-    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
-      <input type="text" id="own-rgt-hist-pnu" placeholder="PNU 19자리" maxlength="19"
-             style="padding:8px 12px;border-radius:8px;border:1px solid #2e3640;background:#14171c;color:#e7eaee;font-family:'JetBrains Mono',monospace;width:220px;">
-      <button class="btn btn-primary" id="btn-own-rgt-hist-ingest" th:disabled="${ownRgtHistRunning}"
-              onclick="runOwnRgtHistIngest()">테스트 수집</button>
-      <button class="btn btn-secondary" id="btn-own-rgt-hist-promote" disabled
-              onclick="runOwnRgtHistPromote()">업무 테이블로 승격</button>
-    </div>
-    <div id="own-rgt-hist-result" class="result-box" th:if="${lastOwnRgtHistResult}" th:text="${lastOwnRgtHistResult}"></div>
-    <div id="own-rgt-hist-result-js" class="result-box" style="display:none;"></div>
-    <pre id="own-rgt-hist-preview" class="result-box" style="display:none;"></pre>
   </div>
 
   <!-- 카드 1b-11: 데이터셋 계약 상태 — land_mov_hist -->
   <div class="card kras-hide" id="card-land-mov-hist">
     <div class="card-title">
       데이터셋 계약 상태 — land_mov_hist
-      <span th:if="${landMovHistStatus == 'VERIFIED' and landMovHistEnabled}" class="badge badge-on">VERIFIED · enabled</span>
+      <span th:if="${landMovHistStatus == 'VERIFIED' and landMovHistEnabled}" class="badge badge-on">승인 · 활성</span>
       <span th:unless="${landMovHistStatus == 'VERIFIED' and landMovHistEnabled}" class="badge badge-warn"
-            th:text="${landMovHistStatus} + ' · ' + (${landMovHistEnabled} ? 'enabled' : 'disabled')"></span>
+            th:text="(${landMovHistStatus} == 'VERIFIED' ? '승인' : '미승인') + ' · ' + (${landMovHistEnabled} ? '활성' : '비활성')"></span>
     </div>
     <p style="font-size:12px;color:#69707b;font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;">
       이 API가 동기화하는 테이블 (KRAS000006 · /conn/land_mov_hist)
@@ -667,68 +407,15 @@
         </tbody>
       </table>
     </div>
-    <div th:unless="${landMovHistStatus == 'VERIFIED' and landMovHistEnabled}">
-      <form method="post" action="/kras-db/verify-dataset" id="verify-form-land-mov-hist">
-        <input type="hidden" name="datasetCode" value="land_mov_hist">
-        <div class="confirm-row">
-          <input type="checkbox" id="verify-confirm-land-mov-hist" onchange="document.getElementById('verify-submit-land-mov-hist').disabled = !this.checked;">
-          <label for="verify-confirm-land-mov-hist">실제 운영 응답으로 land_mov_hist 계약을 확인했음</label>
-        </div>
-        <input type="hidden" name="confirmed" id="verify-confirmed-land-mov-hist" value="false">
-        <div class="verify-fields">
-          <div class="verify-fields-row">
-            <div>
-              <label for="verify-by-land-mov-hist">담당자</label>
-              <input type="text" name="verifiedBy" id="verify-by-land-mov-hist">
-            </div>
-            <div>
-              <label for="verify-mapver-land-mov-hist">매퍼 버전(수동 입력)</label>
-              <input type="text" name="mapperVersion" id="verify-mapver-land-mov-hist" placeholder="예: git 커밋 앞자리">
-            </div>
-          </div>
-          <label for="verify-sample-land-mov-hist">응답 샘플</label>
-          <div class="verify-hint">개인정보(OWNER_NM/OWNER_ADDR 등)는 저장 전 서버에서 자동 마스킹됩니다.</div>
-          <textarea name="responseSample" id="verify-sample-land-mov-hist" rows="4"></textarea>
-          <label for="verify-note-land-mov-hist" style="margin-top:8px;">비고</label>
-          <input type="text" name="note" id="verify-note-land-mov-hist">
-        </div>
-        <button type="submit" id="verify-submit-land-mov-hist" class="btn btn-primary" disabled
-                onclick="document.getElementById('verify-confirmed-land-mov-hist').value='true';">계약 확인 → VERIFIED로 전환</button>
-      </form>
-    </div>
-    <form th:if="${landMovHistStatus == 'VERIFIED' and landMovHistEnabled}" method="post" action="/kras-db/revert-dataset"
-          onsubmit="return confirm('land_mov_hist 검증을 원복하시겠습니까? UNVERIFIED/disabled로 되돌아갑니다.');">
-      <input type="hidden" name="datasetCode" value="land_mov_hist">
-      <button type="submit" class="btn btn-secondary">검증 원복</button>
-    </form>
-  </div>
-
-  <!-- 카드 1b-12: land_mov_hist PNU 테스트 수집/승격 -->
-  <div class="card kras-hide" data-companion-of="land-mov-hist">
-    <div class="card-title">
-      land_mov_hist PNU 테스트 수집/승격
-      <span th:if="${landMovHistRunning}" class="badge badge-warn">실행 중</span>
-    </div>
-    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
-      <input type="text" id="land-mov-hist-pnu" placeholder="PNU 19자리" maxlength="19"
-             style="padding:8px 12px;border-radius:8px;border:1px solid #2e3640;background:#14171c;color:#e7eaee;font-family:'JetBrains Mono',monospace;width:220px;">
-      <button class="btn btn-primary" id="btn-land-mov-hist-ingest" th:disabled="${landMovHistRunning}"
-              onclick="runLandMovHistIngest()">테스트 수집</button>
-      <button class="btn btn-secondary" id="btn-land-mov-hist-promote" disabled
-              onclick="runLandMovHistPromote()">업무 테이블로 승격</button>
-    </div>
-    <div id="land-mov-hist-result" class="result-box" th:if="${lastLandMovHistResult}" th:text="${lastLandMovHistResult}"></div>
-    <div id="land-mov-hist-result-js" class="result-box" style="display:none;"></div>
-    <pre id="land-mov-hist-preview" class="result-box" style="display:none;"></pre>
   </div>
 
   <!-- 카드 1b-13: 데이터셋 계약 상태 — collective_unit -->
   <div class="card kras-hide" id="card-collective-unit">
     <div class="card-title">
       데이터셋 계약 상태 — collective_unit
-      <span th:if="${collectiveUnitStatus == 'VERIFIED' and collectiveUnitEnabled}" class="badge badge-on">VERIFIED · enabled</span>
+      <span th:if="${collectiveUnitStatus == 'VERIFIED' and collectiveUnitEnabled}" class="badge badge-on">승인 · 활성</span>
       <span th:unless="${collectiveUnitStatus == 'VERIFIED' and collectiveUnitEnabled}" class="badge badge-warn"
-            th:text="${collectiveUnitStatus} + ' · ' + (${collectiveUnitEnabled} ? 'enabled' : 'disabled')"></span>
+            th:text="(${collectiveUnitStatus} == 'VERIFIED' ? '승인' : '미승인') + ' · ' + (${collectiveUnitEnabled} ? '활성' : '비활성')"></span>
       <span class="badge" style="background:#3a1f1f;color:#e88a82;">conn_svc_id 미확인</span>
     </div>
     <p style="font-size:13px;color:#9aa2ad;margin-bottom:14px;">
@@ -751,72 +438,15 @@
         </tbody>
       </table>
     </div>
-    <div th:unless="${collectiveUnitStatus == 'VERIFIED' and collectiveUnitEnabled}">
-      <form method="post" action="/kras-db/verify-dataset" id="verify-form-collective-unit">
-        <input type="hidden" name="datasetCode" value="collective_unit">
-        <div class="confirm-row">
-          <input type="checkbox" id="verify-confirm-collective-unit" onchange="document.getElementById('verify-submit-collective-unit').disabled = !this.checked;">
-          <label for="verify-confirm-collective-unit">실제 운영 응답으로 collective_unit 계약을 확인했음</label>
-        </div>
-        <input type="hidden" name="confirmed" id="verify-confirmed-collective-unit" value="false">
-        <div class="verify-fields">
-          <div class="verify-fields-row">
-            <div>
-              <label for="verify-by-collective-unit">담당자</label>
-              <input type="text" name="verifiedBy" id="verify-by-collective-unit">
-            </div>
-            <div>
-              <label for="verify-mapver-collective-unit">매퍼 버전(수동 입력)</label>
-              <input type="text" name="mapperVersion" id="verify-mapver-collective-unit" placeholder="예: git 커밋 앞자리">
-            </div>
-          </div>
-          <label for="verify-sample-collective-unit">응답 샘플</label>
-          <div class="verify-hint">개인정보(OWNER_NM/OWNER_ADDR 등)는 저장 전 서버에서 자동 마스킹됩니다.</div>
-          <textarea name="responseSample" id="verify-sample-collective-unit" rows="4"></textarea>
-          <label for="verify-note-collective-unit" style="margin-top:8px;">비고</label>
-          <input type="text" name="note" id="verify-note-collective-unit">
-        </div>
-        <button type="submit" id="verify-submit-collective-unit" class="btn btn-primary" disabled
-                onclick="document.getElementById('verify-confirmed-collective-unit').value='true';">계약 확인 → VERIFIED로 전환</button>
-      </form>
-    </div>
-    <form th:if="${collectiveUnitStatus == 'VERIFIED' and collectiveUnitEnabled}" method="post" action="/kras-db/revert-dataset"
-          onsubmit="return confirm('collective_unit 검증을 원복하시겠습니까? UNVERIFIED/disabled로 되돌아갑니다.');">
-      <input type="hidden" name="datasetCode" value="collective_unit">
-      <button type="submit" class="btn btn-secondary">검증 원복</button>
-    </form>
-  </div>
-
-  <!-- 카드 1b-14: collective_unit PNU 테스트 수집/승격 -->
-  <div class="card kras-hide" data-companion-of="collective-unit">
-    <div class="card-title">
-      collective_unit PNU 테스트 수집/승격
-      <span th:if="${collectiveUnitRunning}" class="badge badge-warn">실행 중</span>
-    </div>
-    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px;">
-      <input type="text" id="collective-unit-pnu" placeholder="PNU 19자리" maxlength="19"
-             style="padding:8px 12px;border-radius:8px;border:1px solid #2e3640;background:#14171c;color:#e7eaee;font-family:'JetBrains Mono',monospace;width:220px;">
-      <input type="text" id="collective-unit-extra-params" placeholder='추가 파라미터(JSON), 예: {"cbldg_seqno":"0285"}'
-             style="padding:8px 12px;border-radius:8px;border:1px solid #2e3640;background:#14171c;color:#e7eaee;font-family:'JetBrains Mono',monospace;flex:1;min-width:260px;">
-    </div>
-    <div style="display:flex;gap:10px;">
-      <button class="btn btn-primary" id="btn-collective-unit-ingest" th:disabled="${collectiveUnitRunning}"
-              onclick="runCollectiveUnitIngest()">테스트 수집</button>
-      <button class="btn btn-secondary" id="btn-collective-unit-promote" disabled
-              onclick="runCollectiveUnitPromote()">업무 테이블로 승격</button>
-    </div>
-    <div id="collective-unit-result" class="result-box" th:if="${lastCollectiveUnitResult}" th:text="${lastCollectiveUnitResult}"></div>
-    <div id="collective-unit-result-js" class="result-box" style="display:none;"></div>
-    <pre id="collective-unit-preview" class="result-box" style="display:none;"></pre>
   </div>
 
   <!-- 카드 1b-15: 데이터셋 계약 상태 + 테스트 — land_right -->
   <div class="card kras-hide" id="card-land-right">
     <div class="card-title">
       데이터셋 계약 상태 — land_right
-      <span th:if="${landRightStatus == 'VERIFIED' and landRightEnabled}" class="badge badge-on">VERIFIED · enabled</span>
+      <span th:if="${landRightStatus == 'VERIFIED' and landRightEnabled}" class="badge badge-on">승인 · 활성</span>
       <span th:unless="${landRightStatus == 'VERIFIED' and landRightEnabled}" class="badge badge-warn"
-            th:text="${landRightStatus} + ' · ' + (${landRightEnabled} ? 'enabled' : 'disabled')"></span>
+            th:text="(${landRightStatus} == 'VERIFIED' ? '승인' : '미승인') + ' · ' + (${landRightEnabled} ? '활성' : '비활성')"></span>
       <span class="badge" style="background:#3a1f1f;color:#e88a82;">conn_svc_id 미확인</span>
       <span th:if="${landRightRunning}" class="badge badge-warn">실행 중</span>
     </div>
@@ -827,62 +457,15 @@
       부모(collective_unit)를 먼저 승격해둬야 승격이 성공합니다. conn_svc_id 미확인이라 실제 호출은
       막혀 있습니다.
     </p>
-    <div th:unless="${landRightStatus == 'VERIFIED' and landRightEnabled}">
-      <form method="post" action="/kras-db/verify-dataset" id="verify-form-land-right">
-        <input type="hidden" name="datasetCode" value="land_right">
-        <div class="confirm-row">
-          <input type="checkbox" id="verify-confirm-land-right" onchange="document.getElementById('verify-submit-land-right').disabled = !this.checked;">
-          <label for="verify-confirm-land-right">실제 운영 응답으로 land_right 계약을 확인했음</label>
-        </div>
-        <input type="hidden" name="confirmed" id="verify-confirmed-land-right" value="false">
-        <div class="verify-fields">
-          <div class="verify-fields-row">
-            <div>
-              <label for="verify-by-land-right">담당자</label>
-              <input type="text" name="verifiedBy" id="verify-by-land-right">
-            </div>
-            <div>
-              <label for="verify-mapver-land-right">매퍼 버전(수동 입력)</label>
-              <input type="text" name="mapperVersion" id="verify-mapver-land-right" placeholder="예: git 커밋 앞자리">
-            </div>
-          </div>
-          <label for="verify-sample-land-right">응답 샘플</label>
-          <div class="verify-hint">개인정보(OWNER_NM/OWNER_ADDR 등)는 저장 전 서버에서 자동 마스킹됩니다.</div>
-          <textarea name="responseSample" id="verify-sample-land-right" rows="4"></textarea>
-          <label for="verify-note-land-right" style="margin-top:8px;">비고</label>
-          <input type="text" name="note" id="verify-note-land-right">
-        </div>
-        <button type="submit" id="verify-submit-land-right" class="btn btn-primary" disabled
-                onclick="document.getElementById('verify-confirmed-land-right').value='true';">계약 확인 → VERIFIED로 전환</button>
-      </form>
-    </div>
-    <form th:if="${landRightStatus == 'VERIFIED' and landRightEnabled}" method="post" action="/kras-db/revert-dataset"
-          onsubmit="return confirm('land_right 검증을 원복하시겠습니까?');">
-      <input type="hidden" name="datasetCode" value="land_right">
-      <button type="submit" class="btn btn-secondary">검증 원복</button>
-    </form>
-    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:14px;">
-      <input type="text" id="land-right-pnu" placeholder="PNU 19자리" maxlength="19"
-             style="padding:8px 12px;border-radius:8px;border:1px solid #2e3640;background:#14171c;color:#e7eaee;font-family:'JetBrains Mono',monospace;width:220px;">
-      <input type="text" id="land-right-extra-params" placeholder='추가 파라미터(JSON), 예: {"cbldg_seqno":"0285","dong":"","flr":"1","ho":"102","sil":""}'
-             style="padding:8px 12px;border-radius:8px;border:1px solid #2e3640;background:#14171c;color:#e7eaee;font-family:'JetBrains Mono',monospace;flex:1;min-width:320px;">
-    </div>
-    <div style="display:flex;gap:10px;margin-top:10px;">
-      <button class="btn btn-primary" id="btn-land-right-ingest" th:disabled="${landRightRunning}" onclick="runLandRightIngest()">테스트 수집</button>
-      <button class="btn btn-secondary" id="btn-land-right-promote" disabled onclick="runLandRightPromote()">업무 테이블로 승격</button>
-    </div>
-    <div id="land-right-result" class="result-box" th:if="${lastLandRightResult}" th:text="${lastLandRightResult}"></div>
-    <div id="land-right-result-js" class="result-box" style="display:none;"></div>
-    <pre id="land-right-preview" class="result-box" style="display:none;"></pre>
   </div>
 
   <!-- 카드 1b-16: 데이터셋 계약 상태 + 테스트 — unit_ownership_history -->
   <div class="card kras-hide" id="card-unit-ownership-history">
     <div class="card-title">
       데이터셋 계약 상태 — unit_ownership_history
-      <span th:if="${unitOwnershipHistoryStatus == 'VERIFIED' and unitOwnershipHistoryEnabled}" class="badge badge-on">VERIFIED · enabled</span>
+      <span th:if="${unitOwnershipHistoryStatus == 'VERIFIED' and unitOwnershipHistoryEnabled}" class="badge badge-on">승인 · 활성</span>
       <span th:unless="${unitOwnershipHistoryStatus == 'VERIFIED' and unitOwnershipHistoryEnabled}" class="badge badge-warn"
-            th:text="${unitOwnershipHistoryStatus} + ' · ' + (${unitOwnershipHistoryEnabled} ? 'enabled' : 'disabled')"></span>
+            th:text="(${unitOwnershipHistoryStatus} == 'VERIFIED' ? '승인' : '미승인') + ' · ' + (${unitOwnershipHistoryEnabled} ? '활성' : '비활성')"></span>
       <span class="badge" style="background:#3a1f1f;color:#e88a82;">conn_svc_id 미확인</span>
       <span th:if="${unitOwnershipHistoryRunning}" class="badge badge-warn">실행 중</span>
     </div>
@@ -894,62 +477,15 @@
       (확인 전까지는 모름). 응답은 <code>kras.unit_ownership_history</code>에 source_service=
       'unit_ownership_history'로 쌓입니다.
     </p>
-    <div th:unless="${unitOwnershipHistoryStatus == 'VERIFIED' and unitOwnershipHistoryEnabled}">
-      <form method="post" action="/kras-db/verify-dataset" id="verify-form-unit-ownership-history">
-        <input type="hidden" name="datasetCode" value="unit_ownership_history">
-        <div class="confirm-row">
-          <input type="checkbox" id="verify-confirm-unit-ownership-history" onchange="document.getElementById('verify-submit-unit-ownership-history').disabled = !this.checked;">
-          <label for="verify-confirm-unit-ownership-history">실제 운영 응답으로 unit_ownership_history 계약을 확인했음</label>
-        </div>
-        <input type="hidden" name="confirmed" id="verify-confirmed-unit-ownership-history" value="false">
-        <div class="verify-fields">
-          <div class="verify-fields-row">
-            <div>
-              <label for="verify-by-unit-ownership-history">담당자</label>
-              <input type="text" name="verifiedBy" id="verify-by-unit-ownership-history">
-            </div>
-            <div>
-              <label for="verify-mapver-unit-ownership-history">매퍼 버전(수동 입력)</label>
-              <input type="text" name="mapperVersion" id="verify-mapver-unit-ownership-history" placeholder="예: git 커밋 앞자리">
-            </div>
-          </div>
-          <label for="verify-sample-unit-ownership-history">응답 샘플</label>
-          <div class="verify-hint">개인정보(OWNER_NM/OWNER_ADDR 등)는 저장 전 서버에서 자동 마스킹됩니다.</div>
-          <textarea name="responseSample" id="verify-sample-unit-ownership-history" rows="4"></textarea>
-          <label for="verify-note-unit-ownership-history" style="margin-top:8px;">비고</label>
-          <input type="text" name="note" id="verify-note-unit-ownership-history">
-        </div>
-        <button type="submit" id="verify-submit-unit-ownership-history" class="btn btn-primary" disabled
-                onclick="document.getElementById('verify-confirmed-unit-ownership-history').value='true';">계약 확인 → VERIFIED로 전환</button>
-      </form>
-    </div>
-    <form th:if="${unitOwnershipHistoryStatus == 'VERIFIED' and unitOwnershipHistoryEnabled}" method="post" action="/kras-db/revert-dataset"
-          onsubmit="return confirm('unit_ownership_history 검증을 원복하시겠습니까?');">
-      <input type="hidden" name="datasetCode" value="unit_ownership_history">
-      <button type="submit" class="btn btn-secondary">검증 원복</button>
-    </form>
-    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:14px;">
-      <input type="text" id="unit-ownership-history-pnu" placeholder="PNU 19자리(장부 정리용)" maxlength="19"
-             style="padding:8px 12px;border-radius:8px;border:1px solid #2e3640;background:#14171c;color:#e7eaee;font-family:'JetBrains Mono',monospace;width:220px;">
-      <input type="text" id="unit-ownership-history-extra-params" placeholder='추가 파라미터(JSON), 예: {"cbldg_seqno":"0018","dong":"","flr":"1","ho":"102","sil":""}'
-             style="padding:8px 12px;border-radius:8px;border:1px solid #2e3640;background:#14171c;color:#e7eaee;font-family:'JetBrains Mono',monospace;flex:1;min-width:320px;">
-    </div>
-    <div style="display:flex;gap:10px;margin-top:10px;">
-      <button class="btn btn-primary" id="btn-unit-ownership-history-ingest" th:disabled="${unitOwnershipHistoryRunning}" onclick="runUnitOwnershipHistoryIngest()">테스트 수집</button>
-      <button class="btn btn-secondary" id="btn-unit-ownership-history-promote" disabled onclick="runUnitOwnershipHistoryPromote()">업무 테이블로 승격</button>
-    </div>
-    <div id="unit-ownership-history-result" class="result-box" th:if="${lastUnitOwnershipHistoryResult}" th:text="${lastUnitOwnershipHistoryResult}"></div>
-    <div id="unit-ownership-history-result-js" class="result-box" style="display:none;"></div>
-    <pre id="unit-ownership-history-preview" class="result-box" style="display:none;"></pre>
   </div>
 
   <!-- 카드 1b-17: 데이터셋 계약 상태 + 테스트 — integrated_building -->
   <div class="card kras-hide" id="card-integrated-building">
     <div class="card-title">
       데이터셋 계약 상태 — integrated_building
-      <span th:if="${integratedBuildingStatus == 'VERIFIED' and integratedBuildingEnabled}" class="badge badge-on">VERIFIED · enabled</span>
+      <span th:if="${integratedBuildingStatus == 'VERIFIED' and integratedBuildingEnabled}" class="badge badge-on">승인 · 활성</span>
       <span th:unless="${integratedBuildingStatus == 'VERIFIED' and integratedBuildingEnabled}" class="badge badge-warn"
-            th:text="${integratedBuildingStatus} + ' · ' + (${integratedBuildingEnabled} ? 'enabled' : 'disabled')"></span>
+            th:text="(${integratedBuildingStatus} == 'VERIFIED' ? '승인' : '미승인') + ' · ' + (${integratedBuildingEnabled} ? '활성' : '비활성')"></span>
       <span class="badge" style="background:#3a1f1f;color:#e88a82;">conn_svc_id 미확인</span>
       <span th:if="${integratedBuildingRunning}" class="badge badge-warn">실행 중</span>
     </div>
@@ -960,58 +496,15 @@
       <code>kras.building_parcel</code>에 같이 승격됩니다. LAREA/BAREA 등 면적 필드는 응답에 천단위
       콤마가 붙어 있어 파싱 전에 제거합니다.
     </p>
-    <div th:unless="${integratedBuildingStatus == 'VERIFIED' and integratedBuildingEnabled}">
-      <form method="post" action="/kras-db/verify-dataset" id="verify-form-integrated-building">
-        <input type="hidden" name="datasetCode" value="integrated_building">
-        <div class="confirm-row">
-          <input type="checkbox" id="verify-confirm-integrated-building" onchange="document.getElementById('verify-submit-integrated-building').disabled = !this.checked;">
-          <label for="verify-confirm-integrated-building">실제 운영 응답으로 integrated_building 계약을 확인했음</label>
-        </div>
-        <input type="hidden" name="confirmed" id="verify-confirmed-integrated-building" value="false">
-        <div class="verify-fields">
-          <div class="verify-fields-row">
-            <div>
-              <label for="verify-by-integrated-building">담당자</label>
-              <input type="text" name="verifiedBy" id="verify-by-integrated-building">
-            </div>
-            <div>
-              <label for="verify-mapver-integrated-building">매퍼 버전(수동 입력)</label>
-              <input type="text" name="mapperVersion" id="verify-mapver-integrated-building" placeholder="예: git 커밋 앞자리">
-            </div>
-          </div>
-          <label for="verify-sample-integrated-building">응답 샘플</label>
-          <div class="verify-hint">개인정보(OWNER_NM/OWNER_ADDR 등)는 저장 전 서버에서 자동 마스킹됩니다.</div>
-          <textarea name="responseSample" id="verify-sample-integrated-building" rows="4"></textarea>
-          <label for="verify-note-integrated-building" style="margin-top:8px;">비고</label>
-          <input type="text" name="note" id="verify-note-integrated-building">
-        </div>
-        <button type="submit" id="verify-submit-integrated-building" class="btn btn-primary" disabled
-                onclick="document.getElementById('verify-confirmed-integrated-building').value='true';">계약 확인 → VERIFIED로 전환</button>
-      </form>
-    </div>
-    <form th:if="${integratedBuildingStatus == 'VERIFIED' and integratedBuildingEnabled}" method="post" action="/kras-db/revert-dataset"
-          onsubmit="return confirm('integrated_building 검증을 원복하시겠습니까?');">
-      <input type="hidden" name="datasetCode" value="integrated_building">
-      <button type="submit" class="btn btn-secondary">검증 원복</button>
-    </form>
-    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:14px;">
-      <input type="text" id="integrated-building-pnu" placeholder="PNU 19자리" maxlength="19"
-             style="padding:8px 12px;border-radius:8px;border:1px solid #2e3640;background:#14171c;color:#e7eaee;font-family:'JetBrains Mono',monospace;width:220px;">
-      <button class="btn btn-primary" id="btn-integrated-building-ingest" th:disabled="${integratedBuildingRunning}" onclick="runIntegratedBuildingIngest()">테스트 수집</button>
-      <button class="btn btn-secondary" id="btn-integrated-building-promote" disabled onclick="runIntegratedBuildingPromote()">업무 테이블로 승격</button>
-    </div>
-    <div id="integrated-building-result" class="result-box" th:if="${lastIntegratedBuildingResult}" th:text="${lastIntegratedBuildingResult}"></div>
-    <div id="integrated-building-result-js" class="result-box" style="display:none;"></div>
-    <pre id="integrated-building-preview" class="result-box" style="display:none;"></pre>
   </div>
 
   <!-- 카드 1b-17b: 데이터셋 계약 상태 + 테스트 — building_image (§14, 응답이 파일) -->
   <div class="card kras-hide" id="card-building-image">
     <div class="card-title">
       데이터셋 계약 상태 — building_image
-      <span th:if="${buildingImageStatus == 'VERIFIED' and buildingImageEnabled}" class="badge badge-on">VERIFIED · enabled</span>
+      <span th:if="${buildingImageStatus == 'VERIFIED' and buildingImageEnabled}" class="badge badge-on">승인 · 활성</span>
       <span th:unless="${buildingImageStatus == 'VERIFIED' and buildingImageEnabled}" class="badge badge-warn"
-            th:text="${buildingImageStatus} + ' · ' + (${buildingImageEnabled} ? 'enabled' : 'disabled')"></span>
+            th:text="(${buildingImageStatus} == 'VERIFIED' ? '승인' : '미승인') + ' · ' + (${buildingImageEnabled} ? '활성' : '비활성')"></span>
       <span class="badge" style="background:#3a1f1f;color:#e88a82;">conn_svc_id 미확인</span>
       <span th:if="${buildingImageRunning}" class="badge badge-warn">실행 중</span>
     </div>
@@ -1025,60 +518,15 @@
       mime_type은 실제 파일 포맷이 문서에 없어 NULL로 둡니다. conn_svc_id도 미확인이라 실제 호출은
       막혀 있습니다.
     </p>
-    <div th:unless="${buildingImageStatus == 'VERIFIED' and buildingImageEnabled}">
-      <form method="post" action="/kras-db/verify-dataset" id="verify-form-building-image">
-        <input type="hidden" name="datasetCode" value="building_image">
-        <div class="confirm-row">
-          <input type="checkbox" id="verify-confirm-building-image" onchange="document.getElementById('verify-submit-building-image').disabled = !this.checked;">
-          <label for="verify-confirm-building-image">실제 운영 응답으로 building_image 계약을 확인했음</label>
-        </div>
-        <input type="hidden" name="confirmed" id="verify-confirmed-building-image" value="false">
-        <div class="verify-fields">
-          <div class="verify-fields-row">
-            <div>
-              <label for="verify-by-building-image">담당자</label>
-              <input type="text" name="verifiedBy" id="verify-by-building-image">
-            </div>
-            <div>
-              <label for="verify-mapver-building-image">매퍼 버전(수동 입력)</label>
-              <input type="text" name="mapperVersion" id="verify-mapver-building-image" placeholder="예: git 커밋 앞자리">
-            </div>
-          </div>
-          <label for="verify-sample-building-image">응답 샘플</label>
-          <div class="verify-hint">개인정보(OWNER_NM/OWNER_ADDR 등)는 저장 전 서버에서 자동 마스킹됩니다.</div>
-          <textarea name="responseSample" id="verify-sample-building-image" rows="4"></textarea>
-          <label for="verify-note-building-image" style="margin-top:8px;">비고</label>
-          <input type="text" name="note" id="verify-note-building-image">
-        </div>
-        <button type="submit" id="verify-submit-building-image" class="btn btn-primary" disabled
-                onclick="document.getElementById('verify-confirmed-building-image').value='true';">계약 확인 → VERIFIED로 전환</button>
-      </form>
-    </div>
-    <form th:if="${buildingImageStatus == 'VERIFIED' and buildingImageEnabled}" method="post" action="/kras-db/revert-dataset"
-          onsubmit="return confirm('building_image 검증을 원복하시겠습니까?');">
-      <input type="hidden" name="datasetCode" value="building_image">
-      <button type="submit" class="btn btn-secondary">검증 원복</button>
-    </form>
-    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:14px;">
-      <input type="text" id="building-image-pnu" placeholder="PNU 19자리" maxlength="19"
-             style="padding:8px 12px;border-radius:8px;border:1px solid #2e3640;background:#14171c;color:#e7eaee;font-family:'JetBrains Mono',monospace;width:220px;">
-      <input type="text" id="building-image-extra-params" placeholder='추가 파라미터(JSON), 예: {"width":"800","height":"600","scale":"1000"}'
-             style="padding:8px 12px;border-radius:8px;border:1px solid #2e3640;background:#14171c;color:#e7eaee;font-family:'JetBrains Mono',monospace;flex:1;min-width:260px;">
-      <button class="btn btn-primary" id="btn-building-image-ingest" th:disabled="${buildingImageRunning}" onclick="runBuildingImageIngest()">테스트 수집</button>
-      <button class="btn btn-secondary" id="btn-building-image-promote" disabled onclick="runBuildingImagePromote()">업무 테이블로 승격</button>
-    </div>
-    <div id="building-image-result" class="result-box" th:if="${lastBuildingImageResult}" th:text="${lastBuildingImageResult}"></div>
-    <div id="building-image-result-js" class="result-box" style="display:none;"></div>
-    <pre id="building-image-preview" class="result-box" style="display:none;"></pre>
   </div>
 
   <!-- 카드 1b-18: 데이터셋 계약 상태 + 테스트 — land_change (기간 조회, PNU 아님) -->
   <div class="card kras-hide" id="card-land-change">
     <div class="card-title">
       데이터셋 계약 상태 — land_change
-      <span th:if="${landChangeStatus == 'VERIFIED' and landChangeEnabled}" class="badge badge-on">VERIFIED · enabled</span>
+      <span th:if="${landChangeStatus == 'VERIFIED' and landChangeEnabled}" class="badge badge-on">승인 · 활성</span>
       <span th:unless="${landChangeStatus == 'VERIFIED' and landChangeEnabled}" class="badge badge-warn"
-            th:text="${landChangeStatus} + ' · ' + (${landChangeEnabled} ? 'enabled' : 'disabled')"></span>
+            th:text="(${landChangeStatus} == 'VERIFIED' ? '승인' : '미승인') + ' · ' + (${landChangeEnabled} ? '활성' : '비활성')"></span>
       <span class="badge" style="background:#3a1f1f;color:#e88a82;">conn_svc_id 미확인</span>
       <span th:if="${landChangeRunning}" class="badge badge-warn">실행 중</span>
     </div>
@@ -1091,40 +539,6 @@
       <b>kras.md §11(소유권변동내역)·§12(집합건물소유권변동내역)는 문서 자체가 §10 내용을 그대로
       복사해놔서(필드명·샘플까지 동일) 만들지 않았습니다</b> — 실제 응답을 봐야 진행 가능합니다.
     </p>
-    <div th:unless="${landChangeStatus == 'VERIFIED' and landChangeEnabled}">
-      <form method="post" action="/kras-db/verify-dataset" id="verify-form-land-change">
-        <input type="hidden" name="datasetCode" value="land_change">
-        <div class="confirm-row">
-          <input type="checkbox" id="verify-confirm-land-change" onchange="document.getElementById('verify-submit-land-change').disabled = !this.checked;">
-          <label for="verify-confirm-land-change">실제 운영 응답으로 land_change 계약을 확인했음</label>
-        </div>
-        <input type="hidden" name="confirmed" id="verify-confirmed-land-change" value="false">
-        <div class="verify-fields">
-          <div class="verify-fields-row">
-            <div>
-              <label for="verify-by-land-change">담당자</label>
-              <input type="text" name="verifiedBy" id="verify-by-land-change">
-            </div>
-            <div>
-              <label for="verify-mapver-land-change">매퍼 버전(수동 입력)</label>
-              <input type="text" name="mapperVersion" id="verify-mapver-land-change" placeholder="예: git 커밋 앞자리">
-            </div>
-          </div>
-          <label for="verify-sample-land-change">응답 샘플</label>
-          <div class="verify-hint">개인정보(OWNER_NM/OWNER_ADDR 등)는 저장 전 서버에서 자동 마스킹됩니다.</div>
-          <textarea name="responseSample" id="verify-sample-land-change" rows="4"></textarea>
-          <label for="verify-note-land-change" style="margin-top:8px;">비고</label>
-          <input type="text" name="note" id="verify-note-land-change">
-        </div>
-        <button type="submit" id="verify-submit-land-change" class="btn btn-primary" disabled
-                onclick="document.getElementById('verify-confirmed-land-change').value='true';">계약 확인 → VERIFIED로 전환</button>
-      </form>
-    </div>
-    <form th:if="${landChangeStatus == 'VERIFIED' and landChangeEnabled}" method="post" action="/kras-db/revert-dataset"
-          onsubmit="return confirm('land_change 검증을 원복하시겠습니까?');">
-      <input type="hidden" name="datasetCode" value="land_change">
-      <button type="submit" class="btn btn-secondary">검증 원복</button>
-    </form>
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:14px;">
       <input type="date" id="land-change-start" style="padding:8px 12px;border-radius:8px;border:1px solid #2e3640;background:#14171c;color:#e7eaee;font-family:'JetBrains Mono',monospace;">
       <input type="date" id="land-change-end" style="padding:8px 12px;border-radius:8px;border:1px solid #2e3640;background:#14171c;color:#e7eaee;font-family:'JetBrains Mono',monospace;">
@@ -1138,6 +552,18 @@
     <div id="land-change-result" class="result-box" th:if="${lastLandChangeResult}" th:text="${lastLandChangeResult}"></div>
     <div id="land-change-result-js" class="result-box" style="display:none;"></div>
     <pre id="land-change-preview" class="result-box" style="display:none;"></pre>
+
+    <div style="margin-top:14px;padding-top:14px;border-top:1px solid #2e3640;">
+      <p class="history-help" style="margin-top:0;">
+        10일 제한을 넘는 기간은 자동으로 조각내 순서대로 수집합니다. 시작일을 비우면 이 연계가
+        마지막으로 성공한 수집 다음부터 이어서 수집합니다(종료일은 위 입력을 그대로 씁니다).
+        승격은 하지 않으므로, 조각마다 생긴 수집 건은 <a href="/kras-stats" target="_blank">KRAS 통계</a>의
+        수집 이력에서 확인 후 승격하세요.
+      </p>
+      <button class="btn btn-secondary" id="btn-land-change-auto" th:disabled="${landChangeRunning}"
+              onclick="runLandChangeAutoIngest()">자동 분할 수집 (이어서)</button>
+      <div id="land-change-auto-result" class="result-box" style="display:none;margin-top:10px;white-space:pre-line;"></div>
+    </div>
   </div>
 
   <!-- 카드 1c: 선언형 매퍼 14개 — 카드를 복붙하지 않고 th:each로 찍는다 -->
@@ -1155,16 +581,16 @@
       ⚠ 이 14개의 <b>태그명은 업무 테이블 컬럼명을 대문자로 바꾼 가설</b>입니다(kras.md에 응답 XML이 없음).
       반복 그룹을 감싸는 태그는 추측하지 않고 기준 필드로 역추적하며, 기준 태그가 응답에 없으면
       <b>응답에 실제로 있던 태그 목록을 에러 메시지에 붙여</b> 알려줍니다. 한 번 수집해 보면 올바른
-      태그를 바로 알 수 있으니, <code>KrasSpecMapperConfig</code>에서 고친 뒤 VERIFIED로 올리세요.
+      태그를 바로 알 수 있으니, <code>KrasSpecMapperConfig</code>에서 고친 뒤 승인하세요.
     </p>
   </div>
 
   <div class="card kras-hide" th:each="d : ${specServices}" th:id="'card-' + ${d.slug}">
     <div class="card-title">
       <span th:text="${d.datasetCode} + ' — ' + ${d.label}"></span>
-      <span th:if="${d.status == 'VERIFIED' and d.enabled}" class="badge badge-on">VERIFIED · enabled</span>
+      <span th:if="${d.status == 'VERIFIED' and d.enabled}" class="badge badge-on">승인 · 활성</span>
       <span th:unless="${d.status == 'VERIFIED' and d.enabled}" class="badge badge-warn"
-            th:text="${d.status} + ' · ' + (${d.enabled} ? 'enabled' : 'disabled')"></span>
+            th:text="(${d.status} == 'VERIFIED' ? '승인' : '미승인') + ' · ' + (${d.enabled} ? '활성' : '비활성')"></span>
       <span th:if="${d.running}" class="badge badge-warn">실행 중</span>
     </div>
     <p style="font-size:13px;color:#9aa2ad;margin-bottom:10px;">
@@ -1176,41 +602,7 @@
     </p>
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px;">
       <a th:href="'/api-test?api=' + ${d.apiTestId}" target="_blank" class="btn btn-secondary">응답 확인</a>
-      <form th:unless="${d.status == 'VERIFIED' and d.enabled}" method="post" action="/kras-db/verify-dataset"
-            style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-        <input type="hidden" name="datasetCode" th:value="${d.datasetCode}">
-        <input type="hidden" name="confirmed" value="true">
-        <input type="text" name="verifiedBy" placeholder="담당자"
-               style="padding:7px 10px;border-radius:8px;border:1px solid #2e3640;background:#14171c;color:#c8cdd4;font-size:12.5px;width:110px;">
-        <input type="text" name="mapperVersion" placeholder="매퍼 버전(수동)"
-               style="padding:7px 10px;border-radius:8px;border:1px solid #2e3640;background:#14171c;color:#c8cdd4;font-size:12.5px;width:150px;">
-        <input type="text" name="responseSample" placeholder="응답 샘플(PII 자동 마스킹)"
-               style="padding:7px 10px;border-radius:8px;border:1px solid #2e3640;background:#14171c;color:#c8cdd4;font-size:12.5px;flex:1;min-width:180px;">
-        <button type="submit" class="btn btn-secondary"
-                th:attr="onclick=|return confirm('실제 운영 응답으로 ${d.datasetCode} 태그명까지 확인했습니까?')|">VERIFIED로 전환</button>
-      </form>
-      <form th:if="${d.status == 'VERIFIED' and d.enabled}" method="post" action="/kras-db/revert-dataset" style="display:inline;">
-        <input type="hidden" name="datasetCode" th:value="${d.datasetCode}">
-        <button type="submit" class="btn btn-secondary"
-                th:attr="onclick=|return confirm('${d.datasetCode} 검증을 원복하시겠습니까?')|">검증 원복</button>
-      </form>
     </div>
-    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px;">
-      <input type="text" th:id="${d.slug} + '-pnu'" placeholder="PNU 19자리" maxlength="19"
-             style="padding:8px 12px;border-radius:8px;border:1px solid #2e3640;background:#14171c;color:#e7eaee;font-family:'JetBrains Mono',monospace;width:220px;">
-      <input type="text" th:id="${d.slug} + '-extra-params'"
-             th:placeholder="${d.needsBno} ? '추가 파라미터(JSON), 예: {&quot;bldg_gbn_no&quot;:&quot;...&quot;}' : '추가 파라미터(JSON), 선택'"
-             style="padding:8px 12px;border-radius:8px;border:1px solid #2e3640;background:#14171c;color:#e7eaee;font-family:'JetBrains Mono',monospace;flex:1;min-width:260px;">
-    </div>
-    <div style="display:flex;gap:10px;">
-      <button class="btn btn-primary" th:id="'btn-' + ${d.slug} + '-ingest'" th:disabled="${d.running}"
-              th:attr="data-slug=${d.slug}" onclick="runPnuIngest(this.dataset.slug)">테스트 수집</button>
-      <button class="btn btn-secondary" th:id="'btn-' + ${d.slug} + '-promote'" disabled
-              th:attr="data-slug=${d.slug}" onclick="runPnuPromote(this.dataset.slug)">업무 테이블로 승격</button>
-    </div>
-    <div class="result-box" th:if="${d.lastResult}" th:text="${d.lastResult}"></div>
-    <div th:id="${d.slug} + '-result-js'" class="result-box" style="display:none;"></div>
-    <pre th:id="${d.slug} + '-preview'" class="result-box" style="display:none;"></pre>
   </div>
 
 
@@ -1253,95 +645,27 @@
   <div class="card kras-hide" id="card-layer-list">
     <div class="card-title">
       데이터셋 계약 상태 — layer_list
-      <span th:if="${layerListStatus == 'VERIFIED' and layerListEnabled}" class="badge badge-on">VERIFIED · enabled</span>
+      <span th:if="${layerListStatus == 'VERIFIED' and layerListEnabled}" class="badge badge-on">승인 · 활성</span>
       <span th:unless="${layerListStatus == 'VERIFIED' and layerListEnabled}" class="badge badge-warn"
-            th:text="${layerListStatus} + ' · ' + (${layerListEnabled} ? 'enabled' : 'disabled')"></span>
+            th:text="(${layerListStatus} == 'VERIFIED' ? '승인' : '미승인') + ' · ' + (${layerListEnabled} ? '활성' : '비활성')"></span>
     </div>
     <p style="font-size:13px;color:#9aa2ad;margin-bottom:14px;">
       "레이어 목록 조회"(KRAS000037) — 용도지역 카탈로그 수집(아래 카드)이 이 데이터셋으로 item을 만듭니다.
     </p>
-    <div th:unless="${layerListStatus == 'VERIFIED' and layerListEnabled}">
-      <form method="post" action="/kras-db/verify-dataset" id="verify-form-layer-list">
-        <input type="hidden" name="datasetCode" value="layer_list">
-        <div class="confirm-row">
-          <input type="checkbox" id="verify-confirm-layer-list" onchange="document.getElementById('verify-submit-layer-list').disabled = !this.checked;">
-          <label for="verify-confirm-layer-list">실제 운영 응답으로 layer_list 계약을 확인했음</label>
-        </div>
-        <input type="hidden" name="confirmed" id="verify-confirmed-layer-list" value="false">
-        <div class="verify-fields">
-          <div class="verify-fields-row">
-            <div>
-              <label for="verify-by-layer-list">담당자</label>
-              <input type="text" name="verifiedBy" id="verify-by-layer-list">
-            </div>
-            <div>
-              <label for="verify-mapver-layer-list">매퍼 버전(수동 입력)</label>
-              <input type="text" name="mapperVersion" id="verify-mapver-layer-list" placeholder="예: git 커밋 앞자리">
-            </div>
-          </div>
-          <label for="verify-sample-layer-list">응답 샘플</label>
-          <div class="verify-hint">개인정보(OWNER_NM/OWNER_ADDR 등)는 저장 전 서버에서 자동 마스킹됩니다.</div>
-          <textarea name="responseSample" id="verify-sample-layer-list" rows="4"></textarea>
-          <label for="verify-note-layer-list" style="margin-top:8px;">비고</label>
-          <input type="text" name="note" id="verify-note-layer-list">
-        </div>
-        <button type="submit" id="verify-submit-layer-list" class="btn btn-primary" disabled
-                onclick="document.getElementById('verify-confirmed-layer-list').value='true';">계약 확인 → VERIFIED로 전환</button>
-      </form>
-    </div>
-    <form th:if="${layerListStatus == 'VERIFIED' and layerListEnabled}" method="post" action="/kras-db/revert-dataset"
-          onsubmit="return confirm('layer_list 검증을 원복하시겠습니까?');">
-      <input type="hidden" name="datasetCode" value="layer_list">
-      <button type="submit" class="btn btn-secondary">검증 원복</button>
-    </form>
   </div>
 
   <!-- 카드 5b: 데이터셋 계약 상태 — usezone_file -->
   <div class="card kras-hide" id="card-usezone-file">
     <div class="card-title">
       데이터셋 계약 상태 — usezone_file
-      <span th:if="${usezoneFileStatus == 'VERIFIED' and usezoneFileEnabled}" class="badge badge-on">VERIFIED · enabled</span>
+      <span th:if="${usezoneFileStatus == 'VERIFIED' and usezoneFileEnabled}" class="badge badge-on">승인 · 활성</span>
       <span th:unless="${usezoneFileStatus == 'VERIFIED' and usezoneFileEnabled}" class="badge badge-warn"
-            th:text="${usezoneFileStatus} + ' · ' + (${usezoneFileEnabled} ? 'enabled' : 'disabled')"></span>
+            th:text="(${usezoneFileStatus} == 'VERIFIED' ? '승인' : '미승인') + ' · ' + (${usezoneFileEnabled} ? '활성' : '비활성')"></span>
     </div>
     <p style="font-size:13px;color:#9aa2ad;margin-bottom:14px;">
       "SHAPE 다운로드"(KRAS000038)를 레이어별로 순회해 kras.usezone_feature에 적재합니다. 연속지적과 달리
       기관 전체 레이어가 한 번에 완전해야 release가 발행됩니다(아래 카드).
     </p>
-    <div th:unless="${usezoneFileStatus == 'VERIFIED' and usezoneFileEnabled}">
-      <form method="post" action="/kras-db/verify-dataset" id="verify-form-usezone-file">
-        <input type="hidden" name="datasetCode" value="usezone_file">
-        <div class="confirm-row">
-          <input type="checkbox" id="verify-confirm-usezone-file" onchange="document.getElementById('verify-submit-usezone-file').disabled = !this.checked;">
-          <label for="verify-confirm-usezone-file">실제 운영 응답으로 usezone_file 계약을 확인했음</label>
-        </div>
-        <input type="hidden" name="confirmed" id="verify-confirmed-usezone-file" value="false">
-        <div class="verify-fields">
-          <div class="verify-fields-row">
-            <div>
-              <label for="verify-by-usezone-file">담당자</label>
-              <input type="text" name="verifiedBy" id="verify-by-usezone-file">
-            </div>
-            <div>
-              <label for="verify-mapver-usezone-file">매퍼 버전(수동 입력)</label>
-              <input type="text" name="mapperVersion" id="verify-mapver-usezone-file" placeholder="예: git 커밋 앞자리">
-            </div>
-          </div>
-          <label for="verify-sample-usezone-file">응답 샘플</label>
-          <div class="verify-hint">개인정보(OWNER_NM/OWNER_ADDR 등)는 저장 전 서버에서 자동 마스킹됩니다.</div>
-          <textarea name="responseSample" id="verify-sample-usezone-file" rows="4"></textarea>
-          <label for="verify-note-usezone-file" style="margin-top:8px;">비고</label>
-          <input type="text" name="note" id="verify-note-usezone-file">
-        </div>
-        <button type="submit" id="verify-submit-usezone-file" class="btn btn-primary" disabled
-                onclick="document.getElementById('verify-confirmed-usezone-file').value='true';">계약 확인 → VERIFIED로 전환</button>
-      </form>
-    </div>
-    <form th:if="${usezoneFileStatus == 'VERIFIED' and usezoneFileEnabled}" method="post" action="/kras-db/revert-dataset"
-          onsubmit="return confirm('usezone_file 검증을 원복하시겠습니까?');">
-      <input type="hidden" name="datasetCode" value="usezone_file">
-      <button type="submit" class="btn btn-secondary">검증 원복</button>
-    </form>
   </div>
 
   <!-- 카드 5c: 용도지역 릴리즈 진행상태 (설계 §9.2) -->
@@ -1395,9 +719,9 @@
   <div class="card kras-hide" id="card-land-basic-file">
     <div class="card-title">
       데이터셋 계약 상태 + 수집 — land_basic_file (토지기본정보 전체 TXT)
-      <span th:if="${landBasicFileStatus == 'VERIFIED' and landBasicFileEnabled}" class="badge badge-on">VERIFIED · enabled</span>
+      <span th:if="${landBasicFileStatus == 'VERIFIED' and landBasicFileEnabled}" class="badge badge-on">승인 · 활성</span>
       <span th:unless="${landBasicFileStatus == 'VERIFIED' and landBasicFileEnabled}" class="badge badge-warn"
-            th:text="${landBasicFileStatus} + ' · ' + (${landBasicFileEnabled} ? 'enabled' : 'disabled')"></span>
+            th:text="(${landBasicFileStatus} == 'VERIFIED' ? '승인' : '미승인') + ' · ' + (${landBasicFileEnabled} ? '활성' : '비활성')"></span>
       <span th:if="${landBasicFileRunning}" class="badge badge-warn">실행 중</span>
     </div>
     <p style="font-size:13px;color:#9aa2ad;margin-bottom:14px;">
@@ -1423,40 +747,6 @@
         </tbody>
       </table>
     </div>
-    <div th:unless="${landBasicFileStatus == 'VERIFIED' and landBasicFileEnabled}">
-      <form method="post" action="/kras-db/verify-dataset" id="verify-form-land-basic-file">
-        <input type="hidden" name="datasetCode" value="land_basic_file">
-        <div class="confirm-row">
-          <input type="checkbox" id="verify-confirm-land-basic-file" onchange="document.getElementById('verify-submit-land-basic-file').disabled = !this.checked;">
-          <label for="verify-confirm-land-basic-file">실제 운영 파일로 land_basic_file 계약을 확인했음</label>
-        </div>
-        <input type="hidden" name="confirmed" id="verify-confirmed-land-basic-file" value="false">
-        <div class="verify-fields">
-          <div class="verify-fields-row">
-            <div>
-              <label for="verify-by-land-basic-file">담당자</label>
-              <input type="text" name="verifiedBy" id="verify-by-land-basic-file">
-            </div>
-            <div>
-              <label for="verify-mapver-land-basic-file">매퍼 버전(수동 입력)</label>
-              <input type="text" name="mapperVersion" id="verify-mapver-land-basic-file" placeholder="예: git 커밋 앞자리">
-            </div>
-          </div>
-          <label for="verify-sample-land-basic-file">응답 샘플</label>
-          <div class="verify-hint">개인정보(OWNER_NM/OWNER_ADDR 등)는 저장 전 서버에서 자동 마스킹됩니다.</div>
-          <textarea name="responseSample" id="verify-sample-land-basic-file" rows="4"></textarea>
-          <label for="verify-note-land-basic-file" style="margin-top:8px;">비고</label>
-          <input type="text" name="note" id="verify-note-land-basic-file">
-        </div>
-        <button type="submit" id="verify-submit-land-basic-file" class="btn btn-primary" disabled
-                onclick="document.getElementById('verify-confirmed-land-basic-file').value='true';">계약 확인 → VERIFIED로 전환</button>
-      </form>
-    </div>
-    <form th:if="${landBasicFileStatus == 'VERIFIED' and landBasicFileEnabled}" method="post" action="/kras-db/revert-dataset"
-          onsubmit="return confirm('land_basic_file 검증을 원복하시겠습니까?');">
-      <input type="hidden" name="datasetCode" value="land_basic_file">
-      <button type="submit" class="btn btn-secondary">검증 원복</button>
-    </form>
     <div style="display:flex;gap:10px;flex-wrap:wrap;">
       <button class="btn btn-primary" id="btn-land-basic-file-ingest" th:disabled="${landBasicFileRunning}"
               onclick="runLandBasicFileIngest()">전체 TXT 수집</button>
@@ -1471,9 +761,9 @@
   <div class="card kras-hide" id="card-land-price-file">
     <div class="card-title">
       데이터셋 계약 상태 + 수집 — land_price_file (공시지가 전체 TXT)
-      <span th:if="${landPriceFileStatus == 'VERIFIED' and landPriceFileEnabled}" class="badge badge-on">VERIFIED · enabled</span>
+      <span th:if="${landPriceFileStatus == 'VERIFIED' and landPriceFileEnabled}" class="badge badge-on">승인 · 활성</span>
       <span th:unless="${landPriceFileStatus == 'VERIFIED' and landPriceFileEnabled}" class="badge badge-warn"
-            th:text="${landPriceFileStatus} + ' · ' + (${landPriceFileEnabled} ? 'enabled' : 'disabled')"></span>
+            th:text="(${landPriceFileStatus} == 'VERIFIED' ? '승인' : '미승인') + ' · ' + (${landPriceFileEnabled} ? '활성' : '비활성')"></span>
       <span th:if="${landPriceFileRunning}" class="badge badge-warn">실행 중</span>
     </div>
     <p style="font-size:13px;color:#9aa2ad;margin-bottom:14px;">
@@ -1484,40 +774,6 @@
       파일 컬럼 순서는 kras.md에 없어 기존 <code>KrasTxtLoaderService</code>가 쓰는 순서
       (land_cd, base_year, jiga, base_mon, pyo_yn)를 그대로 따릅니다.
     </p>
-    <div th:unless="${landPriceFileStatus == 'VERIFIED' and landPriceFileEnabled}">
-      <form method="post" action="/kras-db/verify-dataset" id="verify-form-land-price-file">
-        <input type="hidden" name="datasetCode" value="land_price_file">
-        <div class="confirm-row">
-          <input type="checkbox" id="verify-confirm-land-price-file" onchange="document.getElementById('verify-submit-land-price-file').disabled = !this.checked;">
-          <label for="verify-confirm-land-price-file">실제 운영 파일로 land_price_file 계약을 확인했음</label>
-        </div>
-        <input type="hidden" name="confirmed" id="verify-confirmed-land-price-file" value="false">
-        <div class="verify-fields">
-          <div class="verify-fields-row">
-            <div>
-              <label for="verify-by-land-price-file">담당자</label>
-              <input type="text" name="verifiedBy" id="verify-by-land-price-file">
-            </div>
-            <div>
-              <label for="verify-mapver-land-price-file">매퍼 버전(수동 입력)</label>
-              <input type="text" name="mapperVersion" id="verify-mapver-land-price-file" placeholder="예: git 커밋 앞자리">
-            </div>
-          </div>
-          <label for="verify-sample-land-price-file">응답 샘플</label>
-          <div class="verify-hint">개인정보(OWNER_NM/OWNER_ADDR 등)는 저장 전 서버에서 자동 마스킹됩니다.</div>
-          <textarea name="responseSample" id="verify-sample-land-price-file" rows="4"></textarea>
-          <label for="verify-note-land-price-file" style="margin-top:8px;">비고</label>
-          <input type="text" name="note" id="verify-note-land-price-file">
-        </div>
-        <button type="submit" id="verify-submit-land-price-file" class="btn btn-primary" disabled
-                onclick="document.getElementById('verify-confirmed-land-price-file').value='true';">계약 확인 → VERIFIED로 전환</button>
-      </form>
-    </div>
-    <form th:if="${landPriceFileStatus == 'VERIFIED' and landPriceFileEnabled}" method="post" action="/kras-db/revert-dataset"
-          onsubmit="return confirm('land_price_file 검증을 원복하시겠습니까?');">
-      <input type="hidden" name="datasetCode" value="land_price_file">
-      <button type="submit" class="btn btn-secondary">검증 원복</button>
-    </form>
     <div style="display:flex;gap:10px;">
       <button class="btn btn-primary" id="btn-land-price-file-ingest" th:disabled="${landPriceFileRunning}"
               onclick="runLandPriceFileIngest()">전체 TXT 수집</button>
@@ -1531,6 +787,10 @@
 
 <th:block layout:fragment="scripts">
 <script src="/js/kras-history.js"></script>
+<script th:inline="javascript">
+// 데이터셋별 추가 파라미터(JSON) 예시 — 필요한 데이터셋에서만 "실제 수집"에 입력칸을 보여주는 데 쓴다.
+const KRAS_EXTRA_PARAMS_HINTS = /*[[${extraParamsHints}]]*/ {};
+</script>
 <script>
 async function runIngest() { await run('/kras-db/ingest/cadastral', 'btn-ingest'); }
 async function runPromote() { await run('/kras-db/promote/cadastral', 'btn-promote'); }
@@ -1556,76 +816,6 @@ async function run(url, btnId) {
   } finally {
     ingestBtn.disabled = false;
     promoteBtn.disabled = false;
-  }
-}
-
-// PNU 단건 매퍼 카드(land-info, land-bldg-check, ...) 공용 — slug만 다르고 나머지는 동일한 패턴.
-const pnuItemIds = {};
-
-async function runPnuIngest(slug) {
-  pnuItemIds[slug] = null;
-  const pnu = document.getElementById(slug + '-pnu').value.trim();
-  const ingestBtn = document.getElementById('btn-' + slug + '-ingest');
-  const promoteBtn = document.getElementById('btn-' + slug + '-promote');
-  const box = document.getElementById(slug + '-result-js');
-  const preview = document.getElementById(slug + '-preview');
-  ingestBtn.disabled = true;
-  promoteBtn.disabled = true;
-  box.style.display = 'block';
-  box.className = 'result-box';
-  box.textContent = '수집 중...';
-  preview.style.display = 'none';
-  const extraParamsEl = document.getElementById(slug + '-extra-params');
-  const extraParams = extraParamsEl ? extraParamsEl.value.trim() : '';
-  try {
-    let url = '/kras-db/ingest/' + slug + '?pnu=' + encodeURIComponent(pnu);
-    if (extraParams) url += '&extraParamsJson=' + encodeURIComponent(extraParams);
-    const res = await krasRequest(url, { method: 'POST' });
-    const data = await res.json();
-    box.textContent = krasResultMessage(data);
-    box.classList.add(krasResultClass(data));
-    if (window.refreshKrasHistory) await window.refreshKrasHistory();
-    if (data.success && data.preview) {
-      preview.style.display = 'block';
-      preview.textContent = JSON.stringify(data.preview, null, 2);
-    }
-    if (data.success && data.promotable) {
-      pnuItemIds[slug] = data.itemId;
-      promoteBtn.disabled = false;
-    } else {
-      pnuItemIds[slug] = null;
-    }
-  } catch (err) {
-    box.textContent = '요청 실패: ' + err;
-    box.classList.add('err');
-  } finally {
-    ingestBtn.disabled = false;
-  }
-}
-
-async function runPnuPromote(slug) {
-  const itemId = pnuItemIds[slug];
-  if (!itemId) return;
-  const ingestBtn = document.getElementById('btn-' + slug + '-ingest');
-  const promoteBtn = document.getElementById('btn-' + slug + '-promote');
-  ingestBtn.disabled = true;
-  promoteBtn.disabled = true;
-  const box = document.getElementById(slug + '-result-js');
-  box.style.display = 'block';
-  box.className = 'result-box';
-  box.textContent = '승격 중...';
-  try {
-    const res = await krasRequest('/kras-db/promote/' + slug + '?itemId=' + itemId, { method: 'POST' });
-    const data = await res.json();
-    box.textContent = krasResultMessage(data);
-    box.classList.add(krasResultClass(data));
-    if (window.refreshKrasHistory) await window.refreshKrasHistory();
-  } catch (err) {
-    box.textContent = '요청 실패: ' + err;
-    box.classList.add('err');
-  } finally {
-    ingestBtn.disabled = false;
-    promoteBtn.disabled = !pnuItemIds[slug];
   }
 }
 
@@ -1703,28 +893,39 @@ async function runDateRangePromote(slug) {
 function runLandChangeIngest() { return runDateRangeIngest('land-change'); }
 function runLandChangePromote() { return runDateRangePromote('land-change'); }
 
-function runLandInfoIngest() { return runPnuIngest('land-info'); }
-function runLandInfoPromote() { return runPnuPromote('land-info'); }
-function runLandBldgCheckIngest() { return runPnuIngest('land-bldg-check'); }
-function runLandBldgCheckPromote() { return runPnuPromote('land-bldg-check'); }
-function runCollectiveBuildingIngest() { return runPnuIngest('collective-building'); }
-function runCollectiveBuildingPromote() { return runPnuPromote('collective-building'); }
-function runShrYmbIngest() { return runPnuIngest('shr-ymb'); }
-function runShrYmbPromote() { return runPnuPromote('shr-ymb'); }
-function runOwnRgtHistIngest() { return runPnuIngest('own-rgt-hist'); }
-function runOwnRgtHistPromote() { return runPnuPromote('own-rgt-hist'); }
-function runLandMovHistIngest() { return runPnuIngest('land-mov-hist'); }
-function runLandMovHistPromote() { return runPnuPromote('land-mov-hist'); }
-function runCollectiveUnitIngest() { return runPnuIngest('collective-unit'); }
-function runCollectiveUnitPromote() { return runPnuPromote('collective-unit'); }
-function runLandRightIngest() { return runPnuIngest('land-right'); }
-function runLandRightPromote() { return runPnuPromote('land-right'); }
-function runUnitOwnershipHistoryIngest() { return runPnuIngest('unit-ownership-history'); }
-function runUnitOwnershipHistoryPromote() { return runPnuPromote('unit-ownership-history'); }
-function runIntegratedBuildingIngest() { return runPnuIngest('integrated-building'); }
-function runIntegratedBuildingPromote() { return runPnuPromote('integrated-building'); }
-function runBuildingImageIngest() { return runPnuIngest('building-image'); }
-function runBuildingImagePromote() { return runPnuPromote('building-image'); }
+async function runLandChangeAutoIngest() {
+  const slug = 'land-change';
+  const start = document.getElementById(slug + '-start').value; // 비워도 됨 — 비우면 서버가 커서를 쓴다
+  const end = document.getElementById(slug + '-end').value;
+  if (!end) { alert('종료일을 입력하세요.'); return; }
+  const btn = document.getElementById('btn-' + slug + '-auto');
+  const box = document.getElementById(slug + '-auto-result');
+  const extraParamsEl = document.getElementById(slug + '-extra-params');
+  const extraParams = extraParamsEl ? extraParamsEl.value.trim() : '';
+  btn.disabled = true;
+  box.style.display = 'block';
+  box.className = 'result-box';
+  box.textContent = '자동 분할 수집 중... (10일씩 순서대로)';
+  try {
+    let url = '/kras-db/ingest-range-auto/' + slug + '?endDate=' + encodeURIComponent(end);
+    if (start) url += '&startDate=' + encodeURIComponent(start);
+    if (extraParams) url += '&extraParamsJson=' + encodeURIComponent(extraParams);
+    const res = await krasRequest(url, { method: 'POST' });
+    const data = await res.json();
+    box.classList.add(krasResultClass(data));
+    const lines = [krasResultMessage(data)];
+    (data.chunks || []).forEach(c => {
+      lines.push(c.start + ' ~ ' + c.end + ': ' + (c.success ? ('성공 (item_id=' + c.itemId + ')') : ('실패 — ' + c.error)));
+    });
+    box.textContent = lines.join('\n');
+    if (window.refreshKrasHistory) await window.refreshKrasHistory();
+  } catch (err) {
+    box.textContent = '요청 실패: ' + err;
+    box.classList.add('err');
+  } finally {
+    btn.disabled = false;
+  }
+}
 
 // 전체 페이지 이동 없이 상태만 갱신해 실패 레이어 메시지와 다른 카드의 선택을 보존한다.
 async function refreshUsezoneSnapshot() {
@@ -1849,69 +1050,357 @@ function krasFocusDataset(slug) {
 */
 
 /**
- * 목록 항목을 클릭하면 해당 데이터셋의 카드(+companion 카드)를 팝업으로 보여준다.
- * 카드를 복제하지 않고 실제 DOM 노드를 모달로 옮긴다 — 그래야 카드 내부의 id 참조 버튼/폼이
- * (runPnuIngest 등) 그대로 동작한다. 닫으면 원래 있던 자리(placeholder)로 되돌린다.
+ * 데이터셋 팝업 — 응답 확인·승인(위)과 데이터 구조(아래)를 한 화면에서 같이 보여준다.
+ * 구조 영역은 기존 카드(+companion 카드)를 복제하지 않고 실제 DOM 노드를 그대로 옮겨서 보여준다
+ * (그래야 카드 내부 id 참조 버튼/폼이 그대로 동작한다). 닫으면 원래 자리(placeholder)로 되돌린다.
  */
-const krasDatasetModal = (() => {
-  const backdrop = document.getElementById('dataset-modal-backdrop');
-  const body = document.getElementById('dataset-modal-body');
-  const title = document.getElementById('dataset-modal-title');
+const krasDatasetPopup = (() => {
+  const backdrop = document.getElementById('dset-modal-backdrop');
+  const title = document.getElementById('dset-modal-title');
+  const structurePane = document.getElementById('dset-pane-structure');
+  const approveStatus = document.getElementById('dset-approve-status');
+  const approveSample = document.getElementById('dset-approve-sample');
+  const approveCheckBtn = document.getElementById('dset-approve-check');
+  const approveSubmitBtn = document.getElementById('dset-approve-submit');
+  const approveRevertBtn = document.getElementById('dset-approve-revert');
+  const approveResult = document.getElementById('dset-approve-result');
+  const liveRow = document.getElementById('dset-live-row');
+  const livePnu = document.getElementById('dset-live-pnu');
+  const liveExtraFields = document.getElementById('dset-live-extra-fields');
+  const liveCollectBtn = document.getElementById('dset-live-collect');
+  const livePromoteBtn = document.getElementById('dset-live-promote');
+  const liveResult = document.getElementById('dset-live-result');
+  const livePreview = document.getElementById('dset-live-preview');
   let moved = null; // [{ node, placeholder }]
+  let current = { slug: null, datasetCode: null, liveItemId: null };
 
   function close() {
-    if (!moved) return;
-    moved.forEach(({ node, placeholder }) => {
-      node.classList.add('kras-hide');
-      placeholder.parentNode.replaceChild(node, placeholder);
-    });
-    moved = null;
+    if (moved) {
+      moved.forEach(({ node, placeholder }) => {
+        node.classList.add('kras-hide');
+        placeholder.parentNode.replaceChild(node, placeholder);
+      });
+      moved = null;
+    }
     backdrop.hidden = true;
-    body.replaceChildren();
   }
 
-  function open(slug, label) {
+  function renderExtraFields(datasetCode) {
+    liveExtraFields.innerHTML = '';
+    const hint = (KRAS_EXTRA_PARAMS_HINTS || {})[datasetCode];
+    const keys = hint ? Object.keys(hint) : [];
+    liveExtraFields.hidden = keys.length === 0;
+    liveExtraFields.style.display = keys.length ? 'flex' : 'none';
+    keys.forEach(key => {
+      const wrap = document.createElement('label');
+      wrap.style.cssText = 'display:flex;flex-direction:column;gap:3px;font-size:11px;color:#69707b;';
+      wrap.append(key);
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.dataset.extraKey = key;
+      input.value = hint[key];
+      input.style.cssText = 'padding:7px 10px;border-radius:8px;border:1px solid #2e3640;background:#14171c;'
+          + 'color:#e7eaee;font-family:\'JetBrains Mono\',monospace;width:110px;';
+      wrap.appendChild(input);
+      liveExtraFields.appendChild(wrap);
+    });
+  }
+
+  function collectExtraParamsJson() {
+    const inputs = liveExtraFields.querySelectorAll('[data-extra-key]');
+    if (!inputs.length) return '';
+    const obj = {};
+    inputs.forEach(input => { obj[input.dataset.extraKey] = input.value; });
+    return JSON.stringify(obj);
+  }
+
+  function resetApprovePanel(slug, datasetCode, contractStatus, enabled, hasPnuMapper) {
+    current = { slug, datasetCode, liveItemId: null };
+    approveSample.value = '';
+    approveSubmitBtn.disabled = true;
+    approveResult.style.display = 'none';
+    approveResult.textContent = '';
+    const approved = contractStatus === 'VERIFIED' && enabled;
+    approveStatus.textContent = approved
+      ? '현재 상태: 승인 · 활성 — 이미 승인된 데이터셋입니다. 다시 승인하려면 새 응답으로 확인하세요.'
+      : '현재 상태: 미승인 — 아래에서 실제로 호출하거나, 받아둔 응답을 붙여넣어 확인한 뒤 승인하세요.';
+    approveRevertBtn.hidden = !approved;
+
+    liveRow.hidden = !hasPnuMapper;
+    livePnu.value = '';
+    renderExtraFields(datasetCode);
+    livePromoteBtn.disabled = true;
+    liveResult.style.display = 'none';
+    liveResult.textContent = '';
+    livePreview.style.display = 'none';
+    livePreview.textContent = '';
+  }
+
+  function open(slug, datasetCode, label, contractStatus, enabled, hasPnuMapper) {
     close();
     const primary = document.getElementById('card-' + slug);
     if (!primary) return;
     const cards = [primary, ...document.querySelectorAll('[data-companion-of="' + slug + '"]')];
     moved = cards.map(node => {
-      const placeholder = document.createComment('dataset-modal-placeholder-' + slug);
+      const placeholder = document.createComment('dset-popup-placeholder-' + slug);
       node.parentNode.insertBefore(placeholder, node);
       return { node, placeholder };
     });
-    moved.forEach(({ node }) => { node.classList.remove('kras-hide'); body.appendChild(node); });
-    title.textContent = label || slug;
+    moved.forEach(({ node }) => { node.classList.remove('kras-hide'); structurePane.appendChild(node); });
+    title.textContent = (datasetCode || slug) + (label ? (' · ' + label) : '');
+    resetApprovePanel(slug, datasetCode, contractStatus, enabled, hasPnuMapper);
     backdrop.hidden = false;
   }
 
-  if (backdrop) {
-    document.getElementById('dataset-modal-close').addEventListener('click', close);
-    backdrop.addEventListener('click', e => { if (e.target === backdrop) close(); });
-    document.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
+  async function liveCollect() {
+    if (!current.slug) return;
+    const pnu = livePnu.value.trim();
+    liveCollectBtn.disabled = true;
+    livePromoteBtn.disabled = true;
+    liveResult.style.display = 'block';
+    liveResult.className = 'result-box';
+    liveResult.textContent = '수집 중...';
+    livePreview.style.display = 'none';
+    current.liveItemId = null;
+    try {
+      let url = '/kras-db/ingest/' + current.slug + '?pnu=' + encodeURIComponent(pnu);
+      const extra = collectExtraParamsJson();
+      if (extra) url += '&extraParamsJson=' + encodeURIComponent(extra);
+      const res = await krasRequest(url, { method: 'POST' });
+      const data = await res.json();
+      liveResult.textContent = krasResultMessage(data);
+      liveResult.classList.add(krasResultClass(data));
+      if (window.refreshKrasHistory) await window.refreshKrasHistory();
+      if (data.success && data.preview) {
+        livePreview.style.display = 'block';
+        livePreview.textContent = JSON.stringify(data.preview, null, 2);
+        approveSample.value = JSON.stringify(data.preview, null, 2);
+      }
+      if (data.success && data.promotable) {
+        current.liveItemId = data.itemId;
+        livePromoteBtn.disabled = false;
+        approveSubmitBtn.disabled = false;
+      }
+    } catch (err) {
+      liveResult.textContent = '요청 실패: ' + err;
+      liveResult.classList.add('err');
+    } finally {
+      liveCollectBtn.disabled = false;
+    }
   }
+
+  async function livePromote() {
+    if (!current.slug || !current.liveItemId) return;
+    liveCollectBtn.disabled = true;
+    livePromoteBtn.disabled = true;
+    liveResult.style.display = 'block';
+    liveResult.className = 'result-box';
+    liveResult.textContent = '승격 중...';
+    try {
+      const res = await krasRequest('/kras-db/promote/' + current.slug + '?itemId=' + current.liveItemId,
+          { method: 'POST' });
+      const data = await res.json();
+      liveResult.textContent = krasResultMessage(data);
+      liveResult.classList.add(krasResultClass(data));
+    } catch (err) {
+      liveResult.textContent = '요청 실패: ' + err;
+      liveResult.classList.add('err');
+    } finally {
+      liveCollectBtn.disabled = false;
+      livePromoteBtn.disabled = !current.liveItemId;
+    }
+  }
+
+  async function verifyCheck() {
+    if (!current.datasetCode) return;
+    approveCheckBtn.disabled = true;
+    approveResult.style.display = 'block';
+    approveResult.className = 'result-box';
+    approveResult.textContent = '확인 중...';
+    try {
+      const body = new URLSearchParams({ datasetCode: current.datasetCode, responseSample: approveSample.value });
+      const res = await fetch('/kras-db/verify-check', { method: 'POST', body });
+      const data = await res.json();
+      approveResult.textContent = data.message;
+      if (data.supported === false) {
+        // 자동 확인 미지원 — 사람이 직접 확인했다고 보고 승인 버튼을 바로 연다.
+        approveResult.classList.add('warn');
+        approveSubmitBtn.disabled = false;
+      } else if (data.valid) {
+        approveResult.classList.add('ok');
+        approveSubmitBtn.disabled = false;
+      } else {
+        approveResult.classList.add('err');
+        approveSubmitBtn.disabled = true;
+      }
+    } catch (err) {
+      approveResult.classList.add('err');
+      approveResult.textContent = '확인 요청 실패: ' + err;
+      approveSubmitBtn.disabled = true;
+    } finally {
+      approveCheckBtn.disabled = false;
+    }
+  }
+
+  function submitApprove() {
+    if (!current.datasetCode || approveSubmitBtn.disabled) return;
+    document.getElementById('dset-approve-form-code').value = current.datasetCode;
+    document.getElementById('dset-approve-form-sample').value = approveSample.value;
+    document.getElementById('dset-approve-form').submit();
+  }
+
+  function submitRevert() {
+    if (!current.datasetCode) return;
+    if (!confirm(current.datasetCode + ' 승인을 취소하시겠습니까? 미승인 · 비활성으로 되돌아갑니다.')) return;
+    document.getElementById('dset-revert-form-code').value = current.datasetCode;
+    document.getElementById('dset-revert-form').submit();
+  }
+
+  if (backdrop) {
+    document.getElementById('dset-modal-close').addEventListener('click', close);
+    backdrop.addEventListener('click', e => { if (e.target === backdrop) close(); });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape' && !backdrop.hidden) close(); });
+  }
+  return { open, close, verifyCheck, submitApprove, submitRevert, liveCollect, livePromote };
+})();
+
+function krasBool(v) { return v === 'true' || v === true; }
+
+function krasOpenDatasetPopup(slug, datasetCode, label, contractStatus, enabled, hasPnuMapper) {
+  krasDatasetPopup.open(slug, datasetCode, label, contractStatus, krasBool(enabled), krasBool(hasPnuMapper));
+}
+function krasCloseDatasetPopup() { krasDatasetPopup.close(); }
+function krasVerifyCheck() { krasDatasetPopup.verifyCheck(); }
+function krasSubmitApprove() { krasDatasetPopup.submitApprove(); }
+function krasSubmitRevert() { krasDatasetPopup.submitRevert(); }
+function krasLiveCollect() { krasDatasetPopup.liveCollect(); }
+function krasLivePromote() { krasDatasetPopup.livePromote(); }
+
+const krasHistoryPopup = (function() {
+  const backdrop = document.getElementById('hist-modal-backdrop');
+  if (!backdrop) return { open() {}, close() {} };
+  const title = document.getElementById('hist-modal-title');
+  const message = document.getElementById('hist-message');
+  const itemsBody = document.getElementById('hist-items');
+  const detail = document.getElementById('hist-detail');
+  const detailTitle = document.getElementById('hist-detail-title');
+  const reasonsBox = document.getElementById('hist-detail-reasons');
+  const comparisonBox = document.getElementById('hist-comparison');
+  const previewBox = document.getElementById('hist-preview');
+  const promoteBtn = document.getElementById('hist-promote');
+  const statusLabels = { SUCCESS: '완료', FAILED: '실패', PARTIAL: '일부 실패', WARNING: '확인 필요',
+    RUNNING: '실행 중', PLANNED: '검증 대기', COLLECTING: '수집 중', READY: '준비 완료', BLOCKED: '차단', INTERRUPTED: '중단' };
+  let current = { datasetCode: null, selected: null };
+
+  function cell(row, text) {
+    const td = document.createElement('td');
+    td.textContent = text == null ? '—' : String(text);
+    row.appendChild(td);
+    return td;
+  }
+
+  function resetDetail() {
+    current.selected = null;
+    detail.hidden = true;
+    promoteBtn.disabled = true;
+  }
+
+  async function selectItem(itemId) {
+    resetDetail();
+    detail.hidden = false;
+    reasonsBox.className = 'result-box';
+    reasonsBox.textContent = '확인하는 중...';
+    try {
+      const data = await (await krasRequest('/kras-db/items/' + encodeURIComponent(itemId))).json();
+      current.selected = data;
+      detailTitle.textContent = '수집 ID ' + data.item.item_id;
+      reasonsBox.textContent = data.reasons.length ? data.reasons.join('\n') : '수집 검증 완료. 내용을 확인한 뒤 반영하세요.';
+      reasonsBox.className = 'result-box ' + (data.promotable ? 'ok' : 'warn');
+      previewBox.textContent = JSON.stringify(data.preview, null, 2);
+      if (data.comparison && data.comparison.length) {
+        comparisonBox.hidden = false;
+        comparisonBox.textContent = '반영 전 비교(참고용 — 조회 실패가 반영을 막지 않습니다)\n' +
+          data.comparison.map(c => '- ' + c.businessTable + ' [' + c.pattern + '] stage ' + c.stageCount + '건 — ' + c.note).join('\n');
+      } else {
+        comparisonBox.hidden = true;
+      }
+      promoteBtn.disabled = !data.promotable;
+    } catch (err) {
+      reasonsBox.textContent = '요청 실패: ' + err;
+      reasonsBox.className = 'result-box err';
+    }
+  }
+
+  async function load() {
+    message.textContent = '이력을 불러오는 중입니다.';
+    message.className = 'result-box';
+    resetDetail();
+    try {
+      const data = await (await krasRequest('/kras-db/history?dataset=' + encodeURIComponent(current.datasetCode))).json();
+      itemsBody.replaceChildren();
+      data.items.forEach(item => {
+        const tr = document.createElement('tr');
+        cell(tr, item.item_id);
+        cell(tr, item.status === 'SUCCESS' ? '수집 검증 완료' : (statusLabels[item.status] || item.status));
+        cell(tr, item.rows_valid + ' / ' + item.rows_rejected);
+        cell(tr, item.window_start + ' ~ ' + item.window_end_exclusive + ' (종료일 미포함)' +
+          (item.started_at ? '\n' + item.started_at : ''));
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'btn btn-secondary';
+        button.textContent = '미리보기 / 이어하기';
+        button.addEventListener('click', () => selectItem(item.item_id));
+        cell(tr, '').appendChild(button);
+        itemsBody.appendChild(tr);
+      });
+      if (!data.items.length) {
+        const tr = document.createElement('tr');
+        cell(tr, '수집 이력이 없습니다.').colSpan = 5;
+        itemsBody.appendChild(tr);
+      }
+      message.textContent = '최신 ' + data.items.length + '건을 표시합니다.';
+    } catch (err) {
+      message.textContent = '요청 실패: ' + err;
+      message.className = 'result-box err';
+    }
+  }
+
+  function open(datasetCode, label) {
+    current = { datasetCode, selected: null };
+    title.textContent = (label || datasetCode) + ' · 수집 이력';
+    backdrop.hidden = false;
+    load();
+  }
+
+  function close() { backdrop.hidden = true; }
+
+  promoteBtn.addEventListener('click', async () => {
+    if (!current.selected || !current.selected.promotable) return;
+    const selection = current.selected;
+    if (!confirm('수집 ID ' + selection.item.item_id + '을 업무 테이블에 반영하시겠습니까? 이전 시점의 데이터일 수 있습니다.')) return;
+    promoteBtn.disabled = true;
+    try {
+      const data = await (await krasRequest(selection.promotePath + '?itemId=' + encodeURIComponent(selection.item.item_id),
+          { method: 'POST' })).json();
+      message.textContent = krasResultMessage(data);
+      message.className = 'result-box ' + krasResultClass(data);
+      await load();
+    } catch (err) {
+      message.textContent = '요청 실패: ' + err;
+      message.className = 'result-box err';
+    } finally {
+      promoteBtn.disabled = !current.selected || !current.selected.promotable;
+    }
+  });
+
+  document.getElementById('hist-modal-close').addEventListener('click', close);
+  backdrop.addEventListener('click', e => { if (e.target === backdrop) close(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && !backdrop.hidden) close(); });
+
   return { open, close };
 })();
 
-function krasOpenDatasetModal(slug, label) { krasDatasetModal.open(slug, label); }
-
-// API 테스트 팝업: /api-test를 임베드 모드로 열어 해당 API의 테스트 모달을 바로 띄운다.
-function krasApiTestPopup(apiId, label) {
-  const backdrop = document.getElementById('api-test-modal-backdrop');
-  const frame = document.getElementById('api-test-frame');
-  if (!backdrop || !frame) return;
-  document.getElementById('api-test-modal-title').textContent = 'API 테스트 · ' + label;
-  frame.src = '/api-test?embed=1&api=' + encodeURIComponent(apiId);
-  backdrop.hidden = false;
-}
-
-function krasCloseApiTestPopup() {
-  const backdrop = document.getElementById('api-test-modal-backdrop');
-  const frame = document.getElementById('api-test-frame');
-  if (backdrop) backdrop.hidden = true;
-  if (frame) frame.src = 'about:blank';
-}
-
+function krasOpenHistoryPopup(datasetCode, label) { krasHistoryPopup.open(datasetCode, label); }
 
 (function initDatasetNav() {
   const search = document.getElementById('dataset-nav-search');
