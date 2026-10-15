@@ -203,4 +203,4 @@ T0 = (가장 최근에 반영까지 끝난 land_basic_file 수집 건의 window_
 - 운영은 `--spring.config.location=conf/application.yml`만 읽는다. **서버 환경변수는 쓰지 않는다.**
 - 설정 화면 저장(`SettingsFileService.save`)은 `kras`·`ods`·`sync` 블록을 화면 항목으로 **통째로 교체**하고 나머지 최상위
   블록은 보존한다. 그래서 증분 설정은 `kras:` 안이 아니라 **최상위 `kras-incremental:`** 블록에 둔다(§2의 `kras.land-change.*`에서 변경).
-- 기동 시 한 번 읽으므로 변경 후 재시작한다. 운영 안내: `docs/database/2026-10-14/2026-10-14-kras-incremental-sync-rules.md` §3.
+- 이후 차세대 스케줄 화면이 생기면서 블록 이름이 `kras-nextgen`으로 바뀌고 재시작 없이 적용된다(`2026-10-14-kras-nextgen-schedule-menu-design.md`). 운영 안내: `docs/database/2026-10-14/2026-10-14-kras-incremental-sync-rules.md` §3.

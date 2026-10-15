@@ -32,6 +32,8 @@ public class KrasStagePromotionService {
      * 자식 stage 행은 매퍼가 "이 행이 몇 번째 부모 행에 속하는지"를 parent_record_no 컬럼에
      * 미리 적어둬야 한다(부모의 row_no와 1:1 대응 — KrasPnuIngestService가 매퍼 반환 순서 그대로
      * row_no를 매기므로, 매퍼가 부모를 순회하는 순서와 같은 카운터를 쓰면 자동으로 맞는다).
+     * sequenceColumn: 부모 안에서 1부터 매기는 순번 컬럼(예: relation_no). 자식 PK가 GENERATED ALWAYS
+     * 식별자면 null — 그 컬럼에 값을 넣으면 DB가 거부한다.
      */
     public record ChildSpec(String stageTable, String businessTable, String parentIdColumn,
                              String sequenceColumn, List<String> copyColumns) {}
@@ -230,16 +232,18 @@ public class KrasStagePromotionService {
                     "SELECT " + childColList + " FROM " + child.stageTable()
                             + " WHERE item_id=? AND parent_record_no=? ORDER BY row_no",
                     itemId, parentRowNo);
+            // sequenceColumn이 null이면 자식 PK가 GENERATED ALWAYS 식별자 — 값을 넣지 않고 DB가 매긴다.
+            boolean numbered = child.sequenceColumn() != null;
             int seq = 1;
             for (Map<String, Object> childRow : childRows) {
                 List<Object> childValues = new ArrayList<>();
                 childValues.add(parentId);
-                childValues.add(seq++);
+                if (numbered) childValues.add(seq++);
                 for (String c : child.copyColumns()) childValues.add(childRow.get(c));
                 childValues.add(itemId);
                 tx.update("INSERT INTO " + child.businessTable() + "(" + child.parentIdColumn() + ","
-                                + child.sequenceColumn() + "," + childColList + ",source_item_id) VALUES ("
-                                + placeholders(childValues.size()) + ")",
+                                + (numbered ? child.sequenceColumn() + "," : "") + childColList
+                                + ",source_item_id) VALUES (" + placeholders(childValues.size()) + ")",
                         childValues.toArray());
             }
         }

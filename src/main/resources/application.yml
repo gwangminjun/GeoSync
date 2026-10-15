@@ -33,18 +33,28 @@ kras:
     jiga-txt: false
     land-txt: false
 
-# 토지 증분 동기화 (토지이동 변동내역 §10 일일 + 토지기본정보 TXT 월 보정).
+# 차세대 연계(kras 스키마) 설정 — 차세대 스케줄 화면(/kras-schedule)이 이 블록을 직접 저장하고 재시작 없이 적용한다.
 # kras 블록 밖에 둔다 — 설정 화면에서 저장하면 kras 블록이 통째로 화면 항목으로 교체되기 때문이다.
-# 서비스 ID·요청 필드명은 배포 시 확인해 conf/application.yml에 채운다. 변경 후 재시작해야 적용된다.
-kras-incremental:
+kras-nextgen:
   land-change:
-    service-id: ""          # land_change 서비스 ID. kras.sync_dataset.service_code와 같은 값. 비우면 호출 안 함
+    service-id: ""          # 토지이동내역 서비스 ID. kras.sync_dataset.service_code와 같은 값. 비우면 호출 안 함
     start-param: ""         # 처리일자(시작일) 요청 필드명
     end-param: ""           # 처리일자(종료일) 요청 필드명
     date-format: "yyyyMMdd"
-    schedule: ""            # 일일 증분 cron, 비우면 꺼짐. 제안: "0 0 6 * * *"
-  land-basic:
-    correction-schedule: "" # 월 보정 cron, 비우면 꺼짐. 제안: "0 0 2 1 * *"
+  schedules:                # cron, 비우면 꺼짐 (묶음 2개 — 설계 2026-10-15 §8)
+    full-load: ""           # 전체 적재: 토지기본정보 TXT → 연속지적·용도지역 SHP(→ public 자동 승격) → 공시지가 TXT → PNU 전체 대기열 등록. 제안 "0 0 1 1 * *"
+    correction: ""          # 보정 적재: 토지이동내역 → 바뀐 필지·순환 재조회 대기열 등록 → 대기열 처리. 제안 "0 0 1 * * *"
+  pnu:                      # PNU 단위 API 대기열 (kras.pnu_work)
+    datasets: []            # 비우면 기본(19종 중 호 목록·집합 전유부 제외)
+    parallelism: 8          # 동시 호출 수
+    daily-call-limit: 0     # 하루 호출 한도, 0=무제한
+    call-interval-ms: 0     # 스레드별 호출 간격
+    stop-at: "07:00"        # 대기열 처리 종료 시각, 비우면 끝까지
+    circuit-break: 20       # 수집 연속 실패 시 그날 실행 중단
+    refresh-days: 90        # 재조회 주기(일) — 순환 재조회·전체 적재 제외 기준
+    rotate-limit: 40000     # 하루 순환 재조회 건수
+    price-refresh-after: "06-01"  # 가격(KOREPS) 연 1회 갱신 기준일
+    no-data-codes: []       # "자료 없음" 응답 코드(실응답 확인 후) — 완료(0건)로 처리
 
 koreps:
   url: "http://10.188.226.221:8385/conn/estateGateway"

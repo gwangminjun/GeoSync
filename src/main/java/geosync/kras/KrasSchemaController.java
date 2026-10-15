@@ -3,8 +3,6 @@ package geosync.kras;
 import geosync.common.xml.XmlUtil;
 import geosync.database.TargetDbService;
 import geosync.settings.RuntimeSettingsService;
-import geosync.synchronization.TableMapper;
-import geosync.synchronization.model.SyncTableDef;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -17,7 +15,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
-import java.nio.file.Path;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -46,7 +43,6 @@ public class KrasSchemaController {
     private static final Logger log = LoggerFactory.getLogger(KrasSchemaController.class);
 
     private static final String LAYER_CODE = "LP_PA_CBND";
-    private static final String CADASTRAL_TGT_TABLE = "ods.lp_pa_cbnd";
 
     /**
      * URL/템플릿에 쓰는 slug(하이픈) → dataset_code(언더스코어) → 모델 속성 접두어(camelCase).
@@ -355,12 +351,11 @@ public class KrasSchemaController {
     private final TargetDbService targetDbService;
     private final RuntimeSettingsService settings;
     private final KrasApiClient krasApiClient;
-    private final KrasWorkspaceScanner workspaceScanner;
-    private final TableMapper tableMapper;
     private final KrasCadastralIngestService cadastralIngestService;
     private final KrasPnuIngestService pnuIngestService;
     private final KrasDateRangeIngestService dateRangeIngestService;
-    private final KrasIncrementalSyncService incrementalSync;
+    private final KrasNextgenScheduler nextgenScheduler;
+    private final KrasFullLoadService fullLoadService;
     private final KrasUsezoneIngestService usezoneIngestService;
     private final KrasTxtIngestService txtIngestService;
     private final Map<String, String> slugToDatasetCode;
@@ -384,8 +379,7 @@ public class KrasSchemaController {
     private volatile String lastLandPriceFileResult;
 
     public KrasSchemaController(TargetDbService targetDbService, RuntimeSettingsService settings,
-                                 KrasApiClient krasApiClient, KrasWorkspaceScanner workspaceScanner,
-                                 TableMapper tableMapper, KrasCadastralIngestService cadastralIngestService,
+                                 KrasApiClient krasApiClient, KrasCadastralIngestService cadastralIngestService,
                                  KrasPnuIngestService pnuIngestService, List<KrasXmlServiceMapper> mappers,
                                  KrasDateRangeIngestService dateRangeIngestService,
                                  List<KrasDateRangeServiceMapper> dateRangeMappers,
@@ -393,16 +387,15 @@ public class KrasSchemaController {
                                  KrasTxtIngestService txtIngestService,
                                  KrasOperationLogService operationLog, KrasHistoryService historyService,
                                  KrasVerificationEvidenceService verificationEvidenceService,
-                                 KrasIncrementalSyncService incrementalSync) {
-        this.incrementalSync = incrementalSync;
+                                 KrasNextgenScheduler nextgenScheduler, KrasFullLoadService fullLoadService) {
+        this.nextgenScheduler = nextgenScheduler;
+        this.fullLoadService = fullLoadService;
         this.operationLog = operationLog;
         this.historyService = historyService;
         this.verificationEvidenceService = verificationEvidenceService;
         this.targetDbService = targetDbService;
         this.settings = settings;
         this.krasApiClient = krasApiClient;
-        this.workspaceScanner = workspaceScanner;
-        this.tableMapper = tableMapper;
         this.cadastralIngestService = cadastralIngestService;
         this.pnuIngestService = pnuIngestService;
         this.dateRangeIngestService = dateRangeIngestService;
@@ -472,7 +465,7 @@ public class KrasSchemaController {
                 .map(SpecItem::datasetCode).filter(java.util.Objects::nonNull).distinct().toList();
         List<Map<String, Object>> specRows = toSpecItemRows(batchDatasetStatus(jdbc, specCodes));
         withRunInfo(specRows, lastSyncByDataset(jdbc, specCodes), mappersByDatasetCode.keySet());
-        withIncrementalSchedule(specRows, incrementalSync.scheduleDisplay());
+        withIncrementalSchedule(specRows, nextgenScheduler.scheduleDisplay());
         Map<String, Map<String, Object>> pendingByCode = historyService.pendingPromotion(jdbc, settings.orgCode(),
                 specCodes.stream().filter(mappersByDatasetCode::containsKey).toList());
         for (Map<String, Object> row : specRows) {
@@ -688,14 +681,8 @@ public class KrasSchemaController {
                 return Map.of("error", "이미 실행 중입니다.");
             }
             try {
-                SyncTableDef def = findCadastralDef();
-                Path workDir = Path.of(settings.krasWorkDir(), orgCd);
-                String baseName = krasApiClient.downloadLayer(def.srcTableName, workDir);
-                Path shpPath = workDir.resolve(baseName + ".shp");
-                List<Map<String, Object>> rows = workspaceScanner.loadShpFile(shpPath, def);
-
                 KrasCadastralIngestService.IngestResult result =
-                        cadastralIngestService.ingest(targetJdbc, orgCd, LAYER_CODE, rows, "UI");
+                        fullLoadService.ingestCadastral(targetJdbc, orgCd, "UI", "MANUAL");
 
                 String msg = "수집 성공: item_id=%d, %d건 적재(도형 없음 %d건 제외)"
                         .formatted(result.itemId(), result.rowCount(), result.skippedCount());
@@ -1262,14 +1249,6 @@ public class KrasSchemaController {
         out.put("lastVerifiedBy", evidence != null ? evidence.get("verified_by") : null);
         out.put("hasPnuMapper", mappersByDatasetCode.containsKey(datasetCode));
         return out;
-    }
-
-    private SyncTableDef findCadastralDef() {
-        return tableMapper.load(settings.krasConfig()).stream()
-                .filter(d -> CADASTRAL_TGT_TABLE.equals(d.tgtTableName))
-                .findFirst()
-                .orElseThrow(() -> new IllegalStateException(
-                        "base-tables.xml에 " + CADASTRAL_TGT_TABLE + " 정의가 없습니다."));
     }
 
     @FunctionalInterface

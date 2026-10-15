@@ -87,6 +87,9 @@
       <a th:href="@{/kras-db}"
          th:style="${currentPage == 'kras-db'} ? 'padding:8px 14px;border-radius:8px;font-weight:600;color:#66c4be;background:rgba(14,155,148,0.16);' : 'padding:8px 14px;border-radius:8px;font-weight:500;color:#8a919c;'">
         KRAS 연계 관리</a>
+      <a th:href="@{/kras-schedule}"
+         th:style="${currentPage == 'kras-schedule'} ? 'padding:8px 14px;border-radius:8px;font-weight:600;color:#66c4be;background:rgba(14,155,148,0.16);' : 'padding:8px 14px;border-radius:8px;font-weight:500;color:#8a919c;'">
+        차세대 스케줄</a>
       <!-- KRAS 통계 화면은 kras-db 팝업(상세 보기)에 흡수돼 메뉴에서 뺐다. 페이지·컨트롤러는 그대로 남아있다.
       <a th:href="@{/kras-stats}"
          th:style="${currentPage == 'kras-stats'} ? 'padding:8px 14px;border-radius:8px;font-weight:600;color:#66c4be;background:rgba(14,155,148,0.16);' : 'padding:8px 14px;border-radius:8px;font-weight:500;color:#8a919c;'">

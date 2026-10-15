@@ -73,7 +73,7 @@ public class KrasSpecMapperConfig {
                 List.of(StagePromotionSpec.scopeReplaceWithChildren("kras.stage_land_use_plan",
                         "kras.land_use_plan", "pnu", "plan_id", planCols,
                         List.of(new ChildSpec("kras.stage_land_use_restriction", "kras.land_use_restriction",
-                                "plan_id", "restriction_id", restrictionCols)))),
+                                "plan_id", null, restrictionCols)))),
                 false);
     }
 
@@ -170,18 +170,19 @@ public class KrasSpecMapperConfig {
             sections.add(Section.repeated("kras.stage_building_title_change", "CHG_RSN_NM", changeCols,
                     List.of("chg_ymd"), NONE));
             children.add(new ChildSpec("kras.stage_building_floor", "kras.building_floor",
-                    "title_id", "floor_id", floorCols));
+                    "title_id", null, floorCols));
             children.add(new ChildSpec("kras.stage_building_title_owner", "kras.building_title_owner",
-                    "title_id", "owner_id", ownerCols));
+                    "title_id", null, ownerCols));
             children.add(new ChildSpec("kras.stage_building_title_change", "kras.building_title_change",
-                    "title_id", "change_id", changeCols));
+                    "title_id", null, changeCols));
         }
 
         return new KrasSpecMapper(datasetCode, connSvcId, "KRAS", sections,
                 List.of(StagePromotionSpec.parentLookupIdentityMatchUpsert("kras.stage_building_title",
                         "kras.building_title", "title_id", List.of("bldg_gbn_no", "source_service"), titleCopyCols,
+                        // 한 필지에 건물이 여러 동이라 PNU만으로는 부모가 하나로 정해지지 않는다 — 요청한 건물번호로 찾는다.
                         new ParentLookup("kras.building_register", "register_id",
-                                List.of("pnu"), List.of("_pnu"), "register_id"),
+                                List.of("pnu", "bldg_gbn_no"), List.of("_pnu", "bldg_gbn_no"), "register_id"),
                         children)),
                 true);
     }
@@ -212,14 +213,14 @@ public class KrasSpecMapperConfig {
                 List.of(StagePromotionSpec.parentLookupIdentityMatchUpsert("kras.stage_building_exclusive",
                         "kras.building_exclusive", "exclusive_id", List.of("bldg_gbn_no"), exclusiveCols,
                         new ParentLookup("kras.building_unit", "building_unit_id",
-                                List.of("pnu"), List.of("_pnu"), "building_unit_id"),
+                                List.of("pnu", "bldg_gbn_no"), List.of("_pnu", "bldg_gbn_no"), "building_unit_id"),
                         List.of(
                             new ChildSpec("kras.stage_building_exclusive_area", "kras.building_exclusive_area",
-                                    "exclusive_id", "area_id", areaCols),
+                                    "exclusive_id", null, areaCols),
                             new ChildSpec("kras.stage_building_exclusive_owner", "kras.building_exclusive_owner",
-                                    "exclusive_id", "owner_id", ownerCols),
+                                    "exclusive_id", null, ownerCols),
                             new ChildSpec("kras.stage_building_exclusive_price", "kras.building_exclusive_price",
-                                    "exclusive_id", "price_id", priceCols)))),
+                                    "exclusive_id", null, priceCols)))),
                 true);
     }
 

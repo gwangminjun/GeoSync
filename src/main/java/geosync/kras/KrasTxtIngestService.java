@@ -220,6 +220,12 @@ public class KrasTxtIngestService {
      * land_info 데이터셋 소유라 이 파일에서 채우지 않는다).
      */
     public IngestResult ingestLandPrice(JdbcTemplate targetJdbc, String orgCd, String triggeredBy) throws Exception {
+        return ingestLandPrice(targetJdbc, orgCd, triggeredBy, "MANUAL");
+    }
+
+    /** @param jobKind kras.sync_run.job_kind — 화면 MANUAL, 차세대 스케줄 DAILY/MONTHLY. */
+    public IngestResult ingestLandPrice(JdbcTemplate targetJdbc, String orgCd, String triggeredBy, String jobKind)
+            throws Exception {
         byte[] data = krasApiClient.downloadJigaTxt();
         List<String[]> rows = parseTxt(data, 5);
         if (rows.isEmpty()) {
@@ -227,12 +233,12 @@ public class KrasTxtIngestService {
         }
         return targetJdbc.execute((ConnectionCallback<IngestResult>) conn ->
                 inTransaction(conn, LAND_PRICE_DATASET,
-                        tx -> ingestLandPriceInTransaction(tx, orgCd, rows, triggeredBy)));
+                        tx -> ingestLandPriceInTransaction(tx, orgCd, rows, triggeredBy, jobKind)));
     }
 
     private IngestResult ingestLandPriceInTransaction(JdbcTemplate tx, String orgCd, List<String[]> rows,
-                                                       String triggeredBy) {
-        long[] ids = createRunAndItem(tx, orgCd, LAND_PRICE_DATASET, triggeredBy, "MANUAL");
+                                                       String triggeredBy, String jobKind) {
+        long[] ids = createRunAndItem(tx, orgCd, LAND_PRICE_DATASET, triggeredBy, jobKind);
         long runId = ids[0];
         long itemId = ids[1];
 

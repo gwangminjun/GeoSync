@@ -84,38 +84,33 @@
 ### R8. 기록
 - 수집·반영 한 번마다 `kras.ui_operation_log`에 남긴다. 화면 실행과 같은 표이고, 요청 요약은 `SCHEDULE …`이다.
 - 실행 묶음은 `kras.sync_run.job_kind`로 구분한다: 일일 `DAILY`, 월 보정 `MONTHLY`, 화면 `MANUAL`.
-- 현황판(`/kras-db`)에는 스케줄이 켜진 행에 "일일 증분 · cron"/"월 보정 · cron"과 다음 실행 시각이 표시된다.
+- 현황판(`/kras-db`)에는 스케줄이 켜진 행에 "작업 이름 · cron"과 다음 실행 시각이 표시된다. 차세대 스케줄 화면에서 지금 실행·최근 실행 기록을 본다.
   실패 사유와 반영 대기 건도 기존 화면에 그대로 보인다.
 
 ## 3. 배포 설정
 
-운영 서버의 `conf/application.yml`(실행 시 이 파일만 읽음)에 **최상위 블록 `kras-incremental:`**으로 넣는다.
-`kras:` 안에 넣지 않는다 — 설정 화면에서 저장하면 `kras:` 블록이 통째로 화면 항목으로 교체돼 지워진다.
-`kras-incremental:`처럼 다른 최상위 블록은 저장해도 그대로 남는다(`SettingsFileServiceIncrementalKeysTest`로 확인).
-서버 환경변수는 쓰지 않는다.
+**차세대 스케줄 화면(`/kras-schedule`)에서 설정한다.** 저장하면 재시작 없이 바로 적용된다.
+화면은 운영 서버 `conf/application.yml`의 최상위 `kras-nextgen:` 블록만 바꾼다(다른 블록은 보존). 서버 환경변수는 쓰지 않는다.
 
 ```yaml
-kras-incremental:
+kras-nextgen:
   land-change:
-    service-id: "KRAS0000xx"        # land_change 서비스 ID — kras.sync_dataset.service_code와 같은 값
+    service-id: "KRAS0000xx"        # 토지이동내역 서비스 ID — kras.sync_dataset.service_code와 같은 값
     start-param: "필드명"            # 처리일자(시작일) 요청 필드명
     end-param: "필드명"              # 처리일자(종료일) 요청 필드명
-    date-format: "yyyyMMdd"         # 요청 날짜 형식
-    schedule: "0 0 6 * * *"         # 일일 증분 cron (비우면 꺼짐)
-  land-basic:
-    correction-schedule: "0 0 2 1 * *"   # 월 보정 cron (비우면 꺼짐)
+    date-format: "yyyyMMdd"
+  schedules:                        # cron, 비우면 꺼짐
+    land-change-daily: "0 0 6 * * *"
+    land-basic-correction: "0 0 3 1 * *"
+    cadastral-full: ""              # 연속지적 전체 → public 자동 승격
+    usezone-full: ""                # 용도지역 전체 → public 자동 승격
+    land-price-full: ""
 ```
 
-| 키 | 비우면 |
-|---|---|
-| `land-change.service-id` | 호출하지 않음(R1에서 "미확정"으로 막힘) |
-| `land-change.start-param` / `end-param` | 일일 증분이 실행되지 않음(화면 수동 수집은 추가 파라미터로 가능) |
-| `land-change.date-format` | `yyyyMMdd` |
-| `land-change.schedule` / `land-basic.correction-schedule` | 스케줄 꺼짐(현황판은 "수동") |
-
-- 이 설정은 **기동할 때 한 번 읽는다.** 바꾸면 서비스를 재시작한다(설정 화면에는 나오지 않는다).
-- 참고로 설정 화면 항목(KRAS url·스케줄, 기관코드 등)은 저장 즉시 적용되지만, `conf/application.yml`을 직접 고친 경우
-  스케줄은 재시작해야 다시 등록된다.
+- `kras:` 안에 두지 않는다 — 기존 설정 화면에서 저장하면 `kras:` 블록이 통째로 교체된다. `kras-nextgen:`은 보존된다.
+- 파일을 직접 고쳤다면 화면의 [설정 파일 다시 읽기]로 반영한다(서비스·필드명은 다음 호출부터 자동 반영).
+- 연속지적·용도지역 전체 적재를 켜면 public GeoServer 테이블을 자동 교체한다. 전환 기간에는 기존 KRAS 스케줄을 끈다
+  (둘 다 켜져 있으면 화면이 경고한다).
 - 배포 DB에는 마이그레이션 2개(적재 현황 문서 §3.4)를 먼저 적용한다.
 
 ## 4. 배포 시 확인할 것

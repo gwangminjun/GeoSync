@@ -45,6 +45,12 @@ public class KrasCadastralIngestService {
      */
     public IngestResult ingest(JdbcTemplate targetJdbc, String orgCd, String layerCode,
                                 List<Map<String, Object>> rows, String triggeredBy) {
+        return ingest(targetJdbc, orgCd, layerCode, rows, triggeredBy, "MANUAL");
+    }
+
+    /** @param jobKind kras.sync_run.job_kind — 화면 MANUAL, 차세대 스케줄 DAILY/MONTHLY. */
+    public IngestResult ingest(JdbcTemplate targetJdbc, String orgCd, String layerCode,
+                                List<Map<String, Object>> rows, String triggeredBy, String jobKind) {
         if (rows.isEmpty()) {
             throw new IllegalStateException("SHP에서 읽은 행이 0건입니다 — 적재를 중단합니다.");
         }
@@ -53,7 +59,7 @@ public class KrasCadastralIngestService {
             conn.setAutoCommit(false);
             try {
                 JdbcTemplate tx = new JdbcTemplate(new SingleConnectionDataSource(conn, true));
-                IngestResult result = ingestInTransaction(tx, orgCd, layerCode, rows, triggeredBy);
+                IngestResult result = ingestInTransaction(tx, orgCd, layerCode, rows, triggeredBy, jobKind);
                 conn.commit();
                 log.info("[KrasCadastralIngest] 적재 완료 runId={} itemId={} rows={} skipped={}",
                         result.runId(), result.itemId(), result.rowCount(), result.skippedCount());
@@ -69,7 +75,8 @@ public class KrasCadastralIngestService {
     }
 
     private IngestResult ingestInTransaction(JdbcTemplate tx, String orgCd, String layerCode,
-                                              List<Map<String, Object>> rows, String triggeredBy) {
+                                              List<Map<String, Object>> rows, String triggeredBy,
+                                              String jobKind) {
         // 1. spatial_layer 존재 확인/등록
         tx.update("""
             INSERT INTO kras.spatial_layer(layer_code, dataset_code, source_epsg, target_epsg)
@@ -82,9 +89,9 @@ public class KrasCadastralIngestService {
         LocalDate tomorrow = today.plusDays(1);
         Long runId = tx.queryForObject("""
             INSERT INTO kras.sync_run(org_cd, job_kind, triggered_by, period_start, period_end_exclusive)
-            VALUES (?, 'MANUAL', ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?)
             RETURNING run_id
-            """, Long.class, orgCd, triggeredBy, today, tomorrow);
+            """, Long.class, orgCd, jobKind, triggeredBy, today, tomorrow);
 
         // 3. sync_item (기본 status='PLANNED' — guard_item_transition이 INSERT 시 SUCCESS 직접 지정을 막음)
         Long itemId = tx.queryForObject("""

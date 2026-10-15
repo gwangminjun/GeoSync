@@ -75,6 +75,12 @@ public class KrasUsezoneIngestService {
     // ── 0. 카탈로그 수집 ──────────────────────────────────────────────
 
     public CatalogResult collectCatalog(JdbcTemplate targetJdbc, String orgCd, String triggeredBy) throws Exception {
+        return collectCatalog(targetJdbc, orgCd, triggeredBy, "MANUAL");
+    }
+
+    /** @param jobKind kras.sync_run.job_kind — 화면 MANUAL, 차세대 스케줄 DAILY/MONTHLY. */
+    public CatalogResult collectCatalog(JdbcTemplate targetJdbc, String orgCd, String triggeredBy, String jobKind)
+            throws Exception {
         JsonNode res = krasApiClient.layerList();
         List<String> layerCodes = new ArrayList<>();
         for (JsonNode layer : res.path("layers")) {
@@ -89,7 +95,7 @@ public class KrasUsezoneIngestService {
             conn.setAutoCommit(false);
             try {
                 JdbcTemplate tx = new JdbcTemplate(new SingleConnectionDataSource(conn, true));
-                CatalogResult result = collectCatalogInTransaction(tx, orgCd, layerCodes, triggeredBy);
+                CatalogResult result = collectCatalogInTransaction(tx, orgCd, layerCodes, triggeredBy, jobKind);
                 conn.commit();
                 log.info("[KrasUsezoneIngest] 카탈로그 수집 완료 itemId={} layers={}",
                         result.itemId(), result.layerCodes().size());
@@ -105,14 +111,14 @@ public class KrasUsezoneIngestService {
     }
 
     private CatalogResult collectCatalogInTransaction(JdbcTemplate tx, String orgCd, List<String> layerCodes,
-                                                        String triggeredBy) {
+                                                        String triggeredBy, String jobKind) {
         LocalDate today = LocalDate.now();
         LocalDate tomorrow = today.plusDays(1);
         Long runId = tx.queryForObject("""
             INSERT INTO kras.sync_run(org_cd, job_kind, triggered_by, period_start, period_end_exclusive)
-            VALUES (?, 'MANUAL', ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?)
             RETURNING run_id
-            """, Long.class, orgCd, triggeredBy, today, tomorrow);
+            """, Long.class, orgCd, jobKind, triggeredBy, today, tomorrow);
 
         Long itemId = tx.queryForObject("""
             INSERT INTO kras.sync_item(run_id, org_cd, dataset_code, scope_key, window_start, window_end_exclusive)
@@ -143,6 +149,11 @@ public class KrasUsezoneIngestService {
 
     public SweepResult runLayerSweep(JdbcTemplate targetJdbc, String orgCd, long catalogItemId,
                                       String triggeredBy) throws Exception {
+        return runLayerSweep(targetJdbc, orgCd, catalogItemId, triggeredBy, "MANUAL");
+    }
+
+    public SweepResult runLayerSweep(JdbcTemplate targetJdbc, String orgCd, long catalogItemId,
+                                      String triggeredBy, String jobKind) throws Exception {
         List<String> expectedCodes = targetJdbc.query("""
             SELECT payload->>'layer_code' FROM kras.sync_record
             WHERE item_id=? AND payload->>'dataset_code'=?
@@ -188,7 +199,7 @@ public class KrasUsezoneIngestService {
                     throw new IllegalStateException("SHP에서 읽은 행이 0건입니다.");
                 }
                 deriveThemeFields(rows);
-                ingestLayer(targetJdbc, orgCd, releaseId, layerCode, fullName, rows, triggeredBy);
+                ingestLayer(targetJdbc, orgCd, releaseId, layerCode, fullName, rows, triggeredBy, jobKind);
                 results.add(new LayerResult(layerCode, true, rows.size() + "건 적재"));
             } catch (Exception e) {
                 log.error("[KrasUsezoneIngest] 레이어 {} 처리 실패: {}", layerCode, e.getMessage(), e);
@@ -224,6 +235,13 @@ public class KrasUsezoneIngestService {
                 }
                 if ("DRAFT".equals(status)) {
                     for (String layerCode : expectedCodes) {
+                        // spatial_release_expected가 spatial_layer를 FK로 참조한다 — 레이어 계약을 먼저 등록해야
+                        // 기대 목록을 넣을 수 있다(레이어 이름은 순회 때 SHP를 받으면서 채운다).
+                        tx.update("""
+                            INSERT INTO kras.spatial_layer(layer_code, dataset_code, source_epsg, target_epsg)
+                            VALUES (?, ?, ?, ?)
+                            ON CONFLICT (layer_code) DO NOTHING
+                            """, layerCode, LAYER_DATASET, SOURCE_EPSG, STORAGE_EPSG);
                         tx.update("""
                             INSERT INTO kras.spatial_release_expected(release_id, layer_code) VALUES (?, ?)
                             ON CONFLICT DO NOTHING
@@ -243,13 +261,14 @@ public class KrasUsezoneIngestService {
     }
 
     private void ingestLayer(JdbcTemplate targetJdbc, String orgCd, long releaseId, String layerCode,
-                              String layerName, List<Map<String, Object>> rows, String triggeredBy) {
+                              String layerName, List<Map<String, Object>> rows, String triggeredBy,
+                              String jobKind) {
         targetJdbc.execute((ConnectionCallback<Void>) conn -> {
             boolean autoCommit = conn.getAutoCommit();
             conn.setAutoCommit(false);
             try {
                 JdbcTemplate tx = new JdbcTemplate(new SingleConnectionDataSource(conn, true));
-                ingestLayerInTransaction(tx, orgCd, releaseId, layerCode, layerName, rows, triggeredBy);
+                ingestLayerInTransaction(tx, orgCd, releaseId, layerCode, layerName, rows, triggeredBy, jobKind);
                 conn.commit();
                 return null;
             } catch (Exception e) {
@@ -262,20 +281,21 @@ public class KrasUsezoneIngestService {
     }
 
     private void ingestLayerInTransaction(JdbcTemplate tx, String orgCd, long releaseId, String layerCode,
-                                           String layerName, List<Map<String, Object>> rows, String triggeredBy) {
+                                           String layerName, List<Map<String, Object>> rows, String triggeredBy,
+                                           String jobKind) {
         tx.update("""
             INSERT INTO kras.spatial_layer(layer_code, dataset_code, layer_name, source_epsg, target_epsg)
             VALUES (?, ?, ?, ?, ?)
-            ON CONFLICT (layer_code) DO NOTHING
+            ON CONFLICT (layer_code) DO UPDATE SET layer_name = COALESCE(kras.spatial_layer.layer_name, EXCLUDED.layer_name)
             """, layerCode, LAYER_DATASET, layerName, SOURCE_EPSG, STORAGE_EPSG);
 
         LocalDate today = LocalDate.now();
         LocalDate tomorrow = today.plusDays(1);
         Long runId = tx.queryForObject("""
             INSERT INTO kras.sync_run(org_cd, job_kind, triggered_by, period_start, period_end_exclusive)
-            VALUES (?, 'MANUAL', ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?)
             RETURNING run_id
-            """, Long.class, orgCd, triggeredBy, today, tomorrow);
+            """, Long.class, orgCd, jobKind, triggeredBy, today, tomorrow);
 
         Long itemId = tx.queryForObject("""
             INSERT INTO kras.sync_item(run_id, org_cd, dataset_code, scope_key, window_start, window_end_exclusive)

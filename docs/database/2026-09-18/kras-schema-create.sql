@@ -4008,6 +4008,7 @@ INSERT INTO kras.business_dataset VALUES
  ('land_movement_history','land_mov_hist'),('land_movement_relation','land_mov_hist'),
  ('land_ownership_history','own_rgt_hist'),('land_change_event','land_change'),
  ('parcel','land_change'),('land_basic','land_change'),
+ ('parcel','shr_ymb'),('parcel','own_rgt_hist'),('parcel','collective_building'),
  ('integrated_building','integrated_building'),('building_parcel','integrated_building'),('building_image','building_image'),
  ('building_register','bldg_dong_info'),('building_summary','bldg_ledg_gen_hds_info'),
  ('building_title','bldg_hds_info'),('building_title','cbldg_hds_info'),
@@ -4577,5 +4578,34 @@ CREATE OR REPLACE VIEW kras.api_current_response AS
 -- 운영 샘플/성능/보존기간은 SQL만으로 확정 불가. 신규 API 계약은 별도 등록·검증한다.
 -- 데이터 및 시퀀스는 보존. 자동 DELETE/CASCADE/운영 스키마 이동은 수행하지 않는다.
 -- 현재 SQL이 정본이다. 이전 문서의 테이블 수·게시 책임 설명은 이번 강화 이전 기준이다.
+
+-- 2026-10-15: PNU 단위 API 적재 대기열 (docs/database/2026-10-15/2026-10-15-kras-schema-migration-pnu-work.sql)
+CREATE TABLE kras.pnu_work (
+    org_cd          kras.org_code NOT NULL,
+    dataset_code    varchar(80)   NOT NULL REFERENCES kras.sync_dataset(dataset_code),
+    pnu             kras.pnu_code NOT NULL,
+    extra_key       varchar(64)   NOT NULL DEFAULT '',
+    extra_params    jsonb         NOT NULL DEFAULT '{}',
+    reason          varchar(10)   NOT NULL CHECK (reason IN ('CHANGE','CHILD','FULL','ANNUAL','ROTATE')),
+    priority        smallint      GENERATED ALWAYS AS (CASE reason WHEN 'CHANGE' THEN 0 WHEN 'CHILD' THEN 1
+                                  WHEN 'FULL' THEN 2 WHEN 'ANNUAL' THEN 3 ELSE 4 END) STORED,
+    status          varchar(10)   NOT NULL DEFAULT 'PENDING'
+                    CHECK (status IN ('PENDING','RETRY','DONE','FAILED','SKIPPED')),
+    attempt_count   integer       NOT NULL DEFAULT 0 CHECK (attempt_count >= 0),
+    next_attempt_at timestamptz   NOT NULL DEFAULT now(),
+    lease_until     timestamptz,
+    pending_item_id bigint REFERENCES kras.sync_item(item_id),
+    queued_at       timestamptz   NOT NULL DEFAULT now(),
+    last_success_at timestamptz,
+    last_item_id    bigint REFERENCES kras.sync_item(item_id),
+    last_error      text,
+    PRIMARY KEY (org_cd, dataset_code, pnu, extra_key),
+    CHECK (org_cd = substring(pnu FROM 1 FOR 5))
+);
+CREATE INDEX ix_pnu_work_due ON kras.pnu_work (org_cd, priority, queued_at)
+    WHERE status IN ('PENDING','RETRY');
+CREATE INDEX ix_pnu_work_fresh ON kras.pnu_work (org_cd, dataset_code, last_success_at);
+COMMENT ON TABLE kras.pnu_work IS 'PNU 단위 API 적재 대기열 + 최신성 기록. lease_until=처리 중 표시, pending_item_id=수집 후 반영 전.';
+COMMENT ON COLUMN kras.pnu_work.last_error IS '마스킹된 오류 요약만. 응답 원문(개인정보) 금지.';
 
 COMMIT;

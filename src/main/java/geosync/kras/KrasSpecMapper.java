@@ -127,7 +127,7 @@ public class KrasSpecMapper implements KrasXmlServiceMapper {
         Map<String, Object> row = new LinkedHashMap<>(section.constants());
         if (section.columns().contains("pnu")) row.put("pnu", pnu);
         for (String col : section.columns()) {
-            if ("pnu".equals(col)) continue;
+            if ("pnu".equals(col) || section.constants().containsKey(col)) continue;   // 고정값(request_key 등)은 응답으로 덮지 않는다
             put(row, col, textOf(xml, col.toUpperCase()), section, warnings);
         }
         return row;
@@ -137,7 +137,7 @@ public class KrasSpecMapper implements KrasXmlServiceMapper {
         Map<String, Object> row = new LinkedHashMap<>(section.constants());
         if (section.columns().contains("pnu")) row.put("pnu", pnu);
         for (String col : section.columns()) {
-            if ("pnu".equals(col)) continue;
+            if ("pnu".equals(col) || section.constants().containsKey(col)) continue;   // 고정값(request_key 등)은 응답으로 덮지 않는다
             put(row, col, textOf(unit, col.toUpperCase()), section, warnings);
         }
         return row;

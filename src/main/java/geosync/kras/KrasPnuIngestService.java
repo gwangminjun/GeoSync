@@ -60,6 +60,12 @@ public class KrasPnuIngestService {
      */
     public IngestResult ingest(JdbcTemplate targetJdbc, String orgCd, KrasXmlServiceMapper mapper,
                                 String pnu, Map<String, String> extraParams, String triggeredBy) {
+        return ingest(targetJdbc, orgCd, mapper, pnu, extraParams, triggeredBy, "MANUAL");
+    }
+
+    /** 대기열 처리기(KrasPnuQueueWorker)용 — sync_run.job_kind(DAILY/MONTHLY/MANUAL)를 지정한다. */
+    public IngestResult ingest(JdbcTemplate targetJdbc, String orgCd, KrasXmlServiceMapper mapper,
+                                String pnu, Map<String, String> extraParams, String triggeredBy, String jobKind) {
         if (!pnu.matches("\\d{19}")) {
             throw new IllegalArgumentException("PNU 형식 오류: 19자리 숫자여야 합니다");
         }
@@ -68,7 +74,7 @@ public class KrasPnuIngestService {
             conn.setAutoCommit(false);
             try {
                 JdbcTemplate tx = new JdbcTemplate(new SingleConnectionDataSource(conn, true));
-                IngestResult result = ingestInTransaction(tx, orgCd, mapper, pnu, extraParams, triggeredBy);
+                IngestResult result = ingestInTransaction(tx, orgCd, mapper, pnu, extraParams, triggeredBy, jobKind);
                 conn.commit();
                 log.info("[KrasPnuIngest] 수집 완료 dataset={} itemId={} promotable={} warnings={}",
                         mapper.datasetCode(), result.itemId(), result.promotable(), result.warnings());
@@ -84,21 +90,27 @@ public class KrasPnuIngestService {
     }
 
     private IngestResult ingestInTransaction(JdbcTemplate tx, String orgCd, KrasXmlServiceMapper mapper,
-                                              String pnu, Map<String, String> extraParams, String triggeredBy) {
+                                              String pnu, Map<String, String> extraParams, String triggeredBy,
+                                              String jobKind) {
         LocalDate today = LocalDate.now();
         LocalDate tomorrow = today.plusDays(1);
 
-        Long runId = findOrCreateTodayRun(tx, orgCd, triggeredBy, today, tomorrow);
+        Long runId = findOrCreateTodayRun(tx, orgCd, triggeredBy, jobKind, today, tomorrow);
 
         String scopeKey = tx.queryForObject(
                 "SELECT kras.entity_key(jsonb_build_object('pnu', ?::text) || ?::jsonb)",
                 String.class, pnu, writeJson(extraParams));
 
+        // 같은 날 같은 PNU를 다시 받으면(재시도·순환 재조회·수동 재수집) 같은 run 안에서 attempt_no만 늘린다 —
+        // UNIQUE(run_id, dataset_code, scope_key, window_start, window_end_exclusive, attempt_no).
         Long itemId = tx.queryForObject("""
-            INSERT INTO kras.sync_item(run_id, org_cd, dataset_code, scope_key, window_start, window_end_exclusive)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO kras.sync_item(run_id, org_cd, dataset_code, scope_key, window_start, window_end_exclusive,
+                                       attempt_no)
+            SELECT ?, ?, ?, ?, ?, ?, coalesce(max(attempt_no), 0) + 1 FROM kras.sync_item
+            WHERE run_id=? AND dataset_code=? AND scope_key=? AND window_start=? AND window_end_exclusive=?
             RETURNING item_id
-            """, Long.class, runId, orgCd, mapper.datasetCode(), scopeKey, today, tomorrow);
+            """, Long.class, runId, orgCd, mapper.datasetCode(), scopeKey, today, tomorrow,
+                runId, mapper.datasetCode(), scopeKey, today, tomorrow);
 
         Document doc;
         try {
@@ -108,7 +120,12 @@ public class KrasPnuIngestService {
                     : krasApiClient.query(mapper.connSvcId(), pnu, extra);
             doc = XmlUtil.parse(xml);
         } catch (Exception e) {
-            throw new IllegalStateException(mapper.connSvcId() + " 호출/파싱 실패: " + e.getMessage(), e);
+            throw new GatewayCallException(mapper.connSvcId() + " 호출/파싱 실패: " + e.getMessage(), e);
+        }
+        // 오류 응답(HEADER CODE≠0000)을 0건으로 받아 반영하면 범위 교체(B) 테이블의 기존 행이 지워진다 — 수집하지 않는다.
+        String code = headerCode(doc);
+        if (code != null && !"0000".equals(code)) {
+            throw new GatewayCodeException(mapper.connSvcId(), code);
         }
         KrasXmlServiceMapper.MappingResult mapped = mapper.map(doc, pnu, extraParams);
 
@@ -140,21 +157,46 @@ public class KrasPnuIngestService {
         return new IngestResult(runId, itemId, promotable, mapped.fieldWarnings(), preview);
     }
 
-    private Long findOrCreateTodayRun(JdbcTemplate tx, String orgCd, String triggeredBy,
+    private Long findOrCreateTodayRun(JdbcTemplate tx, String orgCd, String triggeredBy, String jobKind,
                                        LocalDate today, LocalDate tomorrow) {
         List<Long> existing = tx.query("""
             SELECT run_id FROM kras.sync_run
-            WHERE org_cd=? AND job_kind='MANUAL' AND period_start=? AND period_end_exclusive=?
+            WHERE org_cd=? AND job_kind=? AND period_start=? AND period_end_exclusive=?
             ORDER BY run_id DESC LIMIT 1
-            """, (rs, i) -> rs.getLong(1), orgCd, today, tomorrow);
+            """, (rs, i) -> rs.getLong(1), orgCd, jobKind, today, tomorrow);
         if (!existing.isEmpty()) {
             return existing.get(0);
         }
         return tx.queryForObject("""
             INSERT INTO kras.sync_run(org_cd, job_kind, triggered_by, period_start, period_end_exclusive)
-            VALUES (?, 'MANUAL', ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?)
             RETURNING run_id
-            """, Long.class, orgCd, triggeredBy, today, tomorrow);
+            """, Long.class, orgCd, jobKind, triggeredBy, today, tomorrow);
+    }
+
+    /** 응답 HEADER/CODE. HEADER가 없는 응답이면 null. */
+    static String headerCode(Document doc) {
+        org.w3c.dom.NodeList headers = doc.getElementsByTagName("HEADER");
+        if (headers.getLength() == 0) return null;
+        org.w3c.dom.NodeList codes = ((org.w3c.dom.Element) headers.item(0)).getElementsByTagName("CODE");
+        return codes.getLength() == 0 ? null : codes.item(0).getTextContent().trim();
+    }
+
+    /** 게이트웨이 호출(연결·타임아웃·응답 파싱) 실패 — 대기열은 재시도·연속 실패 차단 대상으로 본다. */
+    public static class GatewayCallException extends IllegalStateException {
+        GatewayCallException(String message, Throwable cause) {
+            super(message, cause);
+        }
+    }
+
+    /** 게이트웨이가 오류 코드로 응답함 — 대기열은 이 코드로 "자료 없음" 여부를 판단한다(pnu.no-data-codes). */
+    public static class GatewayCodeException extends IllegalStateException {
+        public final String code;
+
+        GatewayCodeException(String svc, String code) {
+            super(svc + " 게이트웨이 응답 코드 " + code);
+            this.code = code;
+        }
     }
 
     /**

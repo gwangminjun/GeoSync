@@ -1,6 +1,6 @@
 package geosync.kras;
 
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 import org.w3c.dom.Document;
@@ -12,6 +12,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Supplier;
 
 import static geosync.common.xml.XmlUtil.elementsOf;
 import static geosync.common.xml.XmlUtil.textOf;
@@ -31,7 +32,7 @@ import static geosync.kras.KrasStagePromotionService.StagePromotionSpec;
  * (payload_hash도 DB에서 sha256으로 계산 — Java에서 해시 재구현 안 함).
  *
  * 확인 안 된 것:
- * - conn_svc_id, 처리일자 요청 필드명·형식 — 배포 시 kras-incremental.land-change.* 설정으로 넣는다.
+ * - conn_svc_id, 처리일자 요청 필드명·형식 — 배포 시 차세대 스케줄 화면(kras-nextgen.land-change.*)에서 넣는다.
  * - before_pnu/after_pnu는 응답에 행정구역코드가 안 나와서 요청 시 쓴 org_cd를 그대로 붙여 조립했다 —
  *   실제로 항상 같은 기관인지는 실제 응답으로 확인 필요.
  * - kras.md §11(소유권변동내역)·§12(집합건물소유권변동내역)는 §10과 완전히 동일한 내용(필드명·샘플
@@ -40,20 +41,20 @@ import static geosync.kras.KrasStagePromotionService.StagePromotionSpec;
 @Component
 public class LandChangeMapper implements KrasDateRangeServiceMapper {
 
-    // 서비스 ID·요청 날짜 필드명은 배포 시에만 알 수 있어 설정으로 받는다(kras-incremental.land-change.*).
-    private final String serviceId;
-    private final String startParam;
-    private final String endParam;
-    private final DateTimeFormatter dateFormat;
+    // 서비스 ID·요청 날짜 필드명은 배포 시에만 알 수 있어 설정으로 받는다(kras-nextgen.land-change.*).
+    // 차세대 스케줄 화면에서 바꾸면 재시작 없이 다음 호출부터 반영되도록 매번 읽는다.
+    private final Supplier<KrasNextgenSettingsService.Settings> settings;
 
-    public LandChangeMapper(@Value("${kras-incremental.land-change.service-id:}") String serviceId,
-                            @Value("${kras-incremental.land-change.start-param:}") String startParam,
-                            @Value("${kras-incremental.land-change.end-param:}") String endParam,
-                            @Value("${kras-incremental.land-change.date-format:yyyyMMdd}") String dateFormat) {
-        this.serviceId = serviceId.trim();
-        this.startParam = startParam.trim();
-        this.endParam = endParam.trim();
-        this.dateFormat = DateTimeFormatter.ofPattern(dateFormat.isBlank() ? "yyyyMMdd" : dateFormat.trim());
+    @Autowired
+    public LandChangeMapper(KrasNextgenSettingsService settingsService) {
+        this.settings = settingsService::current;
+    }
+
+    /** 고정값 — 테스트용. */
+    LandChangeMapper(String serviceId, String startParam, String endParam, String dateFormat) {
+        KrasNextgenSettingsService.Settings fixed = new KrasNextgenSettingsService.Settings(
+                serviceId.trim(), startParam.trim(), endParam.trim(), dateFormat, Map.of());
+        this.settings = () -> fixed;
     }
 
     @Override
@@ -61,10 +62,11 @@ public class LandChangeMapper implements KrasDateRangeServiceMapper {
 
     @Override
     public String connSvcId() {
+        String serviceId = settings.get().serviceId();
         if (serviceId.isEmpty()) {
             throw new UnsupportedOperationException(
-                    "land_change의 conn_svc_id가 설정되지 않았습니다 — 배포 서버 conf/application.yml의 "
-                            + "kras-incremental.land-change.service-id와 kras.sync_dataset.service_code를 같은 값으로 채우세요.");
+                    "land_change의 conn_svc_id가 설정되지 않았습니다 — 차세대 스케줄 화면(또는 conf/application.yml의 "
+                            + "kras-nextgen.land-change.service-id)과 kras.sync_dataset.service_code를 같은 값으로 채우세요.");
         }
         return serviceId;
     }
@@ -72,8 +74,10 @@ public class LandChangeMapper implements KrasDateRangeServiceMapper {
     /** 요청 필드명이 설정돼 있지 않으면 비운다 — 수동 화면에서는 추가 파라미터로 직접 넣을 수 있다. */
     @Override
     public Map<String, String> dateParams(LocalDate startDate, LocalDate endDate) {
-        if (startParam.isEmpty() || endParam.isEmpty()) return Map.of();
-        return Map.of(startParam, dateFormat.format(startDate), endParam, dateFormat.format(endDate));
+        KrasNextgenSettingsService.Settings s = settings.get();
+        if (s.startParam().isEmpty() || s.endParam().isEmpty()) return Map.of();
+        DateTimeFormatter f = DateTimeFormatter.ofPattern(s.dateFormat().isBlank() ? "yyyyMMdd" : s.dateFormat().trim());
+        return Map.of(s.startParam(), f.format(startDate), s.endParam(), f.format(endDate));
     }
 
     @Override

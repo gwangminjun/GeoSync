@@ -38,9 +38,8 @@ class KrasLandChangeDbIntegrationTest {
     private final KrasTxtIngestService txt = new KrasTxtIngestService(api, promotion);
     private final KrasDateRangeIngestService range = new KrasDateRangeIngestService(api, promotion);
     private final LandChangeMapper mapper = new LandChangeMapper(SVC, "ST_YMD", "ED_YMD", "yyyyMMdd");
-    private final KrasIncrementalSyncService sync = new KrasIncrementalSyncService(null, null,
-            new KrasHistoryService(List.of(), List.of(mapper)), new KrasOperationLogService(),
-            range, txt, mapper, "", "");
+    private final KrasIncrementalSyncService sync = new KrasIncrementalSyncService(
+            new KrasHistoryService(List.of(), List.of(mapper)), new KrasOperationLogService(), range, txt, mapper);
     private final LocalDate today = LocalDate.now();
 
     @BeforeEach

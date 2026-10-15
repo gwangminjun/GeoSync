@@ -1426,6 +1426,12 @@ const krasHistoryPopup = (function() {
 
 function krasOpenHistoryPopup(datasetCode, label, focusItemId) { krasHistoryPopup.open(datasetCode, label, focusItemId); }
 
+// 차세대 스케줄 대기열의 실패 행에서 바로 연다: /kras-db?hist=<dataset_code>&item=<item_id>
+(function openHistoryFromQuery() {
+  const p = new URLSearchParams(location.search);
+  if (p.get('hist')) krasOpenHistoryPopup(p.get('hist'), null, p.get('item') ? Number(p.get('item')) : null);
+})();
+
 (function initDatasetNav() {
   const search = document.getElementById('dataset-nav-search');
   const statusFilter = document.getElementById('dataset-nav-status');

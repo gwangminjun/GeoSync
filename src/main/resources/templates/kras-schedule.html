@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}" lang="ko">
+
+<head>
+<title>차세대 스케줄</title>
+<th:block layout:fragment="head">
+<link rel="stylesheet" href="/css/kras-console.css">
+<style>
+  .sched-table{width:100%;border-collapse:collapse;font-size:13px;}
+  .sched-table th{text-align:left;color:#69707b;font-weight:600;font-size:12px;padding:8px 10px;border-bottom:1px solid #232a34;}
+  .sched-table td{padding:9px 10px;border-bottom:1px solid #1e242c;color:#c9ced6;vertical-align:top;}
+  .sched-scroll{overflow-x:auto;}
+  .sched-scroll table{min-width:760px;}
+  .group-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:12px;}
+  .head-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end;}
+  .head-actions .btn{font-size:13px;line-height:1.2;padding:8px 16px;border:1px solid transparent;}
+  .head-actions .btn-secondary{border-color:#2e3640;}
+  .dirty-note{color:#e0b963;font-size:12px;}
+  .dirty-note[hidden]{display:none;}
+  .group-sched{display:flex;gap:18px;align-items:flex-start;flex-wrap:wrap;margin-bottom:14px;font-size:12.5px;color:#69707b;}
+  .mode-group{display:inline-flex;border:1px solid #2e3640;border-radius:8px;overflow:hidden;}
+  .mode-btn{padding:5px 10px;background:#14171c;border:none;border-right:1px solid #2e3640;color:#69707b;font-size:12px;cursor:pointer;font-family:inherit;}
+  .mode-btn:last-child{border-right:none;}
+  .mode-btn.active{background:#0a2b29;color:#3dddd4;font-weight:700;}
+  .mode-inputs{margin-top:6px;display:flex;gap:6px;align-items:center;flex-wrap:wrap;}
+  .mode-inputs input,.mode-inputs select,.field input{background:#14171c;color:#c8cdd4;border:1px solid #2e3640;border-radius:6px;padding:5px 8px;font-family:inherit;font-size:12.5px;}
+  .field{display:flex;flex-direction:column;gap:4px;font-size:12px;color:#69707b;}
+  .field-row{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:10px;}
+  .cron-text{font-family:'JetBrains Mono',monospace;font-size:11.5px;color:#69707b;}
+  .gate-ok{color:#5fc98a;}
+  .gate-bad{color:#e0b963;}
+  .warn-banner{padding:12px 16px;border-radius:10px;background:#2a2117;border:1px solid #6b5227;color:#e0b963;font-size:13px;margin-bottom:16px;}
+  .ok-banner{padding:12px 16px;border-radius:10px;background:#0e3530;border:1px solid #1a4a44;color:#5fc98a;font-size:13px;margin-bottom:16px;}
+  .err-banner{padding:12px 16px;border-radius:10px;background:#2a1717;border:1px solid #4a2a2a;color:#e88a82;font-size:13px;margin-bottom:16px;}
+  .step-no{color:#69707b;font-family:'JetBrains Mono',monospace;margin-right:6px;}
+  .last-line{font-size:12.5px;color:#9aa2ad;overflow-wrap:anywhere;}
+  .help-btn{background:none;border:1px solid #2e3640;border-radius:999px;color:#7aafe8;font-size:11.5px;padding:2px 9px;cursor:pointer;font-family:inherit;margin-left:8px;vertical-align:middle;}
+  .help-btn:hover{border-color:#5fa8e8;}
+  .q-stats{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;}
+  .q-stat{background:#14171c;border:1px solid #232a34;border-radius:10px;padding:8px 12px;min-width:92px;}
+  .q-stat b{display:block;font-size:17px;color:#e7eaee;font-family:'JetBrains Mono',monospace;}
+  .q-stat span{font-size:11.5px;color:#69707b;}
+  .q-notice{font-size:12.5px;color:#c9ced6;margin:4px 0;}
+  .q-list summary{cursor:pointer;color:#c9ced6;font-size:13px;margin:10px 0 6px;}
+  .q-search{background:#14171c;color:#c8cdd4;border:1px solid #2e3640;border-radius:6px;padding:4px 8px;font-size:12px;font-family:inherit;}
+  .adv summary{cursor:pointer;color:#c9ced6;font-size:14px;font-weight:600;}
+  .help-body table{width:100%;border-collapse:collapse;font-size:13px;margin:8px 0 14px;}
+  .help-body th,.help-body td{text-align:left;padding:7px 10px;border-bottom:1px solid #232a34;color:#c9ced6;}
+  .help-body th{color:#69707b;font-size:12px;}
+  .help-body h4{font-size:13.5px;color:#e7eaee;margin:12px 0 6px;}
+  .help-body ul{margin:0 0 8px 18px;font-size:13px;color:#c9ced6;line-height:1.7;}
+  .help-body p{font-size:13px;color:#c9ced6;}
+  @media(max-width:640px){.card{padding:18px 16px;}}
+</style>
+</th:block>
+</head>
+<body>
+<main layout:fragment="content">
+
+  <div style="margin-bottom:20px;">
+    <h1 style="font-size:22px;font-weight:700;color:#e7eaee;">차세대 스케줄</h1>
+    <p style="margin-top:6px;font-size:13.5px;color:#69707b;">
+      차세대 연계(kras 스키마)의 <b>전체 적재</b>와 <b>보정 적재</b> 스케줄을 설정합니다. 저장하면 재시작 없이 바로 적용됩니다.
+      기존 연계의 스케줄은 <a href="/schedule" style="color:#7aafe8;">스케줄</a>·<a href="/settings" style="color:#7aafe8;">설정</a> 화면에서 관리합니다.
+    </p>
+  </div>
+
+  <div th:if="${success}" class="ok-banner" th:text="${success}"></div>
+  <div th:if="${error}" class="err-banner" th:text="${error}"></div>
+  <div th:if="${legacyConflict}" class="warn-banner" id="legacy-conflict">
+    ⚠ 기존 KRAS 동기화(KrasWorker)가 켜져 있습니다(<span th:text="${legacySchedule}"></span>).
+    전체 적재의 연속지적·용도지역 단계도 public.lp_pa_cbnd / lt_c_uzone을 교체하므로 두 곳이 같은 테이블을 씁니다.
+    차세대로 전환할 때 <a href="/settings" style="color:#f0c674;">설정</a>에서 기존 KRAS 스케줄을 비활성화하세요.
+  </div>
+  <div th:if="${runningJob}" class="warn-banner" id="running-banner">실행 중: <b th:text="${runningJob}"></b></div>
+
+  <form method="post" action="/kras-schedule" id="schedule-form">
+
+    <section class="card" th:each="g : ${groups}" th:attr="data-group=${g['id']}" aria-label="적재 묶음">
+      <div class="group-head">
+        <h2 class="card-title" style="margin:0;" th:text="${g['label']}">전체 적재</h2>
+        <div class="head-actions">
+          <span class="dirty-note" hidden>변경됨 — [적용]을 눌러야 반영됩니다</span>
+          <button type="submit" class="btn btn-primary apply-btn">적용</button>
+          <button type="button" class="btn btn-secondary run-now" th:attr="data-job=${g['id']},data-label=${g['label']}">지금 실행</button>
+        </div>
+      </div>
+      <div class="group-sched">
+        <div class="sched-editor">
+          <input type="hidden" th:name="'schedule_' + ${g['id']}" th:value="${g['cron']}" class="cron-value"
+                 th:attr="data-public=${g['replacesPublic']},data-initial=${g['cron']},data-label=${g['label']}">
+          <div class="mode-group">
+            <button type="button" class="mode-btn" data-mode="daily">매일</button>
+            <button type="button" class="mode-btn" data-mode="weekly">매주</button>
+            <button type="button" class="mode-btn" data-mode="monthly">매월</button>
+            <button type="button" class="mode-btn" data-mode="cron">cron</button>
+            <button type="button" class="mode-btn" data-mode="off">끔</button>
+          </div>
+          <div class="mode-inputs"></div>
+          <div class="cron-text cron-preview"></div>
+        </div>
+        <div>다음 실행<br><b style="color:#c9ced6;" class="next-run" th:text="${g['nextRun']}">—</b></div>
+        <label th:if="${g['id'] == 'correction'}" class="field">대기열 처리 종료 시각 (비우면 끝까지)
+          <input type="time" name="stopAt" th:value="${pnu.stopAt()}" th:attr="data-initial=${pnu.stopAt()}"></label>
+      </div>
+      <div class="sched-scroll">
+        <table class="sched-table">
+          <thead><tr><th>실행 내용</th><th>실행 조건</th><th>마지막 결과</th></tr></thead>
+          <tbody>
+            <tr th:each="st, i : ${g['steps']}" th:attr="data-step=${st['id']}">
+              <td><span class="step-no" th:text="${i.count} + '.'">1.</span><b style="color:#e7eaee;" th:text="${st['label']}"></b>
+                <div class="cron-text" th:text="${st['target']}"></div></td>
+              <td>
+                <span th:if="${#lists.isEmpty(st['blocked'])}" class="gate-ok">실행 가능</span>
+                <div th:each="b : ${st['blocked']}" class="gate-bad" th:text="'✕ ' + ${b}"></div>
+              </td>
+              <td class="last-line" th:text="${st['lastResult'] != null ? st['lastResult'] : '—'}"></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p th:if="${g['lastResult'] != null}" class="last-line" style="margin-top:10px;" th:text="'마지막 묶음 실행: ' + ${g['lastResult']}"></p>
+    </section>
+
+    <section class="card" aria-labelledby="queue-title" id="queue-panel">
+      <h2 id="queue-title" class="card-title" style="display:flex;align-items:center;flex-wrap:wrap;">
+        대기열 현황
+        <button type="button" class="help-btn" data-help="recovery">ⓘ 끊겼을 때 어떻게 되나</button>
+        <span style="margin-left:auto;font-size:12px;font-weight:400;color:#69707b;">갱신 <span id="q-updated">—</span>
+          <button type="button" class="help-btn" id="q-refresh">새로고침</button></span>
+      </h2>
+      <div id="q-error" class="err-banner" hidden></div>
+      <div class="q-stats" id="q-stats"></div>
+      <div id="q-progress" class="q-notice"></div>
+      <div id="q-notices"></div>
+      <div class="sched-scroll"><table class="sched-table" id="q-datasets">
+        <thead><tr><th>서비스</th><th>대기</th><th>재시도</th><th>실패</th><th>완료</th><th>마지막 성공</th></tr></thead>
+        <tbody></tbody></table></div>
+      <details class="q-list" data-kind="RETRY"><summary>재시도 대기 <span class="q-count"></span></summary>
+        <input class="q-search" placeholder="PNU·서비스 검색">
+        <div class="sched-scroll"><table class="sched-table"><thead><tr><th>PNU</th><th>서비스</th><th>재시도</th><th>다음 시도</th><th>사유</th></tr></thead><tbody></tbody></table></div>
+      </details>
+      <details class="q-list" data-kind="FAILED"><summary>실패 <span class="q-count"></span></summary>
+        <input class="q-search" placeholder="PNU·서비스 검색">
+        <button type="button" class="btn btn-secondary" id="retry-selected">선택 재시도</button>
+        <button type="button" class="btn btn-secondary" id="retry-all">전체 재시도</button>
+        <div class="sched-scroll"><table class="sched-table"><thead><tr><th></th><th>PNU</th><th>서비스</th><th>시도</th><th>마지막 시도</th><th>사유</th></tr></thead><tbody></tbody></table></div>
+      </details>
+      <details class="q-list" data-kind="RUNNING"><summary>처리 중 <span class="q-count"></span></summary>
+        <p class="cron-text" style="margin-bottom:6px;" th:text="${help['leaseMinutes']} + '분 넘게 끝나지 않은 행은 멈춤 의심으로 표시합니다.'"></p>
+        <div class="sched-scroll"><table class="sched-table"><thead><tr><th>PNU</th><th>서비스</th><th>시작</th><th>상태</th></tr></thead><tbody></tbody></table></div>
+      </details>
+    </section>
+
+    <section class="card adv">
+      <details id="advanced">
+        <summary>고급 — 서비스별 켜기/끄기, 대기열 설정, 단계 실행, 배포 설정</summary>
+
+        <h3 style="font-size:13.5px;color:#e7eaee;margin:16px 0 8px;">PNU 서비스</h3>
+        <p class="cron-text" style="margin-bottom:8px;">체크한 서비스만 대기열에 넣고 처리합니다. 실행 조건이 ✕인 서비스는 켜져 있어도 건너뜁니다(행은 그대로 남음).
+          호 목록·집합 전유부는 실응답 확인 전이라 기본으로 꺼져 있습니다.</p>
+        <div class="sched-scroll"><table class="sched-table" id="pnu-datasets">
+          <thead><tr><th>켜기</th><th>서비스</th><th>구분</th><th>실행 조건</th></tr></thead>
+          <tbody>
+            <tr th:each="d : ${pnuDatasets}">
+              <td><input type="checkbox" name="pnuDataset" th:value="${d['code']}" th:checked="${d['enabled']}"></td>
+              <td><b style="color:#e7eaee;" th:text="${d['label']}"></b> <span class="cron-text" th:text="${d['code']}"></span></td>
+              <td th:text="${d['child']} ? '건물번호 하위 조회' : '필지 단위'"></td>
+              <td><span th:if="${#lists.isEmpty(d['blocked'])}" class="gate-ok">실행 가능</span>
+                <div th:each="b : ${d['blocked']}" class="gate-bad" th:text="'✕ ' + ${b}"></div></td>
+            </tr>
+          </tbody>
+        </table></div>
+
+        <h3 style="font-size:13.5px;color:#e7eaee;margin:16px 0 8px;">대기열 설정</h3>
+        <div class="field-row">
+          <label class="field">동시 호출 수<input type="number" min="1" max="32" name="parallelism" th:value="${pnu.parallelism()}" style="width:80px"></label>
+          <label class="field">하루 호출 한도 (0=무제한)<input type="number" min="0" name="dailyCallLimit" th:value="${pnu.dailyCallLimit()}" style="width:110px"></label>
+          <label class="field">호출 간격(ms)<input type="number" min="0" name="callIntervalMs" th:value="${pnu.callIntervalMs()}" style="width:90px"></label>
+          <label class="field">연속 실패 차단(회)<input type="number" min="1" name="circuitBreak" th:value="${pnu.circuitBreak()}" style="width:80px"></label>
+        </div>
+        <div class="field-row">
+          <label class="field">재조회 주기(일)<input type="number" min="1" name="refreshDays" th:value="${pnu.refreshDays()}" style="width:80px"></label>
+          <label class="field">하루 순환 재조회 건수<input type="number" min="0" name="rotateLimit" th:value="${pnu.rotateLimit()}" style="width:100px"></label>
+          <label class="field">가격 갱신 기준일(MM-dd)<input name="priceRefreshAfter" th:value="${pnu.priceRefreshAfter()}" size="6"></label>
+          <label class="field">"자료 없음" 응답 코드 (쉼표 구분)<input name="noDataCodes" th:value="${#strings.listJoin(pnu.noDataCodes(), ',')}" size="16" placeholder="실응답 확인 후 입력"></label>
+        </div>
+
+        <h3 style="font-size:13.5px;color:#e7eaee;margin:16px 0 8px;">단계 하나만 실행</h3>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+          <th:block th:each="g : ${groups}"><th:block th:each="st : ${g['steps']}">
+            <button type="button" class="btn btn-secondary run-now" th:attr="data-job=${st['id']},data-label=${st['label']}" th:text="${st['label']}"></button>
+          </th:block></th:block>
+        </div>
+
+        <h3 style="font-size:13.5px;color:#e7eaee;margin:16px 0 8px;">토지이동내역 연계 정보 <span style="color:#69707b;font-weight:400;">(배포 시 확인값)</span></h3>
+        <div class="field-row">
+          <label class="field">서비스 ID<input name="serviceId" th:value="${settings.serviceId()}" placeholder="KRAS0000xx" size="14"></label>
+          <label class="field">처리일자 시작일 필드<input name="startParam" th:value="${settings.startParam()}" size="14"></label>
+          <label class="field">처리일자 종료일 필드<input name="endParam" th:value="${settings.endParam()}" size="14"></label>
+          <label class="field">날짜 형식<input name="dateFormat" th:value="${settings.dateFormat()}" size="10"></label>
+        </div>
+        <p style="font-size:12.5px;color:#69707b;margin-bottom:6px;">
+          DB에 등록된 서비스 ID: <b style="color:#c9ced6;" th:text="${dbServiceCode != null ? dbServiceCode : '(없음)'}">(없음)</b>
+          <span th:if="${dbServiceCode == null or dbServiceCode != settings.serviceId()}" class="gate-bad"> · 위 서비스 ID와 같아야 호출됩니다(kras.sync_dataset.service_code).</span>
+        </p>
+        <p style="font-size:12.5px;color:#69707b;">
+          기준선(T0): <b style="color:#c9ced6;" th:text="${baseline != null ? baseline : '없음 — 전체 적재의 토지기본정보 TXT를 한 번 실행하면 생깁니다'}">없음</b>
+        </p>
+      </details>
+    </section>
+
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:24px;">
+      <button type="submit" class="btn btn-primary">저장 (즉시 적용)</button>
+      <button type="submit" class="btn btn-secondary" formaction="/kras-schedule/reload">설정 파일 다시 읽기</button>
+      <span style="font-size:12px;color:#69707b;">저장 위치: <span class="cron-text" th:text="${configPath}"></span> 의 kras-nextgen 블록</span>
+    </div>
+  </form>
+
+  <section class="card" aria-labelledby="recent-title">
+    <h2 id="recent-title" class="card-title">최근 스케줄 실행</h2>
+    <div class="sched-scroll">
+      <table class="sched-table" id="recent-runs">
+        <thead><tr><th>시각</th><th>데이터셋</th><th>단계</th><th>상태</th><th>구분</th><th>메시지</th></tr></thead>
+        <tbody>
+          <tr th:if="${#lists.isEmpty(recentRuns)}"><td colspan="6" style="color:#69707b;">아직 스케줄·즉시 실행 기록이 없습니다.</td></tr>
+          <tr th:each="r : ${recentRuns}">
+            <td th:text="${r['started_at']}"></td>
+            <td th:text="${r['dataset_code']}"></td>
+            <td th:text="${r['action']}"></td>
+            <td th:text="${r['status']}" th:classappend="${r['status'] == 'SUCCESS'} ? 'gate-ok' : 'gate-bad'"></td>
+            <td th:text="${r['request_summary']}"></td>
+            <td th:text="${r['message']}" style="max-width:420px;overflow-wrap:anywhere;"></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 도움말 팝업 — 팝업 1개 = 도움말 1항목(설계 §7.2). 항목을 늘리면 data-help 버튼을 하나 더 둔다. -->
+  <div class="dset-modal-backdrop help-modal" id="help-recovery" hidden>
+    <div class="dset-modal" role="dialog" aria-modal="true" aria-labelledby="help-recovery-title" style="max-width:640px;">
+      <div class="dset-modal-head">
+        <h3 id="help-recovery-title">끊겼을 때 어떻게 되나</h3>
+        <button type="button" class="dset-modal-close">닫기 ✕</button>
+      </div>
+      <div class="dset-modal-body help-body">
+        <p>적재가 중간에 끊겨도 처음부터 다시 하지 않습니다. 대기열에 남은 것부터 이어서 적재합니다.</p>
+        <table>
+          <thead><tr><th>끊긴 때</th><th>어떻게 되나</th></tr></thead>
+          <tbody>
+            <tr><td>조회 도중 서버가 꺼짐</td><td th:text="${help['leaseMinutes']} + '분 뒤 다시 조회합니다'"></td></tr>
+            <tr><td>저장 도중 끊김</td><td>반쯤 저장된 데이터는 남지 않고, 다시 조회합니다</td></tr>
+            <tr><td>저장은 됐고 반영 전에 끊김</td><td>다시 조회하지 않고 반영만 합니다</td></tr>
+            <tr><td>반영 도중 끊김</td><td>기존 데이터는 그대로이고, 반영만 다시 합니다</td></tr>
+          </tbody>
+        </table>
+        <h4>오류가 나면</h4>
+        <ul>
+          <li th:text="'연결 실패 등은 ' + ${help['retryDelays']} + ' 뒤 다시 시도하고, 그래도 실패하면(재시도 ' + ${help['maxRetries']} + '번 후) ‘실패’로 둡니다.'"></li>
+          <li th:text="'연속 ' + ${help['circuitBreak']} + '번 실패하면 게이트웨이 장애로 보고 그날은 멈춥니다.'"></li>
+          <li>‘자료 없음’ 응답 코드(고급 설정)는 실패가 아니라 완료(0건)로 처리합니다.</li>
+          <li>필드 검증 경고나 저장 오류(값 길이 초과 등)는 다시 불러도 같으므로 재시도하지 않고 바로 ‘실패’로 둡니다. 원인을 고친 뒤 [재시도]를 누르세요.</li>
+        </ul>
+        <h4>언제 다시 하나</h4>
+        <ul>
+          <li>처리기가 돌고 있으면 시간이 되는 대로 그 안에서 다시 시도합니다.</li>
+          <li th:text="'이미 끝났거나 서버가 꺼져 있었으면 ' + ${help['correctionSchedule']} + '에서 다시 시도합니다.'"></li>
+          <li>바로 하려면 보정 적재의 [지금 실행]을 누르세요.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<th:block layout:fragment="scripts">
+<script th:inline="none">
+(function () {
+  const DOW = [['MON','월'],['TUE','화'],['WED','수'],['THU','목'],['FRI','금'],['SAT','토'],['SUN','일']];
+  const pad = n => String(n).padStart(2, '0');
+  const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+  // cron(초 분 시 일 월 요일) → 화면 모드
+  function parse(cron) {
+    if (!cron) return { mode: 'off' };
+    const f = cron.trim().split(/\s+/);
+    if (f.length === 6 && f[0] === '0' && /^\d+$/.test(f[1]) && /^\d+$/.test(f[2]) && f[4] === '*') {
+      const time = pad(f[2]) + ':' + pad(f[1]);
+      if (f[3] === '*' && (f[5] === '*' || f[5] === '?')) return { mode: 'daily', time };
+      if ((f[3] === '*' || f[3] === '?') && DOW.some(d => d[0] === f[5])) return { mode: 'weekly', time, dow: f[5] };
+      if (/^\d+$/.test(f[3]) && (f[5] === '*' || f[5] === '?')) return { mode: 'monthly', time, day: f[3] };
+    }
+    return { mode: 'cron', cron };
+  }
+
+  function build(state) {
+    const [h, m] = (state.time || '01:00').split(':').map(Number);
+    switch (state.mode) {
+      case 'daily': return `0 ${m} ${h} * * *`;
+      case 'weekly': return `0 ${m} ${h} * * ${state.dow || 'MON'}`;
+      case 'monthly': return `0 ${m} ${h} ${state.day || 1} * *`;
+      case 'cron': return (state.cron || '').trim();
+      default: return '';
+    }
+  }
+
+  function setupEditor(box) {
+    const hidden = box.querySelector('.cron-value');
+    const inputs = box.querySelector('.mode-inputs');
+    const preview = box.querySelector('.cron-preview');
+    let state = parse(hidden.value);
+
+    function render() {
+      box.querySelectorAll('.mode-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === state.mode));
+      inputs.innerHTML = '';
+      if (state.mode === 'weekly') {
+        const sel = document.createElement('select');
+        DOW.forEach(([v, t]) => sel.add(new Option(t + '요일', v, false, v === (state.dow || 'MON'))));
+        sel.onchange = () => { state.dow = sel.value; sync(); };
+        inputs.append(sel);
+      }
+      if (state.mode === 'monthly') {
+        const day = document.createElement('input');
+        day.type = 'number'; day.min = 1; day.max = 28; day.value = state.day || 1; day.style.width = '58px';
+        day.oninput = () => { state.day = day.value; sync(); };
+        inputs.append(day, document.createTextNode('일'));
+      }
+      if (['daily', 'weekly', 'monthly'].includes(state.mode)) {
+        const time = document.createElement('input');
+        time.type = 'time'; time.value = state.time || '01:00';
+        time.oninput = () => { state.time = time.value; sync(); };
+        inputs.append(time);
+      }
+      if (state.mode === 'cron') {
+        const c = document.createElement('input');
+        c.value = state.cron || hidden.value; c.size = 18; c.placeholder = '초 분 시 일 월 요일';
+        c.oninput = () => { state.cron = c.value; sync(); };
+        inputs.append(c);
+      }
+      sync();
+    }
+    function sync() {
+      hidden.value = build(state);
+      preview.textContent = hidden.value ? 'cron: ' + hidden.value : '꺼짐';
+      markDirty(box.closest('section'));
+    }
+    box.querySelectorAll('.mode-btn').forEach(b => b.onclick = () => {
+      state = b.dataset.mode === 'cron' ? { mode: 'cron', cron: hidden.value } : { ...state, mode: b.dataset.mode };
+      render();
+    });
+    render();
+    // "0 0 1 * * ?"처럼 표기만 다른 값은 변경으로 보지 않는다.
+    if (hidden.dataset.initial) hidden.dataset.initial = hidden.value;
+    markDirty(box.closest('section'));
+  }
+
+  // 바꿨는데 아직 적용 안 한 묶음 표시 — 적용(저장)해야 스케줄이 다시 등록된다.
+  function markDirty(card) {
+    if (!card) return;
+    const changed = [...card.querySelectorAll('[data-initial]')].some(el => el.value !== el.dataset.initial);
+    card.querySelector('.dirty-note').hidden = !changed;
+    const next = card.querySelector('.next-run');
+    if (!next.dataset.saved) next.dataset.saved = next.textContent;
+    next.textContent = changed ? '적용 후 계산' : next.dataset.saved;
+  }
+  document.querySelectorAll('input[name="stopAt"]').forEach(i => i.addEventListener('input', () => markDirty(i.closest('section'))));
+
+  document.querySelectorAll('.sched-editor').forEach(setupEditor);
+
+  // public 테이블을 자동 교체하는 묶음(전체 적재)을 새로 켜면 한 번 더 확인한다.
+  document.getElementById('schedule-form').addEventListener('submit', e => {
+    if (e.submitter && e.submitter.getAttribute('formaction')) return;
+    const turnedOn = [...document.querySelectorAll('.cron-value[data-public="true"]')]
+      .filter(h => h.value && !h.dataset.initial).map(h => h.dataset.label);
+    if (turnedOn.length && !confirm(turnedOn.join(', ') + ' 스케줄을 켭니다.\n연속지적·용도지역 수집에 성공하면 public GeoServer 테이블(lp_pa_cbnd / lt_c_uzone)을 자동으로 교체합니다. 계속할까요?')) {
+      e.preventDefault();
+    }
+  });
+
+  document.querySelectorAll('.run-now').forEach(btn => btn.onclick = async () => {
+    if (!confirm(btn.dataset.label + '을(를) 지금 1회 실행할까요?')) return;
+    btn.disabled = true;
+    try {
+      const res = await fetch('/kras-schedule/run/' + btn.dataset.job, { method: 'POST' });
+      const body = await res.json();
+      alert(body.message);
+      if (body.success) poll();
+    } catch (err) {
+      alert('실행 요청 실패: ' + err);
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  // 실행이 끝날 때까지 상태를 확인하고, 끝나면 화면을 새로 고친다. 대기열 처리는 오래 걸리므로 현황만 갱신한다.
+  function poll() {
+    setTimeout(async () => {
+      try {
+        const st = await (await fetch('/kras-schedule/status')).json();
+        if (st.running) { loadQueue(); poll(); } else location.reload();
+      } catch (err) { /* 다음 새로고침에서 다시 본다 */ }
+    }, 3000);
+  }
+
+  // ── 도움말 팝업 ─────────────────────────────────────────
+  document.querySelectorAll('[data-help]').forEach(b => b.onclick = () => {
+    const m = document.getElementById('help-' + b.dataset.help);
+    m.hidden = false;
+    m.querySelector('.dset-modal-close').focus();
+  });
+  document.querySelectorAll('.help-modal').forEach(m => {
+    m.querySelector('.dset-modal-close').onclick = () => { m.hidden = true; };
+    m.addEventListener('click', e => { if (e.target === m) m.hidden = true; });
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') document.querySelectorAll('.help-modal').forEach(m => { m.hidden = true; });
+  });
+
+  // ── 대기열 현황 ─────────────────────────────────────────
+  let labels = {};
+  const name = code => labels[code] || code;
+  const STATS = [['pending','대기'],['running','처리 중'],['retry','재시도 대기'],['failed','실패'],['skipped','제외'],['done','완료']];
+
+  async function loadQueue() {
+    let q;
+    try { q = await (await fetch('/kras-schedule/queue')).json(); } catch (e) { return; }
+    const err = document.getElementById('q-error');
+    err.hidden = !q.error; err.textContent = q.error || '';
+    err.style.display = q.error ? 'block' : 'none';
+    document.getElementById('q-updated').textContent = new Date().toTimeString().slice(0, 5);
+    // 테이블이 없거나 조회 실패면 숫자·목록 영역은 숨기고 안내만 보인다.
+    document.querySelectorAll('#q-stats, #q-progress, #q-notices, #queue-panel .sched-scroll, .q-list')
+      .forEach(el => { el.style.display = q.error ? 'none' : ''; });
+    if (q.error) return;
+    labels = q.datasetLabels || {};
+    document.getElementById('q-updated').textContent = q.updatedAt;
+    document.getElementById('q-stats').innerHTML = STATS.map(([k, t]) =>
+      `<div class="q-stat"><b>${Number(q[k] || 0).toLocaleString()}</b><span>${t}</span></div>`).join('');
+    document.getElementById('q-progress').innerHTML =
+      (q.draining ? `● 처리 중 (스레드 ${q.threads}/${q.parallelism}) · ` : '○ 처리기 대기 · ')
+      + `오늘 처리 ${Number(q.today || 0).toLocaleString()}건`
+      + (q.progress != null ? ` · 전체 적재 진행률 <b>${q.progress}%</b> (예상 완료 ${esc(q.eta)})` : '');
+    document.getElementById('q-notices').innerHTML = (q.notices || []).map(n => `<p class="q-notice">${esc(n)}</p>`).join('');
+    document.querySelector('#q-datasets tbody').innerHTML = (q.datasets || []).map(d =>
+      `<tr><td>${esc(name(d.dataset_code))}</td><td>${d.pending}</td><td>${d.retry}</td><td>${d.failed}</td><td>${d.done}</td><td>${esc(d.last_success || '—')}</td></tr>`).join('')
+      || '<tr><td colspan="6" style="color:#69707b;">대기열이 비어 있습니다. 전체 적재를 실행하면 채워집니다.</td></tr>';
+    const counts = { RETRY: q.retry, FAILED: q.failed, RUNNING: q.running };
+    document.querySelectorAll('.q-list').forEach(d => {
+      d.querySelector('.q-count').textContent = '(' + Number(counts[d.dataset.kind] || 0).toLocaleString() + ')';
+      if (d.open) loadRows(d);
+    });
+  }
+
+  async function loadRows(d) {
+    const kind = d.dataset.kind;
+    const qs = new URLSearchParams({ status: kind, q: d.querySelector('.q-search')?.value || '' });
+    let r;
+    try { r = await (await fetch('/kras-schedule/queue/rows?' + qs)).json(); } catch (e) { return; }
+    const body = d.querySelector('tbody');
+    if (r.error) { body.innerHTML = `<tr><td colspan="6" class="gate-bad">${esc(r.error)}</td></tr>`; return; }
+    const rows = r.rows || [];
+    const svc = x => esc(name(x.dataset_code)) + (x.extra_key ? ` <span class="cron-text">${esc(x.extra_key)}</span>` : '');
+    body.innerHTML = rows.map(x => {
+      if (kind === 'RETRY') return `<tr><td class="cron-text">${esc(x.pnu)}</td><td>${svc(x)}</td><td>${x.attempt_count}/3</td>`
+        + `<td>${esc(x.next_attempt)} (${x.next_in_min}분 뒤)</td><td>${esc(x.last_error)}</td></tr>`;
+      if (kind === 'FAILED') {
+        const key = [x.dataset_code, x.pnu, x.extra_key].join('|');
+        const warn = String(x.last_error || '').match(/^필드 검증 경고\(item_id=(\d+)\)/);
+        const pnuCell = warn
+          ? `<a href="/kras-db?hist=${encodeURIComponent(x.dataset_code)}&item=${warn[1]}" style="color:#7aafe8;" title="수집 이력 팝업 열기">${esc(x.pnu)}</a>` : esc(x.pnu);
+        return `<tr><td><input type="checkbox" class="retry-key" value="${esc(key)}"></td><td class="cron-text">${pnuCell}</td>`
+          + `<td>${svc(x)}</td><td>${x.attempt_count}</td><td>${esc(x.next_attempt)}</td><td>${esc(x.last_error)}</td></tr>`;
+      }
+      return `<tr><td class="cron-text">${esc(x.pnu)}</td><td>${svc(x)}</td><td>${esc(x.started)}</td>`
+        + `<td class="${x.stalled ? 'gate-bad' : 'gate-ok'}">${x.stalled ? '멈춤 의심' : '처리 중'}</td></tr>`;
+    }).join('') || '<tr><td colspan="6" style="color:#69707b;">없음</td></tr>';
+  }
+
+  document.querySelectorAll('.q-list').forEach(d => {
+    d.addEventListener('toggle', () => { if (d.open) loadRows(d); });
+    let t;
+    d.querySelector('.q-search').addEventListener('input', () => { clearTimeout(t); t = setTimeout(() => loadRows(d), 300); });
+  });
+
+  async function retry(keys) {
+    const form = new URLSearchParams();
+    keys.forEach(k => form.append('keys', k));
+    const body = await (await fetch('/kras-schedule/queue/retry', { method: 'POST', body: form })).json();
+    alert(body.message);
+    loadQueue();
+  }
+  document.getElementById('retry-selected').onclick = () => {
+    const keys = [...document.querySelectorAll('.retry-key:checked')].map(c => c.value);
+    if (!keys.length) { alert('재시도할 행을 선택하세요.'); return; }
+    retry(keys);
+  };
+  document.getElementById('retry-all').onclick = () => {
+    if (confirm('실패한 행을 전부 다시 대기로 돌릴까요?')) retry([]);
+  };
+  document.getElementById('q-refresh').onclick = loadQueue;
+
+  loadQueue();
+  // 처리 중일 때만 30초마다 자동 갱신(설계 §7.1)
+  setInterval(async () => {
+    try {
+      const st = await (await fetch('/kras-schedule/status')).json();
+      if (st.running) loadQueue();
+    } catch (e) { /* 무시 */ }
+  }, 30000);
+  if (document.getElementById('running-banner')) poll();
+})();
+</script>
+</th:block>
+</body>
+</html>
