@@ -25,7 +25,7 @@ public class KrasVerificationEvidenceService {
     private static final Pattern PII_TAG_PATTERN = Pattern.compile(
             "(?i)<(" + String.join("|", PII_TAGS) + ")>([^<]*)</\\1>");
     /** 주민등록번호 형식 안전망 — 태그 목록에 없는 필드에 값이 그대로 남는 경우를 잡는다. */
-    private static final Pattern RRN_PATTERN = Pattern.compile("\\b\\d{6}-?\\d{7}\\b");
+    static final Pattern RRN_PATTERN = Pattern.compile("\\b\\d{6}-?\\d{7}\\b");
 
     private static final int MAX_SAMPLE_LEN = 4000;
 

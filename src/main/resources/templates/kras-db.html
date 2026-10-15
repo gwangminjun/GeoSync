@@ -48,7 +48,10 @@
                       th:text="${s.datasetCode}"></button>
               <code th:if="${s.datasetCode == null}">—</code>
             </td>
-            <td class="spec-table-col"><code th:text="${s.targetTable}"></code></td>
+            <td class="spec-table-col"><th:block th:each="p : ${s.targetParts}"><button type="button" class="spec-link-btn tbl-open-btn"
+                      th:if="${#strings.contains(p, '.')}" th:attr="data-table=${p},data-dataset=${s.datasetCode}"
+                      th:text="${p}"></button><span th:unless="${#strings.contains(p, '.')}"
+                      th:text="${p == ',' ? ', ' : ' ' + p + ' '}"></span></th:block></td>
             <td th:text="${s.pathLabel}"></td>
             <td th:text="${s.state}"></td>
             <td><span th:text="${s.callable} ? '가능' : '불가'"
@@ -148,6 +151,71 @@
           <pre id="hist-preview" class="result-box" style="margin-top:10px;"></pre>
           <button type="button" id="hist-promote" class="btn btn-primary" disabled style="margin-top:10px;">선택한 수집 건 업무 테이블 반영</button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 적재 DB 테이블 조회 팝업: 규격 표 "→ 적재 DB 테이블" 칸의 테이블 버튼 전용. 읽기 전용, 현재 기관 행만. -->
+  <div class="dset-modal-backdrop" id="tbl-modal-backdrop" hidden>
+    <div class="dset-modal" role="dialog" aria-modal="true" aria-labelledby="tbl-modal-title" style="max-width:1200px;">
+      <div class="dset-modal-head">
+        <h3 id="tbl-modal-title"></h3>
+        <button type="button" class="dset-modal-close" id="tbl-modal-close">닫기 ✕</button>
+      </div>
+      <div class="dset-modal-body">
+        <!-- 원본 테이블에서 파생된 뷰가 있으면(예: lt_c_uzone → 레이어별 v_lt_c_uzone_*) 골라 볼 수 있다. -->
+        <div id="tbl-view-row" class="tbl-toolbar" style="display:none;margin-bottom:8px;">
+          <label for="tbl-view">보기</label>
+          <input type="search" id="tbl-view-filter" aria-label="레이어 찾기" placeholder="레이어 이름·코드로 찾기 (예: 용도지역, UF801)">
+          <select id="tbl-view" class="tbl-view-select"></select>
+          <span id="tbl-view-note" class="tbl-hint"></span>
+        </div>
+        <form id="tbl-search" class="tbl-toolbar">
+          <select id="tbl-col" aria-label="검색 칼럼"></select>
+          <input type="search" id="tbl-q" aria-label="검색어" placeholder="검색어 (pnu는 앞부분 일치)">
+          <button type="submit" class="btn btn-primary">검색</button>
+          <button type="button" class="btn btn-secondary" id="tbl-reset">초기화</button>
+          <button type="button" class="btn btn-secondary" id="tbl-preview" hidden>미리보기</button>
+        </form>
+        <p id="tbl-note" style="font-size:12px;color:#9aa2ad;margin:8px 0;"></p>
+        <div id="tbl-message" class="result-box" role="status" aria-live="polite" hidden></div>
+        <div class="history-scroll" style="margin-top:8px;overflow-x:auto;"><table class="hist-table" style="min-width:0;white-space:nowrap;">
+          <thead><tr id="tbl-head"></tr></thead>
+          <tbody id="tbl-rows"></tbody>
+        </table></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;">
+          <span id="tbl-range" style="font-size:12.5px;color:#9aa2ad;"></span>
+          <span><button type="button" class="btn btn-secondary" id="tbl-prev">‹ 이전</button>
+            <button type="button" class="btn btn-secondary" id="tbl-next">다음 ›</button></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 지도 미리보기 팝업: SHAPE 다운로드 레이어(lp_pa_cbnd, lt_c_uzone과 그 뷰)만. 지오서버 WMS 이미지 + 포털 스타일(dhc_layer_style).
+       인터넷 없이 동작해야 해서 지도 라이브러리 없이 GetMap 이미지를 겹친다. 설계: 2026-10-15-kras-db-layer-map-preview-design.md -->
+  <div class="dset-modal-backdrop map-modal-backdrop" id="map-modal-backdrop" hidden>
+    <div class="dset-modal map-modal" role="dialog" aria-modal="true" aria-labelledby="map-modal-title">
+      <div class="dset-modal-head">
+        <h3 id="map-modal-title"></h3>
+        <button type="button" class="dset-modal-close" id="map-modal-close">닫기 ✕</button>
+      </div>
+      <div class="dset-modal-body">
+        <div class="tbl-toolbar" style="margin-bottom:8px;">
+          <button type="button" class="btn btn-secondary" id="map-zoom-in" title="확대">＋</button>
+          <button type="button" class="btn btn-secondary" id="map-zoom-out" title="축소">－</button>
+          <button type="button" class="btn btn-secondary" id="map-home">전체 범위</button>
+          <span id="map-bg-toggles" class="map-toggles"></span>
+          <label class="map-toggle"><input type="checkbox" id="map-portal-scale"> 포털 표출 축척 적용 <span id="map-scale-range"></span></label>
+          <button type="button" class="btn btn-secondary" id="map-goto-scale" hidden>표시 축척으로 이동</button>
+        </div>
+        <div id="map-view" class="map-view">
+          <div id="map-layers"></div>
+          <div id="map-loading" class="map-loading" hidden>불러오는 중…</div>
+          <div id="map-empty" class="map-empty" hidden></div>
+        </div>
+        <p id="map-status" class="tbl-hint" style="margin-top:8px;"></p>
+        <p id="map-warn" class="tbl-hint" style="color:#e8b882;" hidden></p>
       </div>
     </div>
   </div>
@@ -796,6 +864,8 @@
 <script th:inline="javascript">
 // 데이터셋별 추가 파라미터(JSON) 예시 — 필요한 데이터셋에서만 "실제 수집"에 입력칸을 보여주는 데 쓴다.
 const KRAS_EXTRA_PARAMS_HINTS = /*[[${extraParamsHints}]]*/ {};
+// 지도 미리보기: 지오서버 WMS 주소(yml geoserver.url)와 미리보기 대상 테이블(SHAPE 다운로드).
+const KRAS_MAP_CONFIG = /*[[${mapConfig}]]*/ {};
 </script>
 <script>
 async function runIngest() { await run('/kras-db/ingest/cadastral', 'btn-ingest'); }
@@ -1425,6 +1495,427 @@ const krasHistoryPopup = (function() {
 })();
 
 function krasOpenHistoryPopup(datasetCode, label, focusItemId) { krasHistoryPopup.open(datasetCode, label, focusItemId); }
+
+const krasTablePopup = (function () {
+  const backdrop = document.getElementById('tbl-modal-backdrop');
+  const title = document.getElementById('tbl-modal-title');
+  const colSelect = document.getElementById('tbl-col');
+  const qInput = document.getElementById('tbl-q');
+  const note = document.getElementById('tbl-note');
+  const message = document.getElementById('tbl-message');
+  const head = document.getElementById('tbl-head');
+  const body = document.getElementById('tbl-rows');
+  const range = document.getElementById('tbl-range');
+  const prev = document.getElementById('tbl-prev');
+  const next = document.getElementById('tbl-next');
+  const viewRow = document.getElementById('tbl-view-row');
+  const viewSelect = document.getElementById('tbl-view');
+  const viewNote = document.getElementById('tbl-view-note');
+  const viewFilter = document.getElementById('tbl-view-filter');
+  const previewBtn = document.getElementById('tbl-preview');
+  const mapCfg = (typeof KRAS_MAP_CONFIG === 'object' && KRAS_MAP_CONFIG) || {};
+  let viewTitles = {};
+  const MAX_CELL = 80;
+  let current = null;
+
+  function showMessage(text) { message.textContent = text; message.className = 'result-box err'; message.hidden = false; }
+
+  async function load() {
+    message.hidden = true;
+    const params = new URLSearchParams({ name: current.table, page: String(current.page) });
+    if (current.q) { params.set('col', current.col); params.set('q', current.q); }
+    let data;
+    try {
+      const res = await fetch('/kras-db/table?' + params);
+      data = await res.json();
+      if (!res.ok) { showMessage(data.message || ('요청 실패 (HTTP ' + res.status + ')')); return; }
+    } catch (err) {
+      showMessage('요청 실패: ' + err);
+      return;
+    }
+    if (!data.exists) {
+      head.replaceChildren(); body.replaceChildren(); range.textContent = ''; note.textContent = '';
+      showMessage('테이블이 아직 없습니다(마이그레이션 미적용).');
+      prev.disabled = next.disabled = true;
+      return;
+    }
+    if (!colSelect.options.length) {
+      data.columns.filter(c => c.searchable).forEach(c => colSelect.add(new Option(c.name, c.name)));
+      colSelect.value = data.defaultColumn;
+      current.col = colSelect.value;
+    }
+    const totalText = data.totalCapped ? '10,000건 이상' : data.total.toLocaleString() + '건';
+    title.textContent = data.table + (viewTitles[data.table] ? ' — ' + viewTitles[data.table] : '') +
+      (data.orgFiltered ? '  (기관 ' + data.orgCd + ' · ' : '  (') + totalText + ')';
+    note.textContent = (data.orgFiltered ? '※ 기관코드(org_cd)=' + data.orgCd + ' 행만 보입니다.'
+      : '※ 기관 구분 칼럼이 없어 전체 행을 보여줍니다.') +
+      (data.columns.some(c => c.masked) ? ' 개인정보 칼럼(🔒)은 가려지고 검색할 수 없습니다.' : '');
+    // 미리보기 테이블이면 맨 앞에 행 선택 칸: 한 건을 고르면 [미리보기]가 그 행만 그린다(다시 누르면 선택 해제).
+    const keyIdx = !previewBtn.hidden && data.rowKey ? data.columns.findIndex(c => c.name === data.rowKey) : -1;
+    if (keyIdx >= 0) note.textContent += ' 행을 하나 고르면 그 행만 미리보기합니다.';
+    const heads = data.columns.map(c => {
+      const th = document.createElement('th');
+      th.textContent = c.name + (c.masked ? ' 🔒' : '');
+      return th;
+    });
+    if (keyIdx >= 0) {
+      const th = document.createElement('th');
+      th.textContent = '선택';
+      heads.unshift(th);
+    }
+    head.replaceChildren(...heads);
+    body.replaceChildren();
+    const itemCol = data.columns.findIndex(c => c.name === 'source_item_id');
+    data.rows.forEach(row => {
+      const tr = document.createElement('tr');
+      if (keyIdx >= 0) {
+        const td = document.createElement('td');
+        const pick = document.createElement('input');
+        pick.type = 'radio'; pick.name = 'tbl-pick'; pick.value = row[keyIdx] || '';
+        pick.disabled = !row[keyIdx];
+        pick.checked = !!row[keyIdx] && row[keyIdx] === current.selected;
+        pick.setAttribute('aria-label', data.rowKey + ' ' + (row[keyIdx] || '') + ' 선택');
+        pick.addEventListener('click', () => select(current.selected === pick.value ? null : pick.value));
+        td.appendChild(pick);
+        tr.appendChild(td);
+      }
+      row.forEach((v, i) => {
+        const td = document.createElement('td');
+        if (i === itemCol && v && current.dataset) {
+          const b = document.createElement('button');
+          b.type = 'button'; b.className = 'spec-link-btn'; b.textContent = v; b.title = '수집 이력 보기';
+          b.addEventListener('click', () => { close(); krasOpenHistoryPopup(current.dataset, null, Number(v)); });
+          td.appendChild(b);
+        } else if (v != null && v.length > MAX_CELL) {
+          td.textContent = v.slice(0, MAX_CELL) + '…';
+          td.title = v;
+        } else {
+          td.textContent = v == null ? '—' : v;
+        }
+        tr.appendChild(td);
+      });
+      body.appendChild(tr);
+    });
+    if (!data.rows.length) {
+      const tr = document.createElement('tr');
+      const td = document.createElement('td');
+      td.colSpan = data.columns.length + (keyIdx >= 0 ? 1 : 0);
+      const others = (data.otherOrgs || []).filter(o => o.org_cd !== data.orgCd);
+      td.textContent = current.q ? '검색 결과가 없습니다.'
+        : others.length ? '이 기관(' + data.orgCd + ') 행은 없습니다. 다른 기관 행: ' +
+            others.map(o => (o.org_cd || '기관 없음') + ' ' + Number(o.total).toLocaleString() + '건').join(', ')
+        : '적재된 행이 없습니다.';
+      tr.appendChild(td); body.appendChild(tr);
+    }
+    const from = data.page * data.pageSize;
+    range.textContent = (data.rows.length ? (from + 1) + '–' + (from + data.rows.length) : '0') + ' / ' + totalText;
+    prev.disabled = data.page === 0;
+    next.disabled = from + data.rows.length >= data.total;
+  }
+
+  function select(key) {
+    current.selected = key;
+    body.querySelectorAll('input[name="tbl-pick"]').forEach(r => { r.checked = !!key && r.value === key; });
+    previewBtn.textContent = key ? '선택 1건 미리보기' : '미리보기';
+  }
+
+  function show(table) {
+    current.table = table; current.col = null; current.q = ''; current.page = 0;
+    select(null);
+    title.textContent = table;
+    colSelect.replaceChildren(); qInput.value = ''; note.textContent = ''; message.hidden = true;
+    head.replaceChildren(); body.replaceChildren(); range.textContent = '불러오는 중…';
+    load();
+  }
+
+  async function loadViews(table) {
+    viewRow.style.display = 'none';
+    viewSelect.replaceChildren();
+    viewFilter.value = '';
+    viewTitles = {};
+    let views;
+    try {
+      const res = await fetch('/kras-db/table/views?name=' + encodeURIComponent(table));
+      if (!res.ok) return;
+      views = await res.json();
+    } catch (err) { return; }
+    if (!views.length || current.base !== table) return;
+    viewSelect.add(new Option('원본 테이블 — ' + table, table));
+    const withRows = document.createElement('optgroup');
+    withRows.label = '뷰 · 이 기관 행 있음';
+    const empty = document.createElement('optgroup');
+    empty.label = '뷰 · 이 기관 행 없음';
+    views.forEach(v => {
+      // 이름(dhc_layer.title)이 있으면 이름 위주로: [UF801] 국토의계획및이용/도시지역 · 6,774건
+      const code = v.filter ? v.filter.split(' = ').pop() : v.name.split('.').pop();
+      if (v.title) viewTitles[v.name] = v.title;
+      const text = '[' + code + '] ' + (v.title || '(레이어 이름 없음)') +
+        (v.total == null ? '' : ' · ' + Number(v.total).toLocaleString() + '건');
+      const option = new Option(text, v.name);
+      option.title = v.name + (v.filter ? ' (' + v.filter + ')' : '');
+      option.dataset.search = (text + ' ' + v.name).toLowerCase();
+      (v.total === 0 ? empty : withRows).appendChild(option);
+    });
+    if (withRows.children.length) viewSelect.appendChild(withRows);
+    if (empty.children.length) viewSelect.appendChild(empty);
+    viewSelect.value = table;
+    viewNote.dataset.base = '뷰 ' + views.length + '개 (행 있음 ' + withRows.children.length + '개)';
+    viewNote.textContent = viewNote.dataset.base;
+    viewRow.style.display = 'flex';
+  }
+
+  // 레이어 이름·코드로 뷰 선택지를 좁힌다. 하나만 남으면 바로 그 뷰를 연다.
+  viewFilter.addEventListener('input', () => {
+    const term = viewFilter.value.trim().toLowerCase();
+    const matches = [];
+    viewSelect.querySelectorAll('optgroup option').forEach(o => {
+      const hit = !term || o.dataset.search.includes(term);
+      o.hidden = !hit;
+      if (hit) matches.push(o);
+    });
+    viewSelect.querySelectorAll('optgroup').forEach(g => {
+      g.hidden = ![...g.children].some(o => !o.hidden);
+    });
+    viewNote.textContent = term ? '일치 ' + matches.length + '개' : viewNote.dataset.base;
+    if (term && matches.length === 1 && viewSelect.value !== matches[0].value) {
+      viewSelect.value = matches[0].value;
+      show(matches[0].value);
+    }
+  });
+
+  function open(table, dataset) {
+    current = { base: table, table, dataset: dataset || null, col: null, q: '', page: 0, selected: null };
+    // SHAPE 다운로드 테이블(과 그 뷰)에서만 [미리보기]. 지오서버 주소가 없으면 누를 수 없다.
+    previewBtn.hidden = !(mapCfg.previewTables || []).includes(table);
+    previewBtn.disabled = !mapCfg.wmsUrl;
+    previewBtn.title = mapCfg.wmsUrl ? '지도로 미리보기 (검색 조건 범위)' : '지오서버 주소(geoserver.url)가 설정되지 않았습니다';
+    backdrop.hidden = false;
+    show(table);
+    loadViews(table);
+  }
+
+  viewSelect.addEventListener('change', () => show(viewSelect.value));
+
+  function close() { backdrop.hidden = true; }
+
+  document.getElementById('tbl-search').addEventListener('submit', e => {
+    e.preventDefault();
+    current.col = colSelect.value; current.q = qInput.value.trim(); current.page = 0;
+    select(null);
+    load();
+  });
+  document.getElementById('tbl-reset').addEventListener('click', () => {
+    qInput.value = ''; current.q = ''; current.page = 0; select(null); load();
+  });
+  previewBtn.addEventListener('click', () => {
+    if (!previewBtn.disabled) krasMapPopup.open(current.table, current.q ? current.col : null, current.q, viewTitles[current.table],
+      current.selected);
+  });
+  prev.addEventListener('click', () => { if (current.page > 0) { current.page--; load(); } });
+  next.addEventListener('click', () => { current.page++; load(); });
+  document.getElementById('tbl-modal-close').addEventListener('click', close);
+  backdrop.addEventListener('click', e => { if (e.target === backdrop) close(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && !backdrop.hidden) close(); });
+  document.querySelectorAll('.tbl-open-btn').forEach(b =>
+    b.addEventListener('click', () => open(b.dataset.table, b.dataset.dataset)));
+
+  return { open, close };
+})();
+
+const krasMapPopup = (function () {
+  const cfg = (typeof KRAS_MAP_CONFIG === 'object' && KRAS_MAP_CONFIG) || {};
+  const OGC_PIXEL_M = 0.00028;   // 지오서버(OGC) 축척 계산 기준 화소 크기 — 화면 표시 축척도 같은 식으로 맞춘다
+  const backdrop = document.getElementById('map-modal-backdrop');
+  const title = document.getElementById('map-modal-title');
+  const view = document.getElementById('map-view');
+  const layersBox = document.getElementById('map-layers');
+  const loading = document.getElementById('map-loading');
+  const empty = document.getElementById('map-empty');
+  const status = document.getElementById('map-status');
+  const warn = document.getElementById('map-warn');
+  const toggles = document.getElementById('map-bg-toggles');
+  const portalScale = document.getElementById('map-portal-scale');
+  const scaleRange = document.getElementById('map-scale-range');
+  const gotoScale = document.getElementById('map-goto-scale');
+  let st = null;   // { layers, home, cx, cy, res(m/CSS px), seq, srid, target, scope, cql }
+
+  function size() { return { w: view.clientWidth || 800, h: view.clientHeight || 480 }; }
+  function scale() { return st.res / OGC_PIXEL_M; }
+  function bbox() {
+    const { w, h } = size();
+    return [st.cx - w * st.res / 2, st.cy - h * st.res / 2, st.cx + w * st.res / 2, st.cy + h * st.res / 2];
+  }
+  function fit(b) {
+    const { w, h } = size();
+    const bw = Math.max(b[2] - b[0], 50) * 1.1, bh = Math.max(b[3] - b[1], 50) * 1.1;   // 5% 여백씩
+    st.cx = (b[0] + b[2]) / 2; st.cy = (b[1] + b[3]) / 2;
+    st.res = Math.max(bw / w, bh / h);
+  }
+  function inRange(layer, s) {
+    return !((layer.minScale > 0 && s < layer.minScale) || (layer.maxScale > 0 && s > layer.maxScale));
+  }
+
+  function wmsUrl(layer, b, w, h) {
+    const p = new URLSearchParams({ SERVICE: 'WMS', VERSION: '1.1.1', REQUEST: 'GetMap', FORMAT: 'image/png',
+      TRANSPARENT: 'true', LAYERS: layer.name, STYLES: '', SRS: 'EPSG:' + (st.srid || 5186),
+      BBOX: b.map(v => v.toFixed(3)).join(','), WIDTH: String(w), HEIGHT: String(h) });
+    const sld = layer.role === 'target' && portalScale.checked ? layer.sldWithScale : layer.sld;
+    if (sld) p.set('SLD_BODY', sld);
+    if (layer.role === 'target' && st.cql) p.set('CQL_FILTER', st.cql);   // 행 한 건 미리보기
+    return cfg.wmsUrl + '?' + p;
+  }
+
+  function render() {
+    const seq = ++st.seq;
+    const { w, h } = size();
+    const ratio = Math.min(window.devicePixelRatio || 1, 2);   // 축척은 CSS 화소 기준, 이미지 화소만 늘린다
+    const b = bbox();
+    const failed = [];
+    let pending = 0;
+    st.layers.forEach(layer => {
+      if (!layer.visible) { layer.img.hidden = true; return; }
+      pending++;
+      const next = new Image();
+      next.onload = () => {
+        if (seq !== st.seq) return;
+        layer.img.src = next.src; layer.img.style.transform = ''; layer.img.hidden = false;
+        if (--pending === 0) done();
+      };
+      next.onerror = () => {
+        if (seq !== st.seq) return;
+        layer.img.hidden = true; failed.push(layer.title || layer.name);
+        if (--pending === 0) done();
+      };
+      next.src = wmsUrl(layer, b, Math.round(w * ratio), Math.round(h * ratio));
+    });
+    loading.hidden = pending === 0;
+    function done() {
+      loading.hidden = true;
+      warn.hidden = !failed.length;
+      warn.textContent = failed.length ? '지오서버에서 이미지를 받지 못한 레이어: ' + failed.join(', ') +
+        ' (지오서버에 없는 레이어이거나 오류)' : '';
+    }
+    updateStatus();
+  }
+
+  function updateStatus() {
+    const s = scale();
+    const t = st.target;
+    status.textContent = 'EPSG:' + (st.srid || 5186) + ' · 축척 약 1:' + Math.round(s).toLocaleString() +
+      ' · 범위: ' + st.scope + ' · 스타일: ' + (t.sld ? '포털(dhc_layer_style)' : '포털 스타일 없음 — 지오서버 기본 스타일');
+    const out = portalScale.checked && t.sld && !inRange(t, s);
+    gotoScale.hidden = !out;
+    if (out) status.textContent += ' · 이 축척에서는 포털에 표시되지 않습니다';
+  }
+
+  function zoomAt(factor, px, py) {
+    const { w, h } = size();
+    const ox = (px == null ? w / 2 : px) - w / 2, oy = (py == null ? h / 2 : py) - h / 2;
+    const wx = st.cx + ox * st.res, wy = st.cy - oy * st.res;
+    st.res = Math.min(Math.max(st.res / factor, 0.01), 5000);
+    st.cx = wx - ox * st.res; st.cy = wy + oy * st.res;
+    render();
+  }
+
+  async function open(table, col, q, layerTitle, key) {
+    const params = new URLSearchParams({ name: table });
+    if (q) { params.set('col', col); params.set('q', q); }
+    if (key) params.set('key', key);
+    let data;
+    try {
+      const res = await fetch('/kras-db/table/extent?' + params);
+      data = await res.json();
+      if (!res.ok) { alert(data.message || ('요청 실패 (HTTP ' + res.status + ')')); return; }
+    } catch (err) { alert('요청 실패: ' + err); return; }
+    const name = table.split('.').pop();
+    title.textContent = '지도 미리보기 — ' + name + (layerTitle ? ' · ' + layerTitle : '');
+    layersBox.replaceChildren(); toggles.replaceChildren(); warn.hidden = true; status.textContent = '';
+    backdrop.hidden = false;
+    if (!data.previewable || !data.bbox) {
+      empty.hidden = false; loading.hidden = true;
+      empty.textContent = data.message || '이 조건으로는 표시할 도형이 없습니다.';
+      st = null;
+      return;
+    }
+    empty.hidden = true;
+    const layers = data.layers.map(l => {
+      const img = document.createElement('img');
+      img.alt = ''; img.hidden = true; img.draggable = false;
+      layersBox.appendChild(img);
+      return Object.assign({}, l, { img, visible: true });
+    });
+    const target = layers.find(l => l.role === 'target');
+    layers.filter(l => l.role === 'background').forEach(l => {
+      const label = document.createElement('label');
+      label.className = 'map-toggle';
+      const box = document.createElement('input');
+      box.type = 'checkbox'; box.checked = true;
+      box.addEventListener('change', () => { l.visible = box.checked; if (st) render(); });
+      label.append(box, ' ' + (l.title || l.name) + (l.maxScale > 0 ? ' (1:' + Number(l.maxScale).toLocaleString() + ' 이하)' : ''));
+      toggles.appendChild(label);
+    });
+    portalScale.checked = false;
+    portalScale.disabled = !(target && target.sld && (target.minScale > 0 || target.maxScale > 0));
+    scaleRange.textContent = target && target.sld && (target.minScale > 0 || target.maxScale > 0)
+      ? '(1:' + Number(target.minScale || 0).toLocaleString() + '–1:' + Number(target.maxScale || 0).toLocaleString() + ')' : '';
+    st = { layers, target, srid: data.srid, seq: 0, home: data.bbox, cql: data.cqlFilter || null,
+      scope: data.cqlFilter ? '선택한 행 (' + data.cqlFilter + ')'
+        : (q ? '검색 조건 · ' : '') + '도형 ' + Number(data.total).toLocaleString() + '건' };
+    fit(data.bbox);
+    render();
+  }
+
+  function close() { backdrop.hidden = true; if (st) st.seq++; }
+
+  // 드래그 이동: 끄는 동안은 이미지를 옮겨 보여주고, 놓으면 새 범위로 다시 받는다.
+  let drag = null;
+  view.addEventListener('pointerdown', e => {
+    if (!st) return;
+    drag = { x: e.clientX, y: e.clientY, dx: 0, dy: 0 };
+    view.setPointerCapture(e.pointerId);
+    view.classList.add('dragging');
+  });
+  view.addEventListener('pointermove', e => {
+    if (!drag) return;
+    drag.dx = e.clientX - drag.x; drag.dy = e.clientY - drag.y;
+    st.layers.forEach(l => { l.img.style.transform = 'translate(' + drag.dx + 'px,' + drag.dy + 'px)'; });
+  });
+  function endDrag() {
+    if (!drag) return;
+    const { dx, dy } = drag;
+    drag = null;
+    view.classList.remove('dragging');
+    if (dx || dy) { st.cx -= dx * st.res; st.cy += dy * st.res; render(); }
+  }
+  view.addEventListener('pointerup', endDrag);
+  view.addEventListener('pointercancel', endDrag);
+  view.addEventListener('wheel', e => {
+    if (!st) return;
+    e.preventDefault();
+    const r = view.getBoundingClientRect();
+    zoomAt(e.deltaY < 0 ? 2 : 0.5, e.clientX - r.left, e.clientY - r.top);
+  }, { passive: false });
+
+  document.getElementById('map-zoom-in').addEventListener('click', () => { if (st) zoomAt(2); });
+  document.getElementById('map-zoom-out').addEventListener('click', () => { if (st) zoomAt(0.5); });
+  document.getElementById('map-home').addEventListener('click', () => { if (st) { fit(st.home); render(); } });
+  portalScale.addEventListener('change', () => { if (st) render(); });
+  gotoScale.addEventListener('click', () => {
+    if (!st) return;
+    const t = st.target, s = scale();
+    const want = t.maxScale > 0 && s > t.maxScale ? t.maxScale * 0.9 : Math.max(t.minScale || 0, 1) * 1.1;
+    st.res = want * OGC_PIXEL_M;
+    render();
+  });
+  document.getElementById('map-modal-close').addEventListener('click', close);
+  backdrop.addEventListener('click', e => { if (e.target === backdrop) close(); });
+  // 테이블 팝업 위에 겹쳐 뜨므로 Esc는 지도 팝업만 닫는다(캡처 단계에서 먼저 받고 전파를 막음).
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && !backdrop.hidden) { close(); e.stopImmediatePropagation(); }
+  }, true);
+
+  return { open, close };
+})();
 
 // 차세대 스케줄 대기열의 실패 행에서 바로 연다: /kras-db?hist=<dataset_code>&item=<item_id>
 (function openHistoryFromQuery() {

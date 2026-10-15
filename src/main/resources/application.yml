@@ -91,3 +91,9 @@ logging:
   level:
     root: INFO
     geosync: DEBUG
+
+# KRAS 연계 관리 지도 미리보기(SHAPE 레이어). 운영은 conf/application.yml에 같은 블록을 넣는다.
+geoserver:
+  url: http://112.216.98.130:31022/geoserver/YG-Space/
+  preview:
+    background-layers: lp_adm_emd,lp_pa_cbnd   # 아래→위, 보이는 축척은 dhc_layer_style을 따른다

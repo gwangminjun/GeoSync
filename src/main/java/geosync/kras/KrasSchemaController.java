@@ -5,6 +5,8 @@ import geosync.database.TargetDbService;
 import geosync.settings.RuntimeSettingsService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -229,6 +231,10 @@ public class KrasSchemaController {
             row.put("datasetCode", item.datasetCode());
             row.put("pathLabel", item.pathLabel());
             row.put("targetTable", item.targetTable() == null ? "—" : item.targetTable());
+            // 테이블 이름은 버튼, 구분자(→ ,)는 글자로 — 조회 팝업 진입점.
+            row.put("targetParts", item.targetTable() == null ? List.of("—")
+                    : Stream.of(item.targetTable().split("(?<=[,→])|(?=[,→])")).map(String::trim)
+                            .filter(t -> !t.isEmpty()).toList());
             row.put("docError", item.docError());
             row.put("state", state);
             row.put("callable", callable);
@@ -356,6 +362,9 @@ public class KrasSchemaController {
     private final KrasDateRangeIngestService dateRangeIngestService;
     private final KrasNextgenScheduler nextgenScheduler;
     private final KrasFullLoadService fullLoadService;
+    /** 지도 미리보기 — 지오서버 작업공간 주소(끝 / 없음, 비면 미리보기 비활성)와 배경 레이어(아래→위). */
+    private final String geoserverUrl;
+    private final List<String> previewBackgroundLayers;
     private final KrasUsezoneIngestService usezoneIngestService;
     private final KrasTxtIngestService txtIngestService;
     private final Map<String, String> slugToDatasetCode;
@@ -387,7 +396,13 @@ public class KrasSchemaController {
                                  KrasTxtIngestService txtIngestService,
                                  KrasOperationLogService operationLog, KrasHistoryService historyService,
                                  KrasVerificationEvidenceService verificationEvidenceService,
-                                 KrasNextgenScheduler nextgenScheduler, KrasFullLoadService fullLoadService) {
+                                 KrasNextgenScheduler nextgenScheduler, KrasFullLoadService fullLoadService,
+                                 @Value("${geoserver.url:}") String geoserverUrl,
+                                 @Value("${geoserver.preview.background-layers:lp_adm_emd,lp_pa_cbnd}")
+                                 String previewBackgroundLayers) {
+        this.geoserverUrl = geoserverUrl == null ? "" : geoserverUrl.trim().replaceAll("/+$", "");
+        this.previewBackgroundLayers = Stream.of(previewBackgroundLayers.split(","))
+                .map(String::trim).filter(n -> n.matches("[a-z0-9_]+")).toList();
         this.nextgenScheduler = nextgenScheduler;
         this.fullLoadService = fullLoadService;
         this.operationLog = operationLog;
@@ -460,6 +475,7 @@ public class KrasSchemaController {
 
         model.addAttribute("specServices", loadSpecServiceRows(jdbc));
         model.addAttribute("extraParamsHints", EXTRA_PARAMS_HINTS);
+        model.addAttribute("mapConfig", mapConfig(geoserverUrl));
         model.addAttribute("datasetIndex", buildDatasetIndex(jdbc));
         List<String> specCodes = SPEC_ITEMS.stream()
                 .map(SpecItem::datasetCode).filter(java.util.Objects::nonNull).distinct().toList();
@@ -556,6 +572,64 @@ public class KrasSchemaController {
      * 이 버튼은 "운영 응답으로 계약을 실제 확인했다"는 사람의 선언을 DB에 반영만 한다 —
      * 검증 자체를 이 버튼이 대신하지 않는다(design §5.3, §14-1).
      */
+    /** 규격 표 "적재 DB 테이블" 칸의 테이블만 조회 팝업에서 열 수 있다. */
+    static final Set<String> BROWSABLE_TABLES = SPEC_ITEMS.stream()
+            .flatMap(i -> KrasTableBrowser.splitTables(i.targetTable()).stream())
+            .collect(Collectors.toUnmodifiableSet());
+
+    /** 적재 DB 테이블 조회 팝업 — 현재 기관 행만, 개인정보는 가려서. 설계 2026-10-15-kras-db-table-popup-design.md */
+    @GetMapping("/kras-db/table")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> browseTable(@RequestParam String name,
+                                                           @RequestParam(required = false) String col,
+                                                           @RequestParam(required = false) String q,
+                                                           @RequestParam(defaultValue = "0") int page) {
+        try {
+            return ResponseEntity.ok(KrasTableBrowser.browse(jdbc(), BROWSABLE_TABLES, name, settings.orgCode(), col, q, page));
+        } catch (KrasTableBrowser.BrowseException e) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", e.getMessage()));
+        }
+    }
+
+    /** 지도 미리보기 대상: 규격 §15 SHAPE 다운로드 행의 테이블(과 그 파생 뷰). */
+    static final Set<String> PREVIEW_TABLES = SPEC_ITEMS.stream().filter(i -> i.specNo() == 15)
+            .flatMap(i -> KrasTableBrowser.splitTables(i.targetTable()).stream())
+            .collect(Collectors.toUnmodifiableSet());
+
+    /** 화면 JS(KRAS_MAP_CONFIG)에 넣는 값 — WMS 주소가 비면 [미리보기]를 누를 수 없다. */
+    static Map<String, Object> mapConfig(String geoserverUrl) {
+        Map<String, Object> cfg = new LinkedHashMap<>();
+        cfg.put("wmsUrl", geoserverUrl == null || geoserverUrl.isBlank() ? "" : geoserverUrl + "/wms");
+        cfg.put("previewTables", PREVIEW_TABLES.stream().sorted().toList());
+        return cfg;
+    }
+
+    /** 지도 미리보기 범위·레이어·포털 스타일(SLD). 설계 2026-10-15-kras-db-layer-map-preview-design.md §5.2 */
+    @GetMapping("/kras-db/table/extent")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> tableExtent(@RequestParam String name,
+                                                           @RequestParam(required = false) String col,
+                                                           @RequestParam(required = false) String q,
+                                                           @RequestParam(required = false) String key) {
+        try {
+            return ResponseEntity.ok(KrasTableBrowser.extent(jdbc(), BROWSABLE_TABLES, PREVIEW_TABLES, name,
+                    settings.orgCode(), col, q, key, previewBackgroundLayers));
+        } catch (KrasTableBrowser.BrowseException e) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", e.getMessage()));
+        }
+    }
+
+    /** 적재 테이블에서 파생된 뷰 목록(예: lt_c_uzone → 레이어별 v_lt_c_uzone_*) — 팝업의 "보기" 선택용. */
+    @GetMapping("/kras-db/table/views")
+    @ResponseBody
+    public ResponseEntity<Object> tableViews(@RequestParam String name) {
+        try {
+            return ResponseEntity.ok(KrasTableBrowser.views(jdbc(), BROWSABLE_TABLES, name, settings.orgCode()));
+        } catch (KrasTableBrowser.BrowseException e) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", e.getMessage()));
+        }
+    }
+
     @PostMapping("/kras-db/verify-dataset")
     public String verifyDataset(@RequestParam String datasetCode,
                                  @RequestParam(defaultValue = "false") boolean confirmed,

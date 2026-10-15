@@ -70,6 +70,7 @@ class KrasIntegrationViewTest {
             r.put("pendingItemId", 77L);
         });
         context.setVariable("specItems", specRows);
+        context.setVariable("mapConfig", KrasSchemaController.mapConfig("http://gs.local/geoserver/YG-Space"));
         context.setVariable("legacyNextRun", "기존 KRAS 동기화(KrasWorker) 다음 실행: 2026-10-08 04:30 (cron 0 30 4 * * *)");
         context.setVariable("specCallableCount", 0L);
         context.setVariable("specNoIdCount", 7L);
@@ -96,7 +97,17 @@ class KrasIntegrationViewTest {
                 "id=\"dset-live-row\"", "id=\"dset-live-pnu\"", "id=\"dset-live-extra-fields\"",
                 "onclick=\"krasLiveCollect()\"", "onclick=\"krasLivePromote()\"", "/kras-db/ingest/", "/kras-db/promote/",
                 // 추가 파라미터가 필요한 데이터셋만 입력칸을 보여준다 — 그 목록을 JS에 심어둔다.
-                "KRAS_EXTRA_PARAMS_HINTS", "cbldg_seqno");
+                "KRAS_EXTRA_PARAMS_HINTS", "cbldg_seqno",
+                // 적재 DB 테이블 칸: 테이블마다 조회 팝업 버튼, 화살표·쉼표는 글자로 남는다.
+                "data-table=\"kras.land_change_event\" data-dataset=\"land_change\"",
+                ">kras.land_change_event</button><span> → </span><button",
+                "data-table=\"kras.land_owner\" data-dataset=\"land_info\"", "<span>, </span>",
+                "id=\"tbl-modal-backdrop\"", "id=\"tbl-col\"", "id=\"tbl-q\"", "/kras-db/table?",
+                // 지도 미리보기: [초기화] 옆 버튼, 지도 팝업, yml 지오서버 주소가 JS로 넘어간다.
+                "id=\"tbl-reset\">초기화</button>\n          <button type=\"button\" class=\"btn btn-secondary\" id=\"tbl-preview\" hidden>미리보기</button>",
+                "id=\"map-modal-backdrop\"", "id=\"map-view\"", "id=\"map-portal-scale\"", "/kras-db/table/extent?",
+                "name=\"tbl-pick\"", "선택 1건 미리보기", "CQL_FILTER", "params.set('key', key)",
+                "\"wmsUrl\":\"http:\\/\\/gs.local\\/geoserver\\/YG-Space\\/wms\"", "public.lt_c_uzone");
         // 규격 상세(수집 이력)는 통계 페이지로 옮겼다
         assertThat(html).doesNotContain("전체 연계 작업 이력", "id=\"integration-history\"", "id=\"spec-detail\"",
                 "krasSpecDetail", "kras ↔ public 건수 비교", "kras.lp_pa_cbnd (게시본)", "kras.land_basic 현재 건수",
