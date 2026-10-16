@@ -43,7 +43,13 @@
   .q-stat b{display:block;font-size:17px;color:#e7eaee;font-family:'JetBrains Mono',monospace;}
   .q-stat span{font-size:11.5px;color:#69707b;}
   .q-notice{font-size:12.5px;color:#c9ced6;margin:4px 0;}
-  .q-list summary{cursor:pointer;color:#c9ced6;font-size:13px;margin:10px 0 6px;}
+  button.q-stat{font-family:inherit;text-align:left;cursor:pointer;}
+  button.q-stat:hover,.q-open:hover{border-color:#5fa8e8;}
+  .q-open-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;}
+  .q-open{background:#14171c;border:1px solid #2e3640;border-radius:8px;color:#c9ced6;font-size:13px;padding:6px 12px;cursor:pointer;font-family:inherit;}
+  .q-list .sched-table tbody tr[data-dataset]{cursor:pointer;}
+  .q-list .sched-table tbody tr[data-dataset]:hover td{background:#171b22;}
+  .q-list[hidden]{display:none;}
   .q-search{background:#14171c;color:#c8cdd4;border:1px solid #2e3640;border-radius:6px;padding:4px 8px;font-size:12px;font-family:inherit;}
   .adv summary{cursor:pointer;color:#c9ced6;font-size:14px;font-weight:600;}
   .help-body table{width:100%;border-collapse:collapse;font-size:13px;margin:8px 0 14px;}
@@ -138,20 +144,11 @@
       <div class="sched-scroll"><table class="sched-table" id="q-datasets">
         <thead><tr><th>서비스</th><th>대기</th><th>재시도</th><th>실패</th><th>완료</th><th>마지막 성공</th></tr></thead>
         <tbody></tbody></table></div>
-      <details class="q-list" data-kind="RETRY"><summary>재시도 대기 <span class="q-count"></span></summary>
-        <input class="q-search" placeholder="PNU·서비스 검색">
-        <div class="sched-scroll"><table class="sched-table"><thead><tr><th>PNU</th><th>서비스</th><th>재시도</th><th>다음 시도</th><th>사유</th></tr></thead><tbody></tbody></table></div>
-      </details>
-      <details class="q-list" data-kind="FAILED"><summary>실패 <span class="q-count"></span></summary>
-        <input class="q-search" placeholder="PNU·서비스 검색">
-        <button type="button" class="btn btn-secondary" id="retry-selected">선택 재시도</button>
-        <button type="button" class="btn btn-secondary" id="retry-all">전체 재시도</button>
-        <div class="sched-scroll"><table class="sched-table"><thead><tr><th></th><th>PNU</th><th>서비스</th><th>시도</th><th>마지막 시도</th><th>사유</th></tr></thead><tbody></tbody></table></div>
-      </details>
-      <details class="q-list" data-kind="RUNNING"><summary>처리 중 <span class="q-count"></span></summary>
-        <p class="cron-text" style="margin-bottom:6px;" th:text="${help['leaseMinutes']} + '분 넘게 끝나지 않은 행은 멈춤 의심으로 표시합니다.'"></p>
-        <div class="sched-scroll"><table class="sched-table"><thead><tr><th>PNU</th><th>서비스</th><th>시작</th><th>상태</th></tr></thead><tbody></tbody></table></div>
-      </details>
+      <div class="q-open-row" id="q-open-row">
+        <button type="button" class="q-open" data-kind="RETRY">재시도 대기 <span class="q-count"></span> ›</button>
+        <button type="button" class="q-open" data-kind="FAILED">실패 <span class="q-count"></span> ›</button>
+        <button type="button" class="q-open" data-kind="RUNNING">처리 중 <span class="q-count"></span> ›</button>
+      </div>
     </section>
 
     <section class="card adv">
@@ -238,6 +235,44 @@
       </table>
     </div>
   </section>
+
+  <!-- 대기열 목록 팝업 — 숫자 칸(재시도 대기·실패·처리 중)이나 목록 버튼에서 연다. 행을 누르면 아래 상세 팝업. -->
+  <div class="dset-modal-backdrop help-modal" id="q-list-modal" hidden>
+    <div class="dset-modal" role="dialog" aria-modal="true" aria-labelledby="q-list-title" style="max-width:1100px;">
+      <div class="dset-modal-head">
+        <h3 id="q-list-title"></h3>
+        <button type="button" class="dset-modal-close">닫기 ✕</button>
+      </div>
+      <div class="dset-modal-body">
+        <p class="cron-text" style="margin-bottom:8px;">최근 50건 · 행을 누르면 상세를 봅니다.</p>
+          <div class="q-list" data-kind="RETRY" data-title="재시도 대기" hidden>
+            <input class="q-search" placeholder="PNU·서비스 검색">
+            <div class="sched-scroll"><table class="sched-table"><thead><tr><th>PNU</th><th>서비스</th><th>재시도</th><th>다음 시도</th><th>사유</th></tr></thead><tbody></tbody></table></div>
+          </div>
+          <div class="q-list" data-kind="FAILED" data-title="실패" hidden>
+            <input class="q-search" placeholder="PNU·서비스 검색">
+            <button type="button" class="btn btn-secondary" id="retry-selected">선택 재시도</button>
+            <button type="button" class="btn btn-secondary" id="retry-all">전체 재시도</button>
+            <div class="sched-scroll"><table class="sched-table"><thead><tr><th></th><th>PNU</th><th>서비스</th><th>시도</th><th>마지막 시도</th><th>사유</th></tr></thead><tbody></tbody></table></div>
+          </div>
+          <div class="q-list" data-kind="RUNNING" data-title="처리 중" hidden>
+            <p class="cron-text" style="margin-bottom:6px;" th:text="${help['leaseMinutes']} + '분 넘게 끝나지 않은 행은 멈춤 의심으로 표시합니다.'"></p>
+            <div class="sched-scroll"><table class="sched-table"><thead><tr><th>PNU</th><th>서비스</th><th>시작</th><th>상태</th></tr></thead><tbody></tbody></table></div>
+          </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 대기열 행 상세 팝업 — 목록 팝업 위에 뜬다(Esc는 위에 있는 것부터 닫힘). -->
+  <div class="dset-modal-backdrop help-modal" id="q-row-modal" hidden>
+    <div class="dset-modal" role="dialog" aria-modal="true" aria-labelledby="q-row-title" style="max-width:820px;">
+      <div class="dset-modal-head">
+        <h3 id="q-row-title"></h3>
+        <button type="button" class="dset-modal-close">닫기 ✕</button>
+      </div>
+      <div class="dset-modal-body help-body" id="q-row-body"></div>
+    </div>
+  </div>
 
   <!-- 도움말 팝업 — 팝업 1개 = 도움말 1항목(설계 §7.2). 항목을 늘리면 data-help 버튼을 하나 더 둔다. -->
   <div class="dset-modal-backdrop help-modal" id="help-recovery" hidden>
@@ -416,13 +451,19 @@
     m.addEventListener('click', e => { if (e.target === m) m.hidden = true; });
   });
   document.addEventListener('keydown', e => {
-    if (e.key === 'Escape') document.querySelectorAll('.help-modal').forEach(m => { m.hidden = true; });
+    if (e.key !== 'Escape') return;
+    const open = [...document.querySelectorAll('.help-modal')].filter(m => !m.hidden);
+    if (open.length) open[open.length - 1].hidden = true;
   });
 
   // ── 대기열 현황 ─────────────────────────────────────────
   let labels = {};
   const name = code => labels[code] || code;
   const STATS = [['pending','대기'],['running','처리 중'],['retry','재시도 대기'],['failed','실패'],['skipped','제외'],['done','완료']];
+  const LIST_KINDS = { running: 'RUNNING', retry: 'RETRY', failed: 'FAILED' };
+  const listModal = document.getElementById('q-list-modal');
+  const rowModal = document.getElementById('q-row-modal');
+  const openList = () => listModal.hidden ? null : listModal.querySelector('.q-list:not([hidden])');
 
   async function loadQueue() {
     let q;
@@ -432,13 +473,15 @@
     err.style.display = q.error ? 'block' : 'none';
     document.getElementById('q-updated').textContent = new Date().toTimeString().slice(0, 5);
     // 테이블이 없거나 조회 실패면 숫자·목록 영역은 숨기고 안내만 보인다.
-    document.querySelectorAll('#q-stats, #q-progress, #q-notices, #queue-panel .sched-scroll, .q-list')
+    document.querySelectorAll('#q-stats, #q-progress, #q-notices, #queue-panel .sched-scroll, #q-open-row')
       .forEach(el => { el.style.display = q.error ? 'none' : ''; });
     if (q.error) return;
     labels = q.datasetLabels || {};
     document.getElementById('q-updated').textContent = q.updatedAt;
-    document.getElementById('q-stats').innerHTML = STATS.map(([k, t]) =>
-      `<div class="q-stat"><b>${Number(q[k] || 0).toLocaleString()}</b><span>${t}</span></div>`).join('');
+    // 재시도 대기·실패·처리 중 숫자 칸은 누르면 그 목록 팝업이 열린다.
+    document.getElementById('q-stats').innerHTML = STATS.map(([k, t]) => LIST_KINDS[k]
+      ? `<button type="button" class="q-stat" data-kind="${LIST_KINDS[k]}" title="${t} 목록 보기"><b>${Number(q[k] || 0).toLocaleString()}</b><span>${t} ›</span></button>`
+      : `<div class="q-stat"><b>${Number(q[k] || 0).toLocaleString()}</b><span>${t}</span></div>`).join('');
     document.getElementById('q-progress').innerHTML =
       (q.draining ? `● 처리 중 (스레드 ${q.threads}/${q.parallelism}) · ` : '○ 처리기 대기 · ')
       + `오늘 처리 ${Number(q.today || 0).toLocaleString()}건`
@@ -448,10 +491,11 @@
       `<tr><td>${esc(name(d.dataset_code))}</td><td>${d.pending}</td><td>${d.retry}</td><td>${d.failed}</td><td>${d.done}</td><td>${esc(d.last_success || '—')}</td></tr>`).join('')
       || '<tr><td colspan="6" style="color:#69707b;">대기열이 비어 있습니다. 전체 적재를 실행하면 채워집니다.</td></tr>';
     const counts = { RETRY: q.retry, FAILED: q.failed, RUNNING: q.running };
-    document.querySelectorAll('.q-list').forEach(d => {
-      d.querySelector('.q-count').textContent = '(' + Number(counts[d.dataset.kind] || 0).toLocaleString() + ')';
-      if (d.open) loadRows(d);
+    document.querySelectorAll('.q-open').forEach(b => {
+      b.querySelector('.q-count').textContent = '(' + Number(counts[b.dataset.kind] || 0).toLocaleString() + ')';
     });
+    const shown = openList();
+    if (shown) loadRows(shown);
   }
 
   async function loadRows(d) {
@@ -463,26 +507,89 @@
     if (r.error) { body.innerHTML = `<tr><td colspan="6" class="gate-bad">${esc(r.error)}</td></tr>`; return; }
     const rows = r.rows || [];
     const svc = x => esc(name(x.dataset_code)) + (x.extra_key ? ` <span class="cron-text">${esc(x.extra_key)}</span>` : '');
+    const tr = x => `<tr data-dataset="${esc(x.dataset_code)}" data-pnu="${esc(x.pnu)}" data-extra="${esc(x.extra_key || '')}">`;
     body.innerHTML = rows.map(x => {
-      if (kind === 'RETRY') return `<tr><td class="cron-text">${esc(x.pnu)}</td><td>${svc(x)}</td><td>${x.attempt_count}/3</td>`
+      if (kind === 'RETRY') return `${tr(x)}<td class="cron-text">${esc(x.pnu)}</td><td>${svc(x)}</td><td>${x.attempt_count}/3</td>`
         + `<td>${esc(x.next_attempt)} (${x.next_in_min}분 뒤)</td><td>${esc(x.last_error)}</td></tr>`;
       if (kind === 'FAILED') {
         const key = [x.dataset_code, x.pnu, x.extra_key].join('|');
         const warn = String(x.last_error || '').match(/^필드 검증 경고\(item_id=(\d+)\)/);
         const pnuCell = warn
           ? `<a href="/kras-db?hist=${encodeURIComponent(x.dataset_code)}&item=${warn[1]}" style="color:#7aafe8;" title="수집 이력 팝업 열기">${esc(x.pnu)}</a>` : esc(x.pnu);
-        return `<tr><td><input type="checkbox" class="retry-key" value="${esc(key)}"></td><td class="cron-text">${pnuCell}</td>`
+        return `${tr(x)}<td><input type="checkbox" class="retry-key" value="${esc(key)}"></td><td class="cron-text">${pnuCell}</td>`
           + `<td>${svc(x)}</td><td>${x.attempt_count}</td><td>${esc(x.next_attempt)}</td><td>${esc(x.last_error)}</td></tr>`;
       }
-      return `<tr><td class="cron-text">${esc(x.pnu)}</td><td>${svc(x)}</td><td>${esc(x.started)}</td>`
+      return `${tr(x)}<td class="cron-text">${esc(x.pnu)}</td><td>${svc(x)}</td><td>${esc(x.started)}</td>`
         + `<td class="${x.stalled ? 'gate-bad' : 'gate-ok'}">${x.stalled ? '멈춤 의심' : '처리 중'}</td></tr>`;
     }).join('') || '<tr><td colspan="6" style="color:#69707b;">없음</td></tr>';
   }
 
-  document.querySelectorAll('.q-list').forEach(d => {
-    d.addEventListener('toggle', () => { if (d.open) loadRows(d); });
+  function showList(kind) {
+    listModal.querySelectorAll('.q-list').forEach(d => { d.hidden = d.dataset.kind !== kind; });
+    const d = listModal.querySelector(`.q-list[data-kind="${kind}"]`);
+    document.getElementById('q-list-title').textContent = d.dataset.title + ' 목록';
+    listModal.hidden = false;
+    loadRows(d);
+  }
+  document.getElementById('queue-panel').addEventListener('click', e => {
+    const b = e.target.closest('[data-kind]');
+    if (b && b.tagName === 'BUTTON') showList(b.dataset.kind);
+  });
+
+  // 행 상세: 체크박스·링크를 누른 건 그대로 두고, 행의 나머지를 누르면 연다.
+  listModal.addEventListener('click', e => {
+    if (e.target.closest('input, a, button')) return;
+    const row = e.target.closest('tr[data-dataset]');
+    if (row) showRow(row.dataset.dataset, row.dataset.pnu, row.dataset.extra);
+  });
+
+  const STATUS_TEXT = { PENDING: '대기', RETRY: '재시도 대기', FAILED: '실패', DONE: '완료', SKIPPED: '제외' };
+  const REASON_TEXT = { CHANGE: '토지이동 재조회', CHILD: '건물 하위 조회', FULL: '전체 적재', ANNUAL: '연 1회 공시', ROTATE: '순환 재조회' };
+  async function showRow(dataset, pnu, extra) {
+    const body = document.getElementById('q-row-body');
+    document.getElementById('q-row-title').textContent = pnu + ' · ' + name(dataset);
+    body.innerHTML = '<p>불러오는 중…</p>';
+    rowModal.hidden = false;
+    let r;
+    try {
+      r = await (await fetch('/kras-schedule/queue/row?' + new URLSearchParams({ dataset, pnu, extraKey: extra || '' }))).json();
+    } catch (e) { body.innerHTML = `<p class="gate-bad">요청 실패: ${esc(String(e))}</p>`; return; }
+    if (r.error) { body.innerHTML = `<p class="gate-bad">${esc(r.error)}</p>`; return; }
+    const hist = id => id ? `<a href="/kras-db?hist=${encodeURIComponent(r.dataset_code)}&item=${id}" style="color:#7aafe8;" title="수집 이력 팝업 열기">#${id}</a>` : '—';
+    const state = r.running ? (r.stalled ? '멈춤 의심(처리 중 끊김)' : '처리 중') : (STATUS_TEXT[r.status] || r.status);
+    const rows = [
+      ['상태', `<span class="${r.status === 'FAILED' || r.stalled ? 'gate-bad' : ''}">${esc(state)}</span>`],
+      ['서비스', `${esc(r.label)} <span class="cron-text">${esc(r.dataset_code)}</span>`],
+      ['PNU', `<span class="cron-text">${esc(r.pnu)}</span>`],
+      ['건물번호 등', r.extra_key ? `<span class="cron-text">${esc(r.extra_key)}</span> · 요청 파라미터 <span class="cron-text">${esc(r.extra_params)}</span>` : '—'],
+      ['들어온 이유', esc(REASON_TEXT[r.reason] || r.reason)],
+      ['시도', `${r.attempt_count}회`],
+      ['대기열 등록', esc(r.queued || '—')],
+      [r.status === 'FAILED' ? '마지막 시도' : '다음 시도', esc(r.next_attempt || '—')],
+      ['처리 시작', r.running ? esc(r.started || '—') : '—'],
+      ['마지막 성공', esc(r.last_success || '없음')],
+      ['반영 대기 수집 건', hist(r.pending_item_id)],
+      ['마지막 수집 건', hist(r.last_item_id)],
+      ['사유', r.last_error ? `<span style="white-space:pre-wrap;overflow-wrap:anywhere;">${esc(r.last_error)}</span>` : '—'],
+    ];
+    const items = (r.items || []).map(i => `<tr><td>${hist(i.item_id)}</td><td>${i.attempt_no}</td><td>${esc(i.status)}</td>`
+      + `<td>${esc(i.requested || '—')}</td><td>${i.rows_received}/${i.rows_applied}</td>`
+      + `<td style="overflow-wrap:anywhere;">${esc(i.error_message || '')}</td></tr>`).join('');
+    body.innerHTML = `<table><tbody>${rows.map(([k, v]) => `<tr><th style="width:150px;">${k}</th><td>${v}</td></tr>`).join('')}</tbody></table>`
+      + `<h4>이 필지의 최근 수집 이력</h4>`
+      + (items ? `<table><thead><tr><th>수집 건</th><th>회차</th><th>상태</th><th>요청</th><th>받음/반영</th><th>오류</th></tr></thead><tbody>${items}</tbody></table>`
+        : '<p class="cron-text">수집 이력이 없습니다.</p>')
+      + (r.status === 'FAILED' ? '<button type="button" class="btn btn-secondary" id="q-row-retry">이 행 재시도</button>' : '');
+    const again = document.getElementById('q-row-retry');
+    if (again) again.onclick = async () => {
+      await retry([[r.dataset_code, r.pnu, r.extra_key].join('|')]);
+      rowModal.hidden = true;
+    };
+  }
+
+  listModal.querySelectorAll('.q-list').forEach(d => {
     let t;
-    d.querySelector('.q-search').addEventListener('input', () => { clearTimeout(t); t = setTimeout(() => loadRows(d), 300); });
+    d.querySelector('.q-search')?.addEventListener('input', () => { clearTimeout(t); t = setTimeout(() => loadRows(d), 300); });
   });
 
   async function retry(keys) {

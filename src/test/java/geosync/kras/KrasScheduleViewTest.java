@@ -99,5 +99,12 @@ class KrasScheduleViewTest {
         // 도움말은 팝업(숨김)으로만 — 첫 화면에 펼치지 않는다.
         assertThat(html).containsPattern("id=\"help-recovery\"\\s+hidden");
         assertThat(html.indexOf("id=\"advanced\"")).isLessThan(html.indexOf("name=\"parallelism\""));
+        // 재시도 대기·실패·처리 중 목록은 팝업으로, 행을 누르면 상세 팝업(둘 다 숨김으로 시작).
+        assertThat(html).contains("class=\"q-open\" data-kind=\"RETRY\"", "class=\"q-open\" data-kind=\"FAILED\"",
+                "class=\"q-open\" data-kind=\"RUNNING\"", "id=\"retry-selected\"", "/kras-schedule/queue/row?",
+                "d.querySelector('.q-search')?.addEventListener")
+                .containsPattern("id=\"q-list-modal\"\\s+hidden").containsPattern("id=\"q-row-modal\"\\s+hidden")
+                .doesNotContain("<details class=\"q-list\"");
+        assertThat(html.indexOf("id=\"q-list-modal\"")).isLessThan(html.indexOf("id=\"q-row-modal\""));
     }
 }

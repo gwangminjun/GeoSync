@@ -299,6 +299,33 @@ public class KrasPnuQueueService {
             """, LEASE_MINUTES, orgCd, like, like);
     }
 
+    /**
+     * 행 하나의 상세(대기열 칸 전부 + 그 필지의 최근 수집 이력 10건). 없으면 null.
+     * 수집 이력은 수집 때와 같은 식(kras.entity_key)으로 scope_key를 만들어 인덱스(dataset_code, scope_key)로 찾는다.
+     */
+    public Map<String, Object> detail(JdbcTemplate jdbc, String orgCd, String datasetCode, String pnu, String extraKey) {
+        List<Map<String, Object>> found = jdbc.queryForList("""
+            SELECT dataset_code, pnu, extra_key, extra_params::text AS extra_params, reason, status, attempt_count,
+                   to_char(queued_at, 'YYYY-MM-DD HH24:MI') AS queued,
+                   to_char(next_attempt_at, 'YYYY-MM-DD HH24:MI') AS next_attempt,
+                   to_char(lease_until - make_interval(mins => ?), 'YYYY-MM-DD HH24:MI') AS started,
+                   lease_until IS NOT NULL AND status IN ('PENDING','RETRY') AS running,
+                   lease_until < now() AS stalled,
+                   to_char(last_success_at, 'YYYY-MM-DD HH24:MI') AS last_success,
+                   pending_item_id, last_item_id, last_error,
+                   kras.entity_key(jsonb_build_object('pnu', pnu::text) || extra_params) AS scope_key
+            FROM kras.pnu_work WHERE\s""" + KEY, LEASE_MINUTES, orgCd, datasetCode, pnu, extraKey);
+        if (found.isEmpty()) return null;
+        Map<String, Object> out = new LinkedHashMap<>(found.get(0));
+        out.put("items", jdbc.queryForList("""
+            SELECT item_id, attempt_no, status, to_char(requested_at, 'YYYY-MM-DD HH24:MI') AS requested,
+                   rows_received, rows_applied, error_message
+            FROM kras.sync_item WHERE org_cd=? AND dataset_code=? AND scope_key=?
+            ORDER BY item_id DESC LIMIT 10
+            """, orgCd, datasetCode, out.remove("scope_key")));
+        return out;
+    }
+
     /** 실패 행 재시도 — keys가 비면 전부. key = dataset_code|pnu|extra_key. */
     public int retryFailed(JdbcTemplate jdbc, String orgCd, List<String> keys) {
         String reset = """

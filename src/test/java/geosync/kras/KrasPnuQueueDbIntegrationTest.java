@@ -156,6 +156,12 @@ class KrasPnuQueueDbIntegrationTest {
         assertThat(count("SELECT count(*) FROM kras.pnu_work WHERE org_cd=? AND status='FAILED'")).isEqualTo(3);
         assertThat(queue.rows(jdbc, org, "FAILED", pnu(1).substring(10))).singleElement()
                 .satisfies(row -> assertThat((String) row.get("last_error")).contains("Connect timed out"));
+        // 상세 팝업: 대기열 칸 + 그 필지 수집 이력(같은 scope_key 식으로 찾는다).
+        assertThat(queue.detail(jdbc, org, "land_bldg_check", pnu(1), ""))
+                .containsEntry("status", "FAILED").containsEntry("attempt_count", 4).containsEntry("running", false)
+                .containsEntry("reason", "FULL").containsKey("items").doesNotContainKey("scope_key")
+                .satisfies(d -> assertThat((String) d.get("last_error")).contains("Connect timed out"));
+        assertThat(queue.detail(jdbc, org, "land_bldg_check", pnu(1), "no-such")).isNull();
         assertThat(queue.retryFailed(jdbc, org, List.of("land_bldg_check|" + pnu(1) + "|"))).isEqualTo(1);
         assertThat(work("land_bldg_check", pnu(1))).containsEntry("status", "PENDING").containsEntry("attempt_count", 0);
         assertThat(queue.retryFailed(jdbc, org, List.of())).isEqualTo(2);

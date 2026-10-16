@@ -280,6 +280,23 @@ public class KrasScheduleController {
         }
     }
 
+    /** 대기열 행 하나의 상세 팝업(설계 §7.1 추가). */
+    @GetMapping("/kras-schedule/queue/row")
+    @ResponseBody
+    public Map<String, Object> queueRow(@RequestParam String dataset, @RequestParam String pnu,
+                                        @RequestParam(defaultValue = "") String extraKey) {
+        try {
+            JdbcTemplate jdbc = targetDbService.getConfiguredTargets().get(0).jdbc();
+            if (!queue.tableExists(jdbc)) return Map.of("error", NO_TABLE);
+            Map<String, Object> row = queue.detail(jdbc, runtimeSettings.orgCode(), dataset, pnu, extraKey);
+            if (row == null) return Map.of("error", "대기열에 없는 행입니다(다른 기관의 행이거나 PNU·서비스가 다름).");
+            row.put("label", DATASET_LABELS.getOrDefault(dataset, dataset));
+            return row;
+        } catch (Exception e) {
+            return Map.of("error", "상세를 조회할 수 없습니다: " + e.getMessage());
+        }
+    }
+
     /** 실패 행 재시도 — keys(dataset|pnu|extra_key)가 없으면 전부. 처리는 다음 실행 또는 "지금 실행"에서. */
     @PostMapping("/kras-schedule/queue/retry")
     @ResponseBody
