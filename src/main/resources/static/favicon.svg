@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- GeoSync: 헤더 로고 색(바탕 #171b21, Sync #0e9b94) — 필지(사각형)를 감싸는 동기화 화살표 두 개 -->
+  <rect width="64" height="64" rx="14" fill="#171b21"/>
+  <g fill="none" stroke="#0e9b94" stroke-width="6" stroke-linecap="round">
+    <path d="M14 30a18 18 0 0 1 31-12"/>
+    <path d="M50 34a18 18 0 0 1-31 12"/>
+  </g>
+  <path d="M51 9v14H37z" fill="#0e9b94"/>
+  <path d="M13 55V41h14z" fill="#0e9b94"/>
+  <rect x="25" y="25" width="14" height="14" rx="2" fill="#f3f5f7"/>
+</svg>
