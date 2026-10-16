@@ -67,12 +67,26 @@ class KrasNextgenSettingsServiceTest {
         var s = service.current();
         assertThat(s.schedule(KrasNextgenGroup.CORRECTION)).isEqualTo("0 0 6 * * *");
         assertThat(s.schedule(KrasNextgenGroup.FULL_LOAD)).isEqualTo("0 30 2 * * *");
+        // 레이어 적재(2026-10-16 신설)는 이전 키를 옮기지 않는다 — 키가 없으면 꺼진 채로 시작.
+        assertThat(s.schedule(KrasNextgenGroup.LAYER)).isEmpty();
 
         service.save(s);
         Map<String, Object> root = new Yaml().load(Files.readString(file, StandardCharsets.UTF_8));
         Map<String, Object> schedules = (Map<String, Object>) ((Map<String, Object>) root.get("kras-nextgen"))
                 .get("schedules");
-        assertThat(schedules).containsOnlyKeys("full-load", "correction");
+        assertThat(schedules).containsOnlyKeys("full-load", "correction", "layer");
+    }
+
+    @Test
+    void layerScheduleIsReadAndSaved(@TempDir Path dir) throws Exception {
+        Path file = dir.resolve("application.yml");
+        Files.writeString(file, "kras-nextgen:\n  schedules:\n    layer: \"0 30 7 * * *\"\n", StandardCharsets.UTF_8);
+        var service = new KrasNextgenSettingsService(file.toString());
+        assertThat(service.current().schedule(KrasNextgenGroup.LAYER)).isEqualTo("0 30 7 * * *");
+        service.save(service.current());
+        Files.setLastModifiedTime(file, FileTime.fromMillis(System.currentTimeMillis() + 5000));
+        assertThat(service.current().schedule(KrasNextgenGroup.LAYER)).isEqualTo("0 30 7 * * *");
+        assertThat(service.current().schedule(KrasNextgenGroup.FULL_LOAD)).isEmpty();
     }
 
     @Test
@@ -114,5 +128,49 @@ class KrasNextgenSettingsServiceTest {
         var service = new KrasNextgenSettingsService(dir.resolve("a.yml").toString());
         assertThatThrownBy(() -> service.save(bad)).isInstanceOf(IllegalArgumentException.class);
         assertThat(dir.resolve("a.yml")).doesNotExist();
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void refreshDaysByDatasetDefaultsToRecommendedAndIsOmittedWhenUnchanged(@TempDir Path dir) throws Exception {
+        // 기본: 소유자 계열 14일, 총괄표제부 90일, 나머지는 refresh-days(30)
+        var d = KrasNextgenSettingsService.Pnu.defaults();
+        assertThat(d.refreshDays("land_info")).isEqualTo(14);
+        assertThat(d.refreshDays("bldg_ledg_gen_hds_info")).isEqualTo(90);
+        assertThat(d.refreshDays("land_bldg_check")).isEqualTo(30);
+
+        Path file = dir.resolve("application.yml");
+        Files.writeString(file, "kras-nextgen:\n  pnu:\n    refresh-days: 20\n", StandardCharsets.UTF_8);
+        var service = new KrasNextgenSettingsService(file.toString());
+        var p = service.current().pnu();
+        assertThat(p.refreshDaysByDataset()).isEqualTo(d.refreshDaysByDataset());   // 키가 없으면 권장값
+        assertThat(p.refreshDays("land_mov_hist")).isEqualTo(20);
+
+        service.save(service.current());
+        Map<String, Object> pnu = (Map<String, Object>) ((Map<String, Object>) ((Map<String, Object>) new Yaml()
+                .load(Files.readString(file, StandardCharsets.UTF_8))).get("kras-nextgen")).get("pnu");
+        assertThat(pnu).doesNotContainKey("refresh-days-by-dataset");   // 권장값과 같으면 쓰지 않는다
+
+        // {}는 "전부 기본 일수", 값을 적으면 그 값 — 저장·다시 읽기 왕복
+        Files.writeString(file, "kras-nextgen:\n  pnu:\n    refresh-days-by-dataset: {}\n", StandardCharsets.UTF_8);
+        Files.setLastModifiedTime(file, FileTime.fromMillis(System.currentTimeMillis() + 5000));
+        assertThat(service.current().pnu().refreshDays("land_info")).isEqualTo(30);
+        Files.writeString(file, "kras-nextgen:\n  pnu:\n    refresh-days-by-dataset:\n      land_info: 7\n",
+                StandardCharsets.UTF_8);
+        Files.setLastModifiedTime(file, FileTime.fromMillis(System.currentTimeMillis() + 10000));
+        service.save(service.current());
+        Files.setLastModifiedTime(file, FileTime.fromMillis(System.currentTimeMillis() + 15000));
+        assertThat(service.current().pnu().refreshDaysByDataset()).containsExactly(entry("land_info", 7));
+    }
+
+    @Test
+    void refreshDaysByDatasetRejectsPriceUnknownAndNonPositiveValues() {
+        var p = new KrasNextgenSettingsService.Pnu(List.of(), 8, 0, 0, "07:00", 20, 30, 200000, "06-01", List.of(),
+                Map.of("land_jiga", 30, "nope", 10, "land_info", 0));
+        assertThat(KrasNextgenSettingsService.validate(
+                new KrasNextgenSettingsService.Settings("", "", "", "yyyyMMdd", Map.of(), p)))
+                .anyMatch(e -> e.contains("land_jiga") && e.contains("가격"))
+                .anyMatch(e -> e.contains("nope"))
+                .anyMatch(e -> e.contains("land_info") && e.contains("1일 이상"));
     }
 }

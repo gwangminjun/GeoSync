@@ -57,7 +57,7 @@ class KrasNextgenSchedulerTest {
 
     @Test
     void groupRunsEveryStepInOrderAndKeepsGoingAfterAFailedStep() {
-        schedules(Map.of("full-load", "0 0 0 1 * *"));
+        schedules(Map.of("full-load", "0 0 0 1 * *", "layer", "0 30 7 * * *"));
         target();
         when(runtime.syncEnabled()).thenReturn(true);
         when(incremental.runMonthlyCorrection(any(), any(), any(), any())).thenReturn(List.of("TXT ok"));
@@ -65,14 +65,29 @@ class KrasNextgenSchedulerTest {
         when(fullLoad.runUsezone(any(), any(), any(), any())).thenReturn(List.of("용도 ok"));
         when(queue.tableExists(jdbc)).thenReturn(false);
 
+        // 전체 적재는 토지기본정보 TXT → 대기열 등록만. 레이어(SHP)는 2026-10-16에 레이어 적재로 분리했다.
         scheduler.runGroup(KrasNextgenGroup.FULL_LOAD, false);
-
         verify(incremental).runMonthlyCorrection(jdbc, "12830", "SCHEDULE", "MONTHLY");
-        verify(fullLoad).runUsezone(jdbc, "12830", "SCHEDULE", "MONTHLY");
+        verify(fullLoad, never()).runCadastral(any(), any(), any(), any());
+        verify(fullLoad, never()).runUsezone(any(), any(), any(), any());
+        assertThat(scheduler.lastResult("full-load")).contains("TXT ok", "pnu_work 테이블이 없습니다");
+
+        // 레이어 적재(매일): 연속지적이 실패해도 용도지역은 돈다.
+        scheduler.runGroup(KrasNextgenGroup.LAYER, false);
+        verify(fullLoad).runUsezone(jdbc, "12830", "SCHEDULE", "DAILY");
         assertThat(scheduler.lastResult("cadastral")).contains("실패: SHP 다운로드 실패");
-        assertThat(scheduler.lastResult("full-load")).contains("TXT ok", "SHP 다운로드 실패", "용도 ok",
-                "pnu_work 테이블이 없습니다");
+        assertThat(scheduler.lastResult("layer")).contains("SHP 다운로드 실패", "용도 ok");
         assertThat(scheduler.running()).isNull();
+    }
+
+    @Test
+    void layerGroupIsShownOnDashboardForShapeDatasets() {
+        schedules(Map.of("layer", "0 30 7 * * *"));
+        assertThat(scheduler.nextRun(KrasNextgenGroup.LAYER)).isPresent();
+        assertThat(scheduler.scheduleDisplay().get("cadastral_file")[0]).isEqualTo("레이어 적재 · 0 30 7 * * *");
+        assertThat(scheduler.scheduleDisplay()).containsKey("usezone_file").doesNotContainKey("land_basic_file");
+        assertThat(KrasNextgenGroup.LAYER.replacesPublic()).isTrue();
+        assertThat(KrasNextgenGroup.FULL_LOAD.replacesPublic()).isFalse();
     }
 
     @Test

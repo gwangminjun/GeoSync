@@ -26,7 +26,8 @@ import java.util.Map;
  *   (기존 SettingsFileService와 같은 방식, 그 클래스는 수정하지 않음).
  * - kras 블록 밖에 두는 이유: 설정 화면 저장이 kras 블록을 화면 항목으로 통째로 교체한다.
  * - 파일 수정 시각이 바뀌면 다시 읽는다 — 저장·직접 수정 모두 재시작 없이 다음 읽기부터 반영된다.
- * - 스케줄은 묶음 2개(full-load, correction)만 둔다(2026-10-15 설계 §8). 이전 단계별 키는 읽을 때 옮기고 저장할 때 지운다.
+ * - 스케줄은 묶음 3개(full-load, correction, layer)에만 둔다(2026-10-15 설계 §8, layer는 2026-10-16 분리).
+ *   이전 단계별 키는 읽을 때 옮기고 저장할 때 지운다.
  */
 @Service
 public class KrasNextgenSettingsService {
@@ -37,14 +38,36 @@ public class KrasNextgenSettingsService {
     /** 2026-10-14 단계별 스케줄 키 → 옮겨 갈 묶음 (앞에 있는 키가 우선). */
     private static final Map<String, List<String>> OLD_SCHEDULE_KEYS = Map.of(
             "correction", List.of("land-change-daily"),
-            "full-load", List.of("cadastral-full", "usezone-full", "land-basic-correction", "land-price-full"));
+            "full-load", List.of("cadastral-full", "usezone-full", "land-basic-correction", "land-price-full"),
+            "layer", List.of());   // 2026-10-16 신설 — 옮길 이전 키 없음(꺼진 채로 시작). 빠지면 parse()가 NPE.
 
-    /** PNU 대기열 설정 (kras-nextgen.pnu). 설계 §8. */
+    /**
+     * PNU 대기열 설정 (kras-nextgen.pnu). 설계 2026-10-15 §8.
+     * @param refreshDaysByDataset 서비스별 재조회 주기(일). 없는 서비스는 refreshDays. 설계 2026-10-16 §8.
+     */
     public record Pnu(List<String> datasets, int parallelism, int dailyCallLimit, int callIntervalMs, String stopAt,
                       int circuitBreak, int refreshDays, int rotateLimit, String priceRefreshAfter,
-                      List<String> noDataCodes) {
+                      List<String> noDataCodes, Map<String, Integer> refreshDaysByDataset) {
+        /** 권장 서비스별 주기 — 소유자 정보 14일, 총괄표제부 90일, 나머지는 refreshDays(30). 설계 2026-10-16 §8.1. */
+        static final Map<String, Integer> RECOMMENDED_REFRESH_DAYS = Map.of(
+                "land_info", 14, "own_rgt_hist", 14, "shr_ymb", 14, "bldg_hds_info", 14,
+                "cbldg_dfhs_info", 14, "bldg_ledg_gen_hds_info", 90);
+
+        /** 서비스별 주기 없이(전부 refreshDays). 권장값이 필요하면 {@link #defaults()}. */
+        public Pnu(List<String> datasets, int parallelism, int dailyCallLimit, int callIntervalMs, String stopAt,
+                   int circuitBreak, int refreshDays, int rotateLimit, String priceRefreshAfter,
+                   List<String> noDataCodes) {
+            this(datasets, parallelism, dailyCallLimit, callIntervalMs, stopAt, circuitBreak, refreshDays, rotateLimit,
+                    priceRefreshAfter, noDataCodes, Map.of());
+        }
+
         public static Pnu defaults() {
-            return new Pnu(List.of(), 8, 0, 0, "07:00", 20, 30, 200000, "06-01", List.of());
+            return new Pnu(List.of(), 8, 0, 0, "07:00", 20, 30, 200000, "06-01", List.of(), RECOMMENDED_REFRESH_DAYS);
+        }
+
+        /** 이 서비스의 재조회 주기(일). */
+        public int refreshDays(String dataset) {
+            return refreshDaysByDataset.getOrDefault(dataset, refreshDays);
         }
 
         /** 실제로 켜진 데이터셋 — 비어 있으면 기본 목록(건물 호·전유부는 실응답 확인 전이라 제외). */
@@ -54,7 +77,7 @@ public class KrasNextgenSettingsService {
     }
 
     /**
-     * @param schedules 묶음 ID(full-load / correction) → cron. 빈 값이면 꺼짐.
+     * @param schedules 묶음 ID(full-load / correction / layer) → cron. 빈 값이면 꺼짐.
      */
     public record Settings(String serviceId, String startParam, String endParam, String dateFormat,
                            Map<String, String> schedules, Pnu pnu) {
@@ -132,6 +155,15 @@ public class KrasNextgenSettingsService {
         for (String ds : p.datasets()) {
             if (!KrasPnuQueueService.ALL_DATASETS.contains(ds)) errors.add("알 수 없는 PNU 서비스: " + ds);
         }
+        p.refreshDaysByDataset().forEach((ds, days) -> {
+            if (!KrasPnuQueueService.ALL_DATASETS.contains(ds)) {
+                errors.add("서비스별 재조회 주기: 알 수 없는 서비스입니다 — " + ds);
+            } else if (KrasPnuQueueService.PRICE_DATASETS.contains(ds)) {
+                errors.add("서비스별 재조회 주기: " + ds + "는 가격 서비스라 연 1회 규칙을 따릅니다(주기를 넣을 수 없음).");
+            } else if (days == null || days < 1) {
+                errors.add("서비스별 재조회 주기: " + ds + "는 1일 이상이어야 합니다.");
+            }
+        });
         return errors;
     }
 
@@ -180,6 +212,10 @@ public class KrasNextgenSettingsService {
         pnu.put("stop-at", p.stopAt().trim());
         pnu.put("circuit-break", p.circuitBreak());
         pnu.put("refresh-days", p.refreshDays());
+        // 권장값과 같으면 키를 쓰지 않는다 — 권장값이 바뀌면 따라가게(datasets의 "기본과 같으면 빈 목록"과 같은 방식).
+        if (!p.refreshDaysByDataset().equals(Pnu.RECOMMENDED_REFRESH_DAYS)) {
+            pnu.put("refresh-days-by-dataset", new java.util.TreeMap<>(p.refreshDaysByDataset()));
+        }
         pnu.put("rotate-limit", p.rotateLimit());
         pnu.put("price-refresh-after", p.priceRefreshAfter().trim());
         pnu.put("no-data-codes", new ArrayList<>(p.noDataCodes()));
@@ -219,7 +255,26 @@ public class KrasNextgenSettingsService {
                 num(m, "circuit-break", d.circuitBreak()), num(m, "refresh-days", d.refreshDays()),
                 num(m, "rotate-limit", d.rotateLimit()),
                 m.containsKey("price-refresh-after") ? str(m.get("price-refresh-after")) : d.priceRefreshAfter(),
-                list(m.get("no-data-codes")));
+                list(m.get("no-data-codes")),
+                // 키가 없으면 권장값, {}를 적으면 "전부 refresh-days".
+                m.containsKey("refresh-days-by-dataset") ? daysMap(m.get("refresh-days-by-dataset"))
+                        : d.refreshDaysByDataset());
+    }
+
+    /** 서비스 → 일. 숫자가 아니면 -1(검증에서 걸린다). */
+    private static Map<String, Integer> daysMap(Object v) {
+        Map<String, Integer> out = new LinkedHashMap<>();
+        if (v instanceof Map<?, ?> m) {
+            m.forEach((k, x) -> {
+                if (str(k).isEmpty()) return;
+                try {
+                    out.put(str(k), Integer.parseInt(str(x)));
+                } catch (NumberFormatException e) {
+                    out.put(str(k), -1);
+                }
+            });
+        }
+        return out;
     }
 
     private static int num(Map<?, ?> m, String key, int fallback) {

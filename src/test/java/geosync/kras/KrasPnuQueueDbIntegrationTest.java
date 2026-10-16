@@ -269,6 +269,41 @@ class KrasPnuQueueDbIntegrationTest {
         assertThat(work("land_jiga", b)).containsEntry("reason", "ANNUAL");
     }
 
+    /** 서비스별 재조회 주기(설계 2026-10-16 §8): 대상·마감일 순·전체 적재 제외 기준이 서비스마다 다르다. */
+    @Test
+    void rotationAndFullLoadUseRefreshDaysPerDataset() throws Exception {
+        baseline(pnu(1), pnu(2));
+        List<String> ds = List.of("land_info", "land_bldg_check");
+        queue.enqueueFull(jdbc, org, ds, 30, Map.of("land_info", 14));
+        jdbc.update("UPDATE kras.pnu_work SET status='DONE', last_success_at=now() - interval '20 days' WHERE org_cd=?", org);
+
+        // 20일 전에 받은 행: land_info(14일)만 마감이 지났다. land_bldg_check(기본 30일)는 아직.
+        assertThat(queue.overdue(jdbc, org, ds, 30, Map.of("land_info", 14))).isEqualTo(2);
+        assertThat(queue.enqueueRotation(jdbc, org, ds, 30, Map.of("land_info", 14), 10)).isEqualTo(2);
+        assertThat(jdbc.queryForList("SELECT DISTINCT dataset_code FROM kras.pnu_work WHERE org_cd=? AND reason='ROTATE'",
+                String.class, org)).containsExactly("land_info");
+
+        // 한도 1건이면 마감을 더 많이 넘긴 것부터: 90일 서비스 100일 전(10일 초과) < 14일 서비스 30일 전(16일 초과).
+        jdbc.update("UPDATE kras.pnu_work SET status='DONE', reason='FULL', last_success_at=now() WHERE org_cd=?", org);
+        jdbc.update("UPDATE kras.pnu_work SET last_success_at=now() - interval '100 days' "
+                + "WHERE org_cd=? AND dataset_code='land_bldg_check' AND pnu=?", org, pnu(1));
+        jdbc.update("UPDATE kras.pnu_work SET last_success_at=now() - interval '30 days' "
+                + "WHERE org_cd=? AND dataset_code='land_info' AND pnu=?", org, pnu(2));
+        Map<String, Integer> days = Map.of("land_info", 14, "land_bldg_check", 90);
+        assertThat(queue.enqueueRotation(jdbc, org, ds, 30, days, 1)).isEqualTo(1);
+        assertThat(work("land_info", pnu(2))).containsEntry("reason", "ROTATE");
+        assertThat(work("land_bldg_check", pnu(1))).containsEntry("status", "DONE");
+
+        // 전체 적재 제외 기준도 서비스별: land_info 10일 전은 건너뛰고 20일 전은 다시 넣는다.
+        jdbc.update("UPDATE kras.pnu_work SET status='DONE', reason='FULL', last_success_at=now() - interval '10 days' "
+                + "WHERE org_cd=? AND pnu=?", org, pnu(1));
+        jdbc.update("UPDATE kras.pnu_work SET status='DONE', reason='FULL', last_success_at=now() - interval '20 days' "
+                + "WHERE org_cd=? AND pnu=?", org, pnu(2));
+        assertThat(queue.enqueueFull(jdbc, org, List.of("land_info"), 30, Map.of("land_info", 14))).isEqualTo(1);
+        assertThat(work("land_info", pnu(2))).containsEntry("status", "PENDING");
+        assertThat(work("land_info", pnu(1))).containsEntry("status", "DONE");
+    }
+
     // ── helpers ───────────────────────────────────────────────────────
 
     private void baseline(String... pnus) throws Exception {

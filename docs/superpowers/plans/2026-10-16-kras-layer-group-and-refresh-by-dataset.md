@@ -8,7 +8,9 @@
 
 **Tech Stack:** 기존과 같다. Java 17, Spring Boot, JdbcTemplate, PostgreSQL, Thymeleaf.
 
-**선행 상태(2026-10-16, 미커밋):** 아래가 이미 반영돼 있다. 이 계획은 그 위에서 진행한다.
+**상태: 구현 완료(2026-10-16, 설계 §12).** 
+
+**선행 상태:** 아래가 이미 반영돼 있다(커밋 `ec6766d`, 2026-10-16 푸시). 이 계획은 그 위에서 진행한다.
 - `refresh-days` 30
 - `rotate-limit` 200,000
 - 공시지가 TXT 삭제
@@ -50,6 +52,9 @@
 - 묶음 enum을 순회하므로 등록·다음 실행·현황판 표시는 자동으로 된다.
 - `step()`의 `CADASTRAL`/`USEZONE` 분기도 그대로 쓴다.
 - `jobKindFor("0 30 7 * * *")`는 일(day-of-month)이 `*`라서 `DAILY`가 된다. 그대로 맞다.
+- 묶음이 3개가 되면 스케줄러 스레드(풀 2개)가 모자랄 수 있다. 매월 1일에 전체 적재가 돌고 보정 적재가 기다리는 중에 07:30 레이어 적재 시각이 오는 경우다.
+  - 이때 레이어 적재는 빈 스레드가 생길 때까지 실행 큐에서 기다렸다가 돈다. 건너뛰지 않으므로 고치지 않는다.
+  - 다만 `runGroup`의 `ponytail:` 주석에 "묶음 3개 기준"이라고 적는다.
 
 ### A4. 화면·컨트롤러 — `KrasScheduleController`, `kras-schedule.html`
 
@@ -58,7 +63,11 @@
   - 판정 기준을 `FULL_LOAD` → `LAYER` cron으로 바꾼다.
   - 문구를 설계 §4.3대로 바꾼다. "기존 연계도 매일 같은 레이어를 받습니다. 차세대로 전환하면 기존 KRAS 스케줄을 끄세요."
   - `ods.schema`가 `public`일 때만 "같은 테이블을 덮어씁니다"를 덧붙인다. 값은 `runtimeSettings.odsSchema()`로 읽는다(`TargetTableNameService`가 쓰는 것과 같은 값).
-- 도움말과 실행 순서 안내에 묶음 2개를 전제한 문구가 있으면 함께 고친다(`grep "묶음\|전체 적재"`).
+- 묶음 2개를 전제한 문구 (2026-10-16 확인한 위치):
+  - `kras-schedule.html` 71행 머리말: "**전체 적재**와 **보정 적재** 스케줄을 설정합니다" → 레이어 적재를 추가한다.
+  - `kras-schedule.html` 408행 주석 "public 테이블을 자동 교체하는 묶음(전체 적재)": 동작은 `data-public` 기준이라 그대로 맞다. 주석만 "레이어 적재"로 고친다. 이제 전체 적재는 확인창이 뜨지 않고 레이어 적재가 뜬다.
+  - `KrasNextgenJob`·`KrasNextgenGroup`·`KrasNextgenSettingsService` 클래스 주석의 "묶음 2개"·"(전체 적재 / 보정 적재)".
+  - `KrasScheduleController` 193행 주석 "묶음(full-load / correction)".
 
 ### A5. 테스트
 
@@ -84,6 +93,8 @@
 - 맨 뒤에 `Map<String, Integer> refreshDaysByDataset` 필드를 추가한다.
 - 위치 기반 생성자(이전 10개 인자)를 그대로 받는 보조 생성자를 둔다. 새 필드는 `Map.of()`로 채운다.
   - 기존 호출 10곳을 고치지 않기 위해서다(테스트 7곳, 컨트롤러 1곳, 설정 서비스 2곳).
+  - **주의:** 보조 생성자의 빈 맵은 "서비스별 값 없음 = 전부 기본 일수"라는 뜻이다. 권장값이 들어가는 곳은 `defaults()`와 파일에 키가 없을 때뿐이다.
+  - `pnuFrom`은 B4에서 맵을 직접 만들어 정식 생성자를 쓰도록 바꾼다. 바꾸기 전에 화면에서 저장하면 권장 맵 대신 `{}`가 저장된다. B1과 B4는 같은 작업 안에서 끝낸다.
 - `int refreshDays(String dataset)`: 맵에 있으면 그 값, 없으면 `refreshDays`.
 - `defaults()`에 권장값을 넣는다(설계 §8.2).
   ```java
@@ -109,7 +120,8 @@
   ```
   - 바인딩: 맵의 JSON 문자열(Jackson `ObjectMapper`, 이미 의존성 있음), 기본 일수.
 - `enqueueFull(jdbc, orgCd, datasets, refreshDays)`
-  - 시그니처를 `enqueueFull(jdbc, orgCd, datasets, Pnu cfg)` 또는 `(…, int defaultDays, Map<String,Integer> byDataset)`로 바꾼다.
+  - `(…, int defaultDays, Map<String,Integer> byDataset)` 오버로드를 추가한다.
+  - **기존 `int` 시그니처는 남겨 빈 맵으로 위임한다.** `KrasPnuQueueDbIntegrationTest`가 `enqueueFull(…, 90)` 8곳과 `enqueueRotation(…, 90, 10)` 2곳에서 부른다.
   - 제외 조건 `last_success_at < now() - make_interval(...)`의 일수를 `kras.pnu_work.dataset_code` 기준으로 고른다.
 - `enqueueRotation(jdbc, orgCd, datasets, refreshDays, limit)`
   - 대상 조건에 같은 식을 쓴다(칼럼은 `dataset_code`).
@@ -154,13 +166,14 @@
 1. A1–A3를 한 뒤 A5 중 스케줄러·설정 테스트를 실행한다.
 2. A4와 화면 테스트를 진행한다. `node --check`로 렌더된 스크립트를 검사한다.
 3. B1과 설정 테스트를 진행한다.
-4. B2와 DB 통합 테스트를 진행한다(`itgradle.py test`).
+4. B2와 DB 통합 테스트를 진행한다(`GEOSYNC_IT_DB_URL`·`_USER`·`_PASSWORD`로 테스트 DB를 지정하고 `gradlew.bat test`).
 5. B3–B4와 화면 테스트를 진행한다.
 6. 전체 테스트를 돌린다. 개발 서버에서 `/kras-schedule`을 확인한다.
    - 카드 3장이 나오는지
    - 레이어 적재 [지금 실행]이 실행 전 확인(cadastral_file·usezone_file 미승인)에서 막히는지
-   - 재조회(일) 저장 → `conf/application.yml`에 반영 → 다시 읽기
-   - 개발 서버의 conf는 실제 파일이다. 저장 전후 해당 블록만 바뀌는지 diff로 확인한다.
+   - 재조회(일) 저장·다시 읽기는 **테스트(임시 파일)로만 확인한다.** 개발 서버에서 [적용]을 누르지 않는다.
+     - 저장하면 `KrasNextgenSettingsService.save`가 `conf/application.yml` 전체를 SnakeYAML로 다시 쓴다. 그러면 파일의 주석이 모두 사라진다(기존 동작).
+     - 이 파일은 운영 비밀번호가 든 사용자 파일이다. 화면 저장까지 확인하려면 사용자에게 먼저 묻는다.
 7. 설계 문서 §11에 반영 결과를 적는다.
 
 **운영 반영 시 사용자 작업:**

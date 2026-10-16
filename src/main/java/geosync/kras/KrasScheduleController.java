@@ -114,8 +114,11 @@ public class KrasScheduleController {
         model.addAttribute("groups", groups);
         model.addAttribute("pnuDatasets", pnuDatasetRows(jdbc, s.pnu()));
         model.addAttribute("runningJob", scheduler.running());
-        model.addAttribute("legacyConflict", KrasNextgenScheduler.isValidCron(s.schedule(KrasNextgenGroup.FULL_LOAD))
+        // 기존 연계(KrasWorker)도 매일 같은 레이어(연속지적·용도지역)를 받는다 — 레이어 적재를 켰으면 안내.
+        // 같은 테이블을 덮어쓰는 건 기존 연계 적재 스키마(ods.schema)가 public일 때뿐이다(설계 2026-10-16 §4.3).
+        model.addAttribute("legacyConflict", KrasNextgenScheduler.isValidCron(s.schedule(KrasNextgenGroup.LAYER))
                 && legacyScheduleActive());
+        model.addAttribute("legacySameTable", "public".equalsIgnoreCase(String.valueOf(runtimeSettings.odsSchema()).trim()));
         model.addAttribute("legacySchedule", runtimeSettings.krasSchedule());
         model.addAttribute("dbServiceCode", jdbc == null ? null : landChangeServiceCode(jdbc));
         model.addAttribute("baseline", jdbc == null ? null
@@ -165,7 +168,23 @@ public class KrasScheduleController {
                 num(params, "circuitBreak", d.circuitBreak()), num(params, "refreshDays", d.refreshDays()),
                 num(params, "rotateLimit", d.rotateLimit()),
                 params.containsKey("priceRefreshAfter") ? one(params, "priceRefreshAfter") : d.priceRefreshAfter(),
-                KrasNextgenSettingsService.list(one(params, "noDataCodes")));
+                KrasNextgenSettingsService.list(one(params, "noDataCodes")), refreshDaysFrom(params, d));
+    }
+
+    /** 폼의 서비스별 재조회(일) 칸(refreshDays_코드). 빈 칸은 넣지 않는다(기본 일수). 칸이 하나도 없으면 권장값. */
+    static Map<String, Integer> refreshDaysFrom(MultiValueMap<String, String> params, KrasNextgenSettingsService.Pnu d) {
+        if (params.keySet().stream().noneMatch(k -> k.startsWith("refreshDays_"))) return d.refreshDaysByDataset();
+        Map<String, Integer> out = new LinkedHashMap<>();
+        for (String ds : KrasPnuQueueService.ALL_DATASETS) {
+            String v = one(params, "refreshDays_" + ds);
+            if (v.isEmpty() || KrasPnuQueueService.PRICE_DATASETS.contains(ds)) continue;
+            try {
+                out.put(ds, Integer.parseInt(v));
+            } catch (NumberFormatException e) {
+                out.put(ds, -1);   // 검증에서 걸린다
+            }
+        }
+        return out;
     }
 
     private static String one(MultiValueMap<String, String> params, String key) {
@@ -190,7 +209,7 @@ public class KrasScheduleController {
         return "redirect:/kras-schedule";
     }
 
-    /** 묶음(full-load / correction) 또는 단계 하나를 지금 실행. */
+    /** 묶음(full-load / correction / layer) 또는 단계 하나를 지금 실행. */
     @PostMapping("/kras-schedule/run/{id}")
     @ResponseBody
     public Map<String, Object> runNow(@PathVariable String id) {
@@ -324,6 +343,17 @@ public class KrasScheduleController {
         if (!draining && n(sum.get("interrupted")) > 0) {
             out.add("⚠ " + n(sum.get("interrupted")) + "건이 처리 도중 중단되어 다음 실행에서 다시 시도합니다.");
         }
+        // 재조회 마감이 지난 행이 하루 한도보다 많으면 주기가 밀린다(설계 2026-10-16 §8.3). 전체 적재 잔량이 있으면
+        // 순환 재조회 자체를 하지 않으므로(초기 적재 우선) 그동안은 띄우지 않는다.
+        var pnuCfg = settingsService.current().pnu();
+        if (queue.fullBacklog(jdbc, orgCd) == 0) {
+            long overdue = queue.overdue(jdbc, orgCd, pnuCfg.effectiveDatasets(), pnuCfg.refreshDays(),
+                    pnuCfg.refreshDaysByDataset());
+            if (overdue > pnuCfg.rotateLimit()) {
+                out.add("ⓘ 재조회 마감이 지난 " + overdue + "건이 하루 한도 " + pnuCfg.rotateLimit()
+                        + "건보다 많아 주기가 밀립니다. 고급 > 하루 순환 재조회 건수를 늘리거나 재조회 주기를 늘리세요.");
+            }
+        }
         long blocked = queue.waitingOutside(jdbc, orgCd,
                 worker.runnable(jdbc, settingsService.current().pnu().effectiveDatasets()));
         if (blocked > 0) {
@@ -379,6 +409,10 @@ public class KrasScheduleController {
             r.put("label", DATASET_LABELS.getOrDefault(ds, ds));
             r.put("enabled", enabled.contains(ds));
             r.put("child", KrasPnuQueueService.CHILD_DATASETS.contains(ds));
+            // 재조회(일) 칸: 서비스별 값이 있으면 그 값, 없으면 빈 칸(기본값을 placeholder로). 가격은 연 1회 고정.
+            r.put("price", KrasPnuQueueService.PRICE_DATASETS.contains(ds));
+            Integer days = pnu.refreshDaysByDataset().get(ds);
+            r.put("refreshDays", days == null ? "" : String.valueOf(days));
             List<String> blocked;
             try {
                 blocked = jdbc == null ? List.of("DB 연결 없음") : historyService.readiness(jdbc, ds);

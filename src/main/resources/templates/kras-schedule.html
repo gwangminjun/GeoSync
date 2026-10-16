@@ -68,7 +68,7 @@
   <div style="margin-bottom:20px;">
     <h1 style="font-size:22px;font-weight:700;color:#e7eaee;">차세대 스케줄</h1>
     <p style="margin-top:6px;font-size:13.5px;color:#69707b;">
-      차세대 연계(kras 스키마)의 <b>전체 적재</b>와 <b>보정 적재</b> 스케줄을 설정합니다. 저장하면 재시작 없이 바로 적용됩니다.
+      차세대 연계(kras 스키마)의 <b>전체 적재</b>, <b>보정 적재</b>, <b>레이어 적재</b> 스케줄을 설정합니다. 저장하면 재시작 없이 바로 적용됩니다.
       기존 연계의 스케줄은 <a href="/schedule" style="color:#7aafe8;">스케줄</a>·<a href="/settings" style="color:#7aafe8;">설정</a> 화면에서 관리합니다.
     </p>
   </div>
@@ -77,8 +77,8 @@
   <div th:if="${error}" class="err-banner" th:text="${error}"></div>
   <div th:if="${legacyConflict}" class="warn-banner" id="legacy-conflict">
     ⚠ 기존 KRAS 동기화(KrasWorker)가 켜져 있습니다(<span th:text="${legacySchedule}"></span>).
-    전체 적재의 연속지적·용도지역 단계도 public.lp_pa_cbnd / lt_c_uzone을 교체하므로 두 곳이 같은 테이블을 씁니다.
-    차세대로 전환할 때 <a href="/settings" style="color:#f0c674;">설정</a>에서 기존 KRAS 스케줄을 비활성화하세요.
+    기존 연계도 매일 같은 레이어(연속지적·용도지역)를 받습니다<span th:if="${legacySameTable}"> — 기존 연계 적재 스키마가 public이라 public.lp_pa_cbnd / lt_c_uzone을 같이 덮어씁니다</span>.
+    차세대로 전환하면 <a href="/settings" style="color:#f0c674;">설정</a>에서 기존 KRAS 스케줄을 끄세요.
   </div>
   <div th:if="${runningJob}" class="warn-banner" id="running-banner">실행 중: <b th:text="${runningJob}"></b></div>
 
@@ -156,15 +156,21 @@
         <summary>고급 — 서비스별 켜기/끄기, 대기열 설정, 단계 실행, 배포 설정</summary>
 
         <h3 style="font-size:13.5px;color:#e7eaee;margin:16px 0 8px;">PNU 서비스</h3>
+        <p class="cron-text" style="margin-bottom:8px;">재조회(일)를 비우면 아래 재조회 주기(일) 기본값을 씁니다. 소유자 정보가 들어 있는 서비스는 14일을 권장합니다.
+          가격 서비스는 연 1회(가격 갱신 기준일 이후) 다시 받습니다.</p>
         <p class="cron-text" style="margin-bottom:8px;">체크한 서비스만 대기열에 넣고 처리합니다. 실행 조건이 ✕인 서비스는 켜져 있어도 건너뜁니다(행은 그대로 남음).
           호 목록·집합 전유부는 실응답 확인 전이라 기본으로 꺼져 있습니다.</p>
         <div class="sched-scroll"><table class="sched-table" id="pnu-datasets">
-          <thead><tr><th>켜기</th><th>서비스</th><th>구분</th><th>실행 조건</th></tr></thead>
+          <thead><tr><th>켜기</th><th>서비스</th><th>구분</th><th>재조회(일)</th><th>실행 조건</th></tr></thead>
           <tbody>
             <tr th:each="d : ${pnuDatasets}">
               <td><input type="checkbox" name="pnuDataset" th:value="${d['code']}" th:checked="${d['enabled']}"></td>
               <td><b style="color:#e7eaee;" th:text="${d['label']}"></b> <span class="cron-text" th:text="${d['code']}"></span></td>
               <td th:text="${d['child']} ? '건물번호 하위 조회' : '필지 단위'"></td>
+              <td><span th:if="${d['price']}" class="cron-text">연 1회</span>
+                <input th:unless="${d['price']}" type="number" min="1" th:name="'refreshDays_' + ${d['code']}"
+                       th:value="${d['refreshDays']}" th:placeholder="${pnu.refreshDays()}" style="width:64px"
+                       class="q-search" th:aria-label="${d['label']} + ' 재조회 주기(일)'"></td>
               <td><span th:if="${#lists.isEmpty(d['blocked'])}" class="gate-ok">실행 가능</span>
                 <div th:each="b : ${d['blocked']}" class="gate-bad" th:text="'✕ ' + ${b}"></div></td>
             </tr>
@@ -405,7 +411,7 @@
 
   document.querySelectorAll('.sched-editor').forEach(setupEditor);
 
-  // public 테이블을 자동 교체하는 묶음(전체 적재)을 새로 켜면 한 번 더 확인한다.
+  // public 테이블을 자동 교체하는 묶음(레이어 적재)을 새로 켜면 한 번 더 확인한다.
   document.getElementById('schedule-form').addEventListener('submit', e => {
     if (e.submitter && e.submitter.getAttribute('formaction')) return;
     const turnedOn = [...document.querySelectorAll('.cron-value[data-public="true"]')]

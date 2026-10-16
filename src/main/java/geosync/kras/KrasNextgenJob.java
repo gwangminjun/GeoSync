@@ -3,7 +3,7 @@ package geosync.kras;
 import java.util.List;
 
 /**
- * 차세대 스케줄의 단계. 스케줄은 단계가 아니라 묶음({@link KrasNextgenGroup}: 전체 적재 / 보정 적재)에 건다.
+ * 차세대 스케줄의 단계. 스케줄은 단계가 아니라 묶음({@link KrasNextgenGroup}: 전체 적재 / 보정 적재 / 레이어 적재)에 건다.
  * 단계는 묶음 안에서 순서대로 돌고, 고급 영역의 "단계 실행"으로 하나만 돌릴 수도 있다.
  * 설계: docs/superpowers/specs/2026-10-15/2026-10-15-kras-pnu-api-full-incremental-design.md §7
  *

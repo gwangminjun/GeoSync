@@ -154,7 +154,8 @@ public class KrasNextgenScheduler {
             }
         } else if (!lock.tryLock()) {
             // 스케줄 실행은 건너뛰지 않고 앞 작업이 끝나길 기다린다 — 매월 1일 전체 적재와 보정 적재가 겹쳐도 둘 다 돈다.
-            // ponytail: 기다리는 동안 스레드 하나를 잡는다(풀 2개). 묶음이 더 늘어 동시에 여럿 기다리게 되면 큐로 바꾼다.
+            // ponytail: 기다리는 동안 스레드 하나를 잡는다(풀 2개, 묶음 3개 기준). 셋이 겹치면 세 번째는 실행 큐에서 빈 스레드를 기다린다 —
+            // 건너뛰진 않는다. 묶음이 더 늘어 대기가 길어지면 큐로 바꾼다.
             log.info("[KrasNextgen] 다른 차세대 작업({}) 실행 중 — {} 은 끝난 뒤 이어서 실행", running, group.id);
             lastResults.put(group.id, LocalDateTime.now().format(TIME) + " 대기: 다른 작업(" + running + ") 끝나면 실행");
             lock.lock();
@@ -209,11 +210,11 @@ public class KrasNextgenScheduler {
                 case LAND_CHANGE -> landChange(jdbc, orgCd, cfg, trigger, jobKind);
                 case PNU_FULL -> queueOp(jdbc, orgCd, "ENQUEUE", trigger + " 전체", () ->
                         "전체 적재 대기열 등록 %d건".formatted(queue.enqueueFull(jdbc, orgCd, cfg.effectiveDatasets(),
-                                cfg.refreshDays())));
+                                cfg.refreshDays(), cfg.refreshDaysByDataset())));
                 case PNU_REFRESH -> queueOp(jdbc, orgCd, "ENQUEUE", trigger + " 재조회", () ->
                         "순환 재조회 %d건, 연 1회 가격 %d건 등록".formatted(
                                 queue.enqueueRotation(jdbc, orgCd, cfg.effectiveDatasets(), cfg.refreshDays(),
-                                        cfg.rotateLimit()),
+                                        cfg.refreshDaysByDataset(), cfg.rotateLimit()),
                                 queue.enqueueAnnual(jdbc, orgCd, cfg.effectiveDatasets(), cfg.priceRefreshAfter(),
                                         LocalDate.now())));
                 case PNU_QUEUE -> drain(jdbc, orgCd, cfg, trigger, jobKind);

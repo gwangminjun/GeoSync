@@ -63,6 +63,12 @@ public class KrasPnuQueueService {
      * @return 새로 넣거나 다시 대기로 돌린 행 수
      */
     public int enqueueFull(JdbcTemplate jdbc, String orgCd, List<String> datasets, int refreshDays) {
+        return enqueueFull(jdbc, orgCd, datasets, refreshDays, Map.of());
+    }
+
+    /** @param daysByDataset 서비스별 재조회 주기(일). 없는 서비스는 refreshDays. 설계 2026-10-16 §8. */
+    public int enqueueFull(JdbcTemplate jdbc, String orgCd, List<String> datasets, int refreshDays,
+                           Map<String, Integer> daysByDataset) {
         List<String> targets = datasets.stream().filter(PARCEL_DATASETS::contains).toList();
         skipClosedParcels(jdbc, orgCd);
         if (targets.isEmpty()) return 0;
@@ -76,8 +82,9 @@ public class KrasPnuQueueService {
                    queued_at=now(), lease_until=NULL, last_error=NULL
              WHERE kras.pnu_work.status IN ('DONE','FAILED','SKIPPED')
                AND (kras.pnu_work.last_success_at IS NULL
-                    OR kras.pnu_work.last_success_at < now() - make_interval(days => ?))
-            """, targets.toArray(String[]::new), orgCd, refreshDays);
+                    OR kras.pnu_work.last_success_at < now() - make_interval(days =>
+                       coalesce((?::jsonb ->> kras.pnu_work.dataset_code)::int, ?)))
+            """, targets.toArray(String[]::new), orgCd, daysJson(daysByDataset), refreshDays);
     }
 
     /** 토지이동내역 반영 후: since 이후 쌓인 이벤트의 필지(현재 ACTIVE) × 토지·토지이용 계열. */
@@ -104,6 +111,15 @@ public class KrasPnuQueueService {
      * 전체 적재(FULL) 잔량이 남아 있으면 넣지 않는다(초기 적재가 먼저).
      */
     public int enqueueRotation(JdbcTemplate jdbc, String orgCd, List<String> datasets, int refreshDays, int limit) {
+        return enqueueRotation(jdbc, orgCd, datasets, refreshDays, Map.of(), limit);
+    }
+
+    /**
+     * 서비스별 주기. 하루 한도 안에서는 마감(last_success_at + 주기)이 가장 오래 지난 것부터 뽑는다 —
+     * 가장 오래전에 받은 순이면 90일 서비스의 오래된 행이 14일 서비스보다 먼저 뽑히기 때문(설계 2026-10-16 §8.3).
+     */
+    public int enqueueRotation(JdbcTemplate jdbc, String orgCd, List<String> datasets, int refreshDays,
+                               Map<String, Integer> daysByDataset, int limit) {
         List<String> targets = datasets.stream().filter(d -> !PRICE_DATASETS.contains(d)).toList();
         if (targets.isEmpty() || limit <= 0 || fullBacklog(jdbc, orgCd) > 0) return 0;
         return jdbc.update("""
@@ -111,10 +127,38 @@ public class KrasPnuQueueService {
                    queued_at=now(), lease_until=NULL, last_error=NULL
             FROM (SELECT org_cd, dataset_code, pnu, extra_key FROM kras.pnu_work
                   WHERE org_cd=? AND status='DONE' AND dataset_code = ANY(?::text[])
-                    AND last_success_at < now() - make_interval(days => ?)
-                  ORDER BY last_success_at LIMIT ?) o
+                    AND last_success_at + """ + DAYS + """
+             < now()
+                  ORDER BY last_success_at + """ + DAYS + """
+             LIMIT ?) o
             WHERE (w.org_cd, w.dataset_code, w.pnu, w.extra_key) = (o.org_cd, o.dataset_code, o.pnu, o.extra_key)
-            """, orgCd, targets.toArray(String[]::new), refreshDays, limit);
+            """, orgCd, targets.toArray(String[]::new), daysJson(daysByDataset), refreshDays,
+                daysJson(daysByDataset), refreshDays, limit);
+    }
+
+    /** 재조회 마감이 지난 완료 행 수(가격 제외) — 하루 한도보다 많으면 주기가 밀린다는 안내용. */
+    public long overdue(JdbcTemplate jdbc, String orgCd, List<String> datasets, int refreshDays,
+                        Map<String, Integer> daysByDataset) {
+        List<String> targets = datasets.stream().filter(d -> !PRICE_DATASETS.contains(d)).toList();
+        if (targets.isEmpty()) return 0;
+        Long n = jdbc.queryForObject("""
+            SELECT count(*) FROM kras.pnu_work
+            WHERE org_cd=? AND status='DONE' AND dataset_code = ANY(?::text[])
+              AND last_success_at + """ + DAYS + """
+             < now()
+            """, Long.class, orgCd, targets.toArray(String[]::new), daysJson(daysByDataset), refreshDays);
+        return n == null ? 0 : n;
+    }
+
+    /** 행의 서비스별 주기 — 바인딩 2개: 서비스별 일수 jsonb, 기본 일수. */
+    private static final String DAYS = "make_interval(days => coalesce((?::jsonb ->> dataset_code)::int, ?))";
+
+    /** {서비스: 일} → jsonb 문자열. 키는 서비스 코드 형식만 통과시킨다(설정 파일을 직접 고친 경우 대비). */
+    static String daysJson(Map<String, Integer> daysByDataset) {
+        return daysByDataset.entrySet().stream()
+                .filter(e -> e.getKey().matches("[a-z0-9_]+") && e.getValue() != null)
+                .map(e -> "\"" + e.getKey() + "\":" + e.getValue())
+                .collect(java.util.stream.Collectors.joining(",", "{", "}"));
     }
 
     /** 연 1회 가격: 올해 기준일이 지났으면, 그 뒤로 아직 받지 않은 가격 계열 완료 행을 다시 대기로. */
