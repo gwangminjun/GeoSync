@@ -57,21 +57,20 @@ class KrasNextgenSchedulerTest {
 
     @Test
     void groupRunsEveryStepInOrderAndKeepsGoingAfterAFailedStep() {
-        schedules(Map.of("full-load", "0 0 1 1 * *"));
+        schedules(Map.of("full-load", "0 0 0 1 * *"));
         target();
         when(runtime.syncEnabled()).thenReturn(true);
         when(incremental.runMonthlyCorrection(any(), any(), any(), any())).thenReturn(List.of("TXT ok"));
         when(fullLoad.runCadastral(any(), any(), any(), any())).thenThrow(new IllegalStateException("SHP 다운로드 실패"));
         when(fullLoad.runUsezone(any(), any(), any(), any())).thenReturn(List.of("용도 ok"));
-        when(fullLoad.runLandPrice(any(), any(), any(), any())).thenReturn(List.of("지가 ok"));
         when(queue.tableExists(jdbc)).thenReturn(false);
 
         scheduler.runGroup(KrasNextgenGroup.FULL_LOAD, false);
 
         verify(incremental).runMonthlyCorrection(jdbc, "12830", "SCHEDULE", "MONTHLY");
-        verify(fullLoad).runLandPrice(jdbc, "12830", "SCHEDULE", "MONTHLY");
+        verify(fullLoad).runUsezone(jdbc, "12830", "SCHEDULE", "MONTHLY");
         assertThat(scheduler.lastResult("cadastral")).contains("실패: SHP 다운로드 실패");
-        assertThat(scheduler.lastResult("full-load")).contains("TXT ok", "SHP 다운로드 실패", "용도 ok", "지가 ok",
+        assertThat(scheduler.lastResult("full-load")).contains("TXT ok", "SHP 다운로드 실패", "용도 ok",
                 "pnu_work 테이블이 없습니다");
         assertThat(scheduler.running()).isNull();
     }
@@ -93,7 +92,7 @@ class KrasNextgenSchedulerTest {
     }
 
     @Test
-    void secondRunWhileOneIsRunningIsSkippedWithReason() throws Exception {
+    void manualRunIsRefusedButScheduledRunWaitsForTheRunningGroup() throws Exception {
         schedules(Map.of());
         target();
         when(runtime.syncEnabled()).thenReturn(true);
@@ -109,10 +108,18 @@ class KrasNextgenSchedulerTest {
         inside.await();
 
         assertThat(scheduler.runNow(KrasNextgenGroup.CORRECTION)).isFalse();
-        scheduler.runGroup(KrasNextgenGroup.CORRECTION, false);
-        assertThat(scheduler.lastResult("correction")).contains("건너뜀", "전체 적재");
+        // 매월 1일처럼 스케줄이 겹치면 건너뛰지 않고, 앞 묶음이 끝난 뒤 이어서 돈다.
+        when(queue.tableExists(jdbc)).thenReturn(false);
+        Thread scheduled = new Thread(() -> scheduler.runGroup(KrasNextgenGroup.CORRECTION, false));
+        scheduled.start();
+        for (int i = 0; i < 100 && scheduler.lastResult("correction") == null; i++) Thread.sleep(20);
+        assertThat(scheduler.lastResult("correction")).contains("대기", "전체 적재");
+        verify(incremental, never()).runDaily(any(), any(), any(LocalDate.class), any(), any());
 
         release.countDown();
         t.join();
+        scheduled.join(5000);
+        assertThat(scheduled.isAlive()).isFalse();
+        verify(incremental).runDaily(eq(jdbc), eq("12830"), any(LocalDate.class), eq("SCHEDULE"), any());
     }
 }

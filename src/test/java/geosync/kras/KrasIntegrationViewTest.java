@@ -34,7 +34,7 @@ class KrasIntegrationViewTest {
         for (String prefix : List.of("dataset", "landInfo", "landBldgCheck", "collectiveBuilding", "shrYmb",
                 "ownRgtHist", "landMovHist", "collectiveUnit", "landRight", "unitOwnershipHistory",
                 "integratedBuilding", "buildingImage", "landChange", "layerList", "usezoneFile",
-                "landBasicFile", "landPriceFile")) {
+                "landBasicFile")) {
             context.setVariable(prefix + "Status", "UNVERIFIED");
             context.setVariable(prefix + "Enabled", false);
             context.setVariable(prefix + "Running", false);

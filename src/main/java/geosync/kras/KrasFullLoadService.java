@@ -149,17 +149,4 @@ public class KrasFullLoadService {
         return out;
     }
 
-    /** 공시지가 TXT 전체 1회: 원본 보존 테이블(kras.land_price_file_row)에 적재 — 반영 단계 없음. */
-    public List<String> runLandPrice(JdbcTemplate jdbc, String orgCd, String trigger, String jobKind) {
-        List<String> blocked = historyService.readiness(jdbc, "land_price_file");
-        if (!blocked.isEmpty()) return blocked;
-        Map<String, Object> ingested = operationLog.execute(jdbc, orgCd, "land_price_file", "INGEST", null,
-                trigger + " 전체", () -> {
-                    var r = txtIngest.ingestLandPrice(jdbc, orgCd, trigger, jobKind);
-                    return result(r.promotable(), r.itemId(), r.promotable()
-                            ? "공시지가 TXT 수집 성공: %d건".formatted(r.rowCount())
-                            : "공시지가 TXT 수집됨(%d건), 파싱 경고: %s".formatted(r.rowCount(), r.warnings()));
-                });
-        return List.of(String.valueOf(ingested.get("message")));
-    }
 }

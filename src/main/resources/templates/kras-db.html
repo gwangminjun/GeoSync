@@ -831,31 +831,6 @@
     <div id="land-basic-file-result-js" class="result-box" style="display:none;"></div>
   </div>
 
-  <!-- 카드 6b: 전체 TXT — land_price_file (KRAS000039) -->
-  <div class="card kras-hide" id="card-land-price-file">
-    <div class="card-title">
-      데이터셋 계약 상태 + 수집 — land_price_file (공시지가 전체 TXT)
-      <span th:if="${landPriceFileStatus == 'VERIFIED' and landPriceFileEnabled}" class="badge badge-on">승인 · 활성</span>
-      <span th:unless="${landPriceFileStatus == 'VERIFIED' and landPriceFileEnabled}" class="badge badge-warn"
-            th:text="(${landPriceFileStatus} == 'VERIFIED' ? '승인' : '미승인') + ' · ' + (${landPriceFileEnabled} ? '활성' : '비활성')"></span>
-      <span th:if="${landPriceFileRunning}" class="badge badge-warn">실행 중</span>
-    </div>
-    <p style="font-size:13px;color:#9aa2ad;margin-bottom:14px;">
-      공시지가 전체 TXT(KRAS000039) — <b>승격 버튼이 없습니다</b>.
-      <code>kras.land_price_file_row</code>는 업무 테이블이 아니라 spatial_feature와 같은
-      <b>원본 보존 테이블</b>이고, business_dataset에 대응 업무 테이블이 등록돼 있지 않아 승격 단계 자체가
-      없습니다(대장 공시지가 <code>kras.land_price</code>는 land_info 데이터셋 소유라 이 파일에서 채우지 않습니다).
-      파일 컬럼 순서는 kras.md에 없어 기존 <code>KrasTxtLoaderService</code>가 쓰는 순서
-      (land_cd, base_year, jiga, base_mon, pyo_yn)를 그대로 따릅니다.
-    </p>
-    <div style="display:flex;gap:10px;">
-      <button class="btn btn-primary" id="btn-land-price-file-ingest" th:disabled="${landPriceFileRunning}"
-              onclick="runLandPriceFileIngest()">전체 TXT 수집</button>
-    </div>
-    <div id="land-price-file-result" class="result-box" th:if="${lastLandPriceFileResult}" th:text="${lastLandPriceFileResult}"></div>
-    <div id="land-price-file-result-js" class="result-box" style="display:none;"></div>
-  </div>
-
   </details>
 </main>
 
@@ -1113,7 +1088,6 @@ function runLandBasicFilePromote() {
   if (!itemId) return;
   return runTxtAction('land-basic-file', '/kras-db/promote/land-basic-file?itemId=' + itemId);
 }
-function runLandPriceFileIngest() { return runTxtAction('land-price-file', '/kras-db/ingest/land-price-file'); }
 
 /* 기존 스크롤 이동 + 하이라이트 방식(팝업으로 교체됨) — 참고용으로 남겨둔다.
 function krasFocusDataset(slug) {

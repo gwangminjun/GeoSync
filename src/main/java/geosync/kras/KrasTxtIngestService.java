@@ -15,17 +15,13 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * kras 스키마 전체 TXT 파일(FULL 수집모드) 적재 — land_basic_file(KRAS000040),
- * land_price_file(KRAS000039).
+ * kras 스키마 전체 TXT 파일(FULL 수집모드) 적재 — land_basic_file(KRAS000040).
+ * 공시지가 TXT(land_price_file, KRAS000039)는 쓰는 곳이 없고 KRAS 규격서(kras.md 16개 서비스)에도 없어 2026-10-16에 뺐다.
  *
  * 기존 KrasTxtLoaderService(ods.anvm_jiga / ods.land_frst_ledg 적재)는 건드리지 않는다 —
  * 같은 원본 파일을 별도로 한 번 더 읽어 kras 스키마에만 독립적으로 적재한다(설계 §3-5).
  *
- * 두 데이터셋의 모양이 다르다:
- * - land_basic_file → kras.stage_parcel + kras.stage_land_basic → 승격(패턴 A×2). 수집/승격 2단계.
- * - land_price_file → kras.land_price_file_row 직행. 이 테이블은 업무 테이블이 아니라
- *   spatial_feature와 같은 원본 보존 테이블(guard_item_content가 SUCCESS 후 불변을 강제)이고
- *   대응하는 업무 테이블이 business_dataset에 없다 — 그래서 승격 단계 자체가 없다.
+ * land_basic_file → kras.stage_parcel + kras.stage_land_basic → 승격(패턴 A×2). 수집/승격 2단계.
  *
  * 구분자: kras.md §16과 DDL 주석(sync_file.delimiter_code=11) 모두 ASCII 11을 정본으로 본다.
  * 기존 KrasTxtLoaderService의 detectDelimiter는 파이프/탭/콤마만 보고 ASCII 11을 모르므로
@@ -37,7 +33,6 @@ public class KrasTxtIngestService {
     private static final Logger log = LoggerFactory.getLogger(KrasTxtIngestService.class);
 
     private static final String LAND_BASIC_DATASET = "land_basic_file";
-    private static final String LAND_PRICE_DATASET = "land_price_file";
     private static final int BATCH_SIZE = 2000;
     /** 경고를 전부 모으면 수십만 줄짜리 파일에서 메시지가 감당이 안 된다 — 앞부분만 남기고 건수만 센다. */
     private static final int MAX_WARNINGS = 20;
@@ -207,75 +202,6 @@ public class KrasTxtIngestService {
             if (table.equals("kras.parcel")) notObserved = n;
         }
         return new CorrectionResult(itemId, reactivated, notObserved, false);
-    }
-
-    // ── land_price_file (KRAS000039) ──────────────────────────────────
-
-    /**
-     * 파일 컬럼 순서는 kras.md에 없다 — 기존 KrasTxtLoaderService가 쓰고 있는 순서를 그대로 따른다:
-     * land_cd, base_year, jiga, base_mon, pyo_yn (jiga가 3번째, base_mon이 4번째로 DB 컬럼 순서와 다름).
-     *
-     * 승격 단계가 없다 — kras.land_price_file_row는 업무 테이블이 아니라 원본 보존 테이블이고,
-     * business_dataset에 대응 업무 테이블이 등록돼 있지 않다(대장 공시지가 kras.land_price는
-     * land_info 데이터셋 소유라 이 파일에서 채우지 않는다).
-     */
-    public IngestResult ingestLandPrice(JdbcTemplate targetJdbc, String orgCd, String triggeredBy) throws Exception {
-        return ingestLandPrice(targetJdbc, orgCd, triggeredBy, "MANUAL");
-    }
-
-    /** @param jobKind kras.sync_run.job_kind — 화면 MANUAL, 차세대 스케줄 DAILY/MONTHLY. */
-    public IngestResult ingestLandPrice(JdbcTemplate targetJdbc, String orgCd, String triggeredBy, String jobKind)
-            throws Exception {
-        byte[] data = krasApiClient.downloadJigaTxt();
-        List<String[]> rows = parseTxt(data, 5);
-        if (rows.isEmpty()) {
-            throw new IllegalStateException("공시지가 TXT에서 읽은 행이 0건입니다 — 적재를 중단합니다.");
-        }
-        return targetJdbc.execute((ConnectionCallback<IngestResult>) conn ->
-                inTransaction(conn, LAND_PRICE_DATASET,
-                        tx -> ingestLandPriceInTransaction(tx, orgCd, rows, triggeredBy, jobKind)));
-    }
-
-    private IngestResult ingestLandPriceInTransaction(JdbcTemplate tx, String orgCd, List<String[]> rows,
-                                                       String triggeredBy, String jobKind) {
-        long[] ids = createRunAndItem(tx, orgCd, LAND_PRICE_DATASET, triggeredBy, jobKind);
-        long runId = ids[0];
-        long itemId = ids[1];
-
-        List<String> warnings = new ArrayList<>();
-        List<Object[]> batch = new ArrayList<>();
-        int rowNo = 0;
-        for (String[] c : rows) {
-            rowNo++;
-            String landCd = trimToNull(c[0]);
-            if (landCd == null || !landCd.matches("\\d{19}")) {
-                addWarning(warnings, rowNo + "행: 토지코드가 19자리 숫자가 아닙니다 — " + landCd);
-                continue;
-            }
-            if (!landCd.startsWith(orgCd)) {
-                addWarning(warnings, rowNo + "행: 토지코드 앞 5자리가 요청 기관(" + orgCd + ")과 다릅니다 — " + landCd);
-                continue;
-            }
-            batch.add(new Object[]{ itemId, orgCd, (long) rowNo, landCd, trimToNull(c[1]), trimToNull(c[3]),
-                    toDecimal(c[2], rowNo, "JIGA", warnings), trimToNull(c[4]) });
-        }
-        if (batch.isEmpty()) {
-            throw new IllegalStateException("유효한 행이 0건입니다(전체 " + rows.size() + "행). 앞부분 경고: " + warnings);
-        }
-
-        batchInsert(tx, """
-            INSERT INTO kras.land_price_file_row(item_id, org_cd, row_no, land_cd, base_year, base_mon, jiga, pyo_yn)
-            VALUES (?,?,?,?,?,?,?,?)
-            """, batch);
-
-        int n = batch.size();
-        boolean promotable = warnings.isEmpty();
-        if (promotable) {
-            markSuccess(tx, itemId, n);
-        } else {
-            log.warn("[KrasTxtIngest] land_price_file 경고 {}건으로 SUCCESS 보류 (item_id={})", warnings.size(), itemId);
-        }
-        return new IngestResult(runId, itemId, n, promotable, warnings);
     }
 
     // ── 공통 ──────────────────────────────────────────────────────────

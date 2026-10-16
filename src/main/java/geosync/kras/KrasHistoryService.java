@@ -21,7 +21,7 @@ public class KrasHistoryService {
     private final Map<String, List<KrasStagePromotionService.StagePromotionSpec>> promotionSpecsByDataset = new LinkedHashMap<>();
     private final ObjectMapper json = new ObjectMapper();
     private static final Set<String> FILE_DATASETS = Set.of(
-            "cadastral_file", "layer_list", "usezone_file", "land_basic_file", "land_price_file");
+            "cadastral_file", "layer_list", "usezone_file", "land_basic_file");
 
     public KrasHistoryService(List<KrasXmlServiceMapper> mappers, List<KrasDateRangeServiceMapper> rangeMappers) {
         for (KrasXmlServiceMapper mapper : mappers) {

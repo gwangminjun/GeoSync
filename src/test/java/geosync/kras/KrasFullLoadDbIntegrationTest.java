@@ -10,7 +10,6 @@ import org.junit.jupiter.api.io.TempDir;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -24,13 +23,12 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 /**
- * 차세대 전체 적재(연속지적·용도지역·공시지가)를 실제 kras 스키마(트리거·발행 함수·public 승격 함수)에 대고 끝까지 돌린다.
+ * 차세대 전체 적재(연속지적·용도지역)를 실제 kras 스키마(트리거·발행 함수·public 승격 함수)에 대고 끝까지 돌린다.
  * KRAS API·SHP 파싱만 mock이다. 테스트 전용 DB에서만(GEOSYNC_IT_DB_* 없으면 건너뜀).
  * DB 준비: kras-schema-create.sql + kras-schema-public-sync.sql + public.lp_pa_cbnd/lt_c_uzone 테이블.
  */
 class KrasFullLoadDbIntegrationTest {
 
-    private static final char VT = 11;
     private static final String WKT = "MULTIPOLYGON(((155000 315000,155500 315000,155500 315500,155000 315500,155000 315000)))";
 
     @TempDir Path workDir;
@@ -49,7 +47,7 @@ class KrasFullLoadDbIntegrationTest {
         jdbc = new JdbcTemplate(new DriverManagerDataSource(url,
                 System.getenv("GEOSYNC_IT_DB_USER"), System.getenv("GEOSYNC_IT_DB_PASSWORD")));
         jdbc.update("UPDATE kras.sync_dataset SET contract_status='VERIFIED', enabled=true WHERE dataset_code IN "
-                + "('cadastral_file','layer_list','usezone_file','land_price_file')");
+                + "('cadastral_file','layer_list','usezone_file')");
 
         when(settings.krasConfig()).thenReturn("conf/kras/base-tables.xml");
         when(settings.krasWorkDir()).thenReturn(workDir.toString());
@@ -124,18 +122,6 @@ class KrasFullLoadDbIntegrationTest {
         assertThat(jdbc.queryForObject("SELECT count(*) FROM public.lt_c_uzone WHERE org_cd=?", Long.class, org))
                 .isZero();
         assertThat(opStatuses("usezone_file")).doesNotContain("PUBLISH:SUCCESS", "PUBLIC:SUCCESS");
-    }
-
-    @Test
-    void landPriceFullLoadStoresRawRows() throws Exception {
-        String line = String.join(String.valueOf(VT), org + "25021100010000", "2026", "1500000", "01", "Y");
-        when(api.downloadJigaTxt()).thenReturn((line + "\n").getBytes(StandardCharsets.US_ASCII));
-
-        List<String> out = fullLoad.runLandPrice(jdbc, org, "NOW", "MANUAL");
-
-        assertThat(out).singleElement().asString().contains("공시지가 TXT 수집 성공: 1건");
-        assertThat(jdbc.queryForObject("SELECT count(*) FROM kras.land_price_file_row WHERE org_cd=?", Long.class, org))
-                .isEqualTo(1);
     }
 
     private Map<String, Object> usezoneRow(String theme) {

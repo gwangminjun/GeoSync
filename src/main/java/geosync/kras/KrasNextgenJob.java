@@ -19,8 +19,6 @@ public enum KrasNextgenJob {
             "kras → public.lp_pa_cbnd", true),
     USEZONE("usezone", "용도지역 SHP", "usezone_file", List.of("layer_list", "usezone_file"),
             "kras → 발행 → public.lt_c_uzone", true),
-    LAND_PRICE("land-price", "공시지가 TXT", "land_price_file", List.of("land_price_file"),
-            "kras.land_price_file_row", false),
     PNU_FULL("pnu-full", "PNU 서비스 전체 대기열 등록", null, List.of(),
             "필지 × 켜진 서비스 → kras.pnu_work", false),
     LAND_CHANGE("land-change", "토지이동내역", "land_change", List.of("land_change"),

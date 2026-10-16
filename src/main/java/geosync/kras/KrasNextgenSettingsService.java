@@ -44,7 +44,7 @@ public class KrasNextgenSettingsService {
                       int circuitBreak, int refreshDays, int rotateLimit, String priceRefreshAfter,
                       List<String> noDataCodes) {
         public static Pnu defaults() {
-            return new Pnu(List.of(), 8, 0, 0, "07:00", 20, 90, 40000, "06-01", List.of());
+            return new Pnu(List.of(), 8, 0, 0, "07:00", 20, 30, 200000, "06-01", List.of());
         }
 
         /** 실제로 켜진 데이터셋 — 비어 있으면 기본 목록(건물 호·전유부는 실응답 확인 전이라 제외). */

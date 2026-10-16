@@ -39,8 +39,6 @@ public class KrasStatsController {
         model.addAttribute("uzoneKrasCount", count(jdbc, "SELECT count(*) FROM kras.lt_c_uzone"));
         model.addAttribute("uzonePublicCount", count(jdbc, "SELECT count(*) FROM public.lt_c_uzone"));
         model.addAttribute("landBasicCount", count(jdbc, "SELECT count(*) FROM kras.land_basic"));
-        model.addAttribute("landPriceFileRowCount",
-                count(jdbc, "SELECT count(*) FROM kras.land_price_file_row WHERE org_cd=?", settings.orgCode()));
         return "kras-stats";
     }
 

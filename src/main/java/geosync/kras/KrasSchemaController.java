@@ -153,8 +153,7 @@ public class KrasSchemaController {
         new FixedDataset("cadastral-file", "cadastral_file", "연속지적 (SHP)", "공간(SHP)"),
         new FixedDataset("layer-list", "layer_list", "용도지역 레이어 목록", "공간(SHP)"),
         new FixedDataset("usezone-file", "usezone_file", "용도지역 (SHP)", "공간(SHP)"),
-        new FixedDataset("land-basic-file", "land_basic_file", "토지기본정보 전체 TXT", "전체TXT"),
-        new FixedDataset("land-price-file", "land_price_file", "공시지가 전체 TXT", "전체TXT")
+        new FixedDataset("land-basic-file", "land_basic_file", "토지기본정보 전체 TXT", "전체TXT")
     );
 
     /**
@@ -259,7 +258,7 @@ public class KrasSchemaController {
     static List<String> historyDatasetCodes() {
         return Stream.concat(
                 SPEC_ITEMS.stream().map(SpecItem::datasetCode).filter(java.util.Objects::nonNull),
-                Stream.of("cadastral_file", "layer_list", "usezone_file", "land_basic_file", "land_price_file"))
+                Stream.of("cadastral_file", "layer_list", "usezone_file", "land_basic_file"))
                 .distinct().sorted().toList();
     }
 
@@ -344,7 +343,7 @@ public class KrasSchemaController {
 
     /** verify/revert-dataset이 건드릴 수 있는 dataset_code 화이트리스트 — 임의 문자열로 다른 데이터셋을 켜지 못하게 막는다. */
     private static final Set<String> VERIFIABLE_DATASETS = Stream.of(
-            Stream.of("cadastral_file", "layer_list", "usezone_file", "land_basic_file", "land_price_file"),
+            Stream.of("cadastral_file", "layer_list", "usezone_file", "land_basic_file"),
             IMPLEMENTED_SERVICES.stream().map(ImplementedService::datasetCode),
             DATE_RANGE_SERVICES.stream().map(DateRangeService::datasetCode),
             SPEC_SERVICES.stream().map(SpecService::datasetCode)
@@ -384,8 +383,6 @@ public class KrasSchemaController {
     /** 전체 TXT 2종 — 파일 하나를 통째로 받는 작업이라 데이터셋별로 실행 상태를 따로 잡는다. */
     private final AtomicBoolean landBasicFileRunning = new AtomicBoolean(false);
     private volatile String lastLandBasicFileResult;
-    private final AtomicBoolean landPriceFileRunning = new AtomicBoolean(false);
-    private volatile String lastLandPriceFileResult;
 
     public KrasSchemaController(TargetDbService targetDbService, RuntimeSettingsService settings,
                                  KrasApiClient krasApiClient, KrasCadastralIngestService cadastralIngestService,
@@ -548,19 +545,13 @@ public class KrasSchemaController {
         }
 
 
-        // 전체 TXT 2종
-        Map<String, Map<String, Object>> txtStatus = batchDatasetStatus(jdbc,
-                List.of("land_basic_file", "land_price_file"));
+        // 전체 TXT
+        Map<String, Map<String, Object>> txtStatus = batchDatasetStatus(jdbc, List.of("land_basic_file"));
         Map<String, Object> basicSt = txtStatus.get("land_basic_file");
         model.addAttribute("landBasicFileStatus", basicSt != null ? basicSt.get("contract_status") : "UNVERIFIED");
         model.addAttribute("landBasicFileEnabled", basicSt != null && Boolean.TRUE.equals(basicSt.get("enabled")));
         model.addAttribute("landBasicFileRunning", landBasicFileRunning.get());
         model.addAttribute("lastLandBasicFileResult", lastLandBasicFileResult);
-        Map<String, Object> priceSt = txtStatus.get("land_price_file");
-        model.addAttribute("landPriceFileStatus", priceSt != null ? priceSt.get("contract_status") : "UNVERIFIED");
-        model.addAttribute("landPriceFileEnabled", priceSt != null && Boolean.TRUE.equals(priceSt.get("enabled")));
-        model.addAttribute("landPriceFileRunning", landPriceFileRunning.get());
-        model.addAttribute("lastLandPriceFileResult", lastLandPriceFileResult);
 
 
         return "kras-db";
@@ -946,39 +937,6 @@ public class KrasSchemaController {
     }
 
     /**
-     * 공시지가 전체 TXT(KRAS000039) 수집 — kras.land_price_file_row 직행이라 승격 단계가 없다.
-     * 기관 전체 파일이라 오래 걸릴 수 있어 비동기로 돌린다(설계 §2차-1).
-     */
-    @PostMapping("/kras-db/ingest/land-price-file")
-    @ResponseBody
-    public Map<String, Object> ingestLandPriceFile() {
-        if (!landPriceFileRunning.compareAndSet(false, true)) {
-            return Map.of("error", "이미 실행 중입니다.");
-        }
-        Map<String, Object> response = executeOperationAsync("land_price_file", "INGEST", null, "", (targetJdbc, orgCd) -> {
-            try {
-                KrasTxtIngestService.IngestResult result =
-                        txtIngestService.ingestLandPrice(targetJdbc, orgCd, "UI");
-                String msg = result.promotable()
-                        ? "수집 성공: item_id=%d, %d건".formatted(result.itemId(), result.rowCount())
-                        : "수집됨(item_id=%d, %d건), 단 파싱 경고로 SUCCESS 보류: %s"
-                                .formatted(result.itemId(), result.rowCount(), result.warnings());
-                lastLandPriceFileResult = msg;
-                return Map.of("success", true, "itemId", result.itemId(), "rowCount", result.rowCount(),
-                        "promotable", result.promotable(), "warnings", result.warnings(), "message", msg);
-            } catch (Exception e) {
-                log.error("[KrasSchema] 공시지가 TXT 수집 실패: {}", e.getMessage(), e);
-                lastLandPriceFileResult = "수집 실패: " + e.getMessage();
-                return Map.of("success", false, "message", lastLandPriceFileResult);
-            } finally {
-                landPriceFileRunning.set(false);
-            }
-        });
-        if (!"RUNNING".equals(response.get("status"))) landPriceFileRunning.set(false);
-        return response;
-    }
-
-    /**
      * PNU 단건 매퍼 공용 테스트 수집(설계 절차 1~8). slug(land-info 등)는 IMPLEMENTED_SERVICES에
      * 등록된 것만 허용 — datasetCode는 이 slug로부터 서버에서 조회하고, 클라이언트가 임의 dataset_code로
      * 다른 매퍼를 부르지 못하게 한다. extraParamsJson은 PNU만으로 안 되는 드릴다운 서비스(collective_unit
@@ -1290,13 +1248,12 @@ public class KrasSchemaController {
                     statusByCode, evidenceByCode, runningByDatasetCode.get(svc.datasetCode()).get()));
         }
         boolean fixedRunning = cadastralRunning.get() || usezoneRunning.get()
-                || landBasicFileRunning.get() || landPriceFileRunning.get();
+                || landBasicFileRunning.get();
         for (FixedDataset ds : FIXED_DATASETS) {
             boolean running = switch (ds.datasetCode()) {
                 case "cadastral_file" -> cadastralRunning.get();
                 case "layer_list", "usezone_file" -> usezoneRunning.get();
                 case "land_basic_file" -> landBasicFileRunning.get();
-                case "land_price_file" -> landPriceFileRunning.get();
                 default -> fixedRunning;
             };
             index.add(datasetIndexRow(ds.slug(), ds.datasetCode(), ds.label(), ds.group(),
